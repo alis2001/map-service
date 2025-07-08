@@ -1,10 +1,10 @@
-// components/FullPageMap.js
+// components/FullPageMap.js - FIXED VERSION
 // Location: /map-service/frontend/src/components/FullPageMap.js
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import CafePopup from './CafePopup';
 import MapControls from './MapControls';
-import { MapLoadingOverlay } from './MapLoadingOverlay';
+import MapLoadingOverlay from './MapLoadingOverlay';
 
 const FullPageMap = ({
   center,
@@ -34,9 +34,12 @@ const FullPageMap = ({
   const radiusCircleRef = useRef(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState(null);
+  const [mapInitialized, setMapInitialized] = useState(false);
 
-  // Initialize Google Map
+  // Initialize Google Map ONLY ONCE
   useEffect(() => {
+    if (mapInitialized || !mapRef.current) return;
+
     const initMap = () => {
       if (!window.google || !window.google.maps) {
         console.error('Google Maps API not loaded');
@@ -44,13 +47,8 @@ const FullPageMap = ({
         return;
       }
 
-      if (!mapRef.current) {
-        console.error('Map container ref not available');
-        return;
-      }
-
       try {
-        console.log('🗺️ Initializing Google Map...');
+        console.log('🗺️ Initializing Google Map ONCE...');
 
         const mapOptions = {
           center: { lat: center.lat, lng: center.lng },
@@ -81,16 +79,6 @@ const FullPageMap = ({
               stylers: [{ visibility: 'off' }]
             }
           ],
-          
-          // Restrictions for better UX
-          restriction: {
-            latLngBounds: {
-              north: 85,
-              south: -85,
-              west: -180,
-              east: 180
-            }
-          },
           
           // Gestures
           gestureHandling: 'greedy',
@@ -124,6 +112,7 @@ const FullPageMap = ({
           setMapError(null);
         });
 
+        setMapInitialized(true);
         console.log('✅ Google Map initialized');
 
       } catch (error) {
@@ -146,11 +135,11 @@ const FullPageMap = ({
       };
       checkGoogleMaps();
     }
-  }, [center.lat, center.lng, zoom, isEmbedMode, onCenterChange, onClosePopup, selectedCafe]);
+  }, []); // Empty dependency array - only run once!
 
-  // Update map center and zoom
+  // Update map center and zoom when props change
   useEffect(() => {
-    if (googleMapRef.current && mapLoaded) {
+    if (googleMapRef.current && mapLoaded && mapInitialized) {
       const currentCenter = googleMapRef.current.getCenter();
       const currentZoom = googleMapRef.current.getZoom();
       
@@ -158,16 +147,16 @@ const FullPageMap = ({
       
       // Only update if significantly different to avoid infinite loops
       if (!currentCenter || 
-          Math.abs(currentCenter.lat() - newCenter.lat) > 0.0001 || 
-          Math.abs(currentCenter.lng() - newCenter.lng) > 0.0001) {
-        googleMapRef.current.panTo(newCenter);
+          Math.abs(currentCenter.lat() - newCenter.lat) > 0.001 || 
+          Math.abs(currentCenter.lng() - newCenter.lng) > 0.001) {
+        googleMapRef.current.setCenter(newCenter);
       }
       
-      if (currentZoom !== zoom) {
+      if (Math.abs(currentZoom - zoom) > 0.5) {
         googleMapRef.current.setZoom(zoom);
       }
     }
-  }, [center.lat, center.lng, zoom, mapLoaded]);
+  }, [center.lat, center.lng, zoom, mapLoaded, mapInitialized]);
 
   // Update user location marker
   useEffect(() => {
@@ -200,7 +189,6 @@ const FullPageMap = ({
     });
 
     userMarkerRef.current = userMarker;
-
     console.log('📍 User location marker updated');
   }, [userLocation, mapLoaded]);
 
@@ -230,7 +218,6 @@ const FullPageMap = ({
     });
 
     radiusCircleRef.current = circle;
-
     console.log('🔍 Search radius circle updated:', searchRadius);
   }, [userLocation, searchRadius, mapLoaded]);
 
@@ -271,8 +258,6 @@ const FullPageMap = ({
           scaledSize: new window.google.maps.Size(32, 40),
           anchor: new window.google.maps.Point(16, 40)
         },
-        animation: cafe.distance && cafe.distance < 500 ? 
-          window.google.maps.Animation.BOUNCE : null,
         zIndex: cafe.distance ? Math.round(1000 - cafe.distance / 10) : 500
       });
 
@@ -318,8 +303,9 @@ const FullPageMap = ({
   const handleRetryMap = useCallback(() => {
     setMapError(null);
     setMapLoaded(false);
+    setMapInitialized(false);
     
-    // Reload the page to reinitialize Google Maps
+    // Force reload by refreshing the page
     window.location.reload();
   }, []);
 

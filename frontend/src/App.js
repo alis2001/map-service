@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from 'react-query';
 import FullPageMap from './components/FullPageMap';
 import LoadingScreen from './components/LoadingScreen';
-import ErrorBoundary from './components/ErrorBoundary';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { useGeolocation } from './hooks/useGeolocation';
 import { useCafes } from './hooks/useCafes';
 import './styles/App.css';
