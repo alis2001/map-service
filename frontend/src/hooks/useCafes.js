@@ -1,21 +1,18 @@
-// hooks/useCafes.js - OPTIMIZED VERSION for Italian Venues
-// Location: /map-service/frontend/src/hooks/useCafes.js
+// hooks/useCafes.js - COMPLETE UPDATED VERSION - Removed Pubs Support
+// Location: /frontend/src/hooks/useCafes.js
 
 import { useQuery } from 'react-query';
 import { useRef, useCallback } from 'react';
 import { placesAPI, apiUtils } from '../services/apiService';
 
-// OPTIMIZED: Smart hook with reduced API calls and better Italian venue support
+// UPDATED: Smart hook with reduced API calls and better Italian venue support (no pubs)
 export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
-  // Refs for tracking
   const lastSearchParamsRef = useRef(null);
   const isSearchingRef = useRef(false);
 
-  // FIXED: Create stable search key with intelligent rounding
   const createSearchKey = useCallback((lat, lng, rad, typ) => {
     if (!lat || !lng) return null;
     
-    // Round coordinates to 2 decimal places (~1km accuracy) for better caching
     const roundedLat = Math.round(lat * 100) / 100;
     const roundedLng = Math.round(lng * 100) / 100;
     
@@ -24,7 +21,6 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
 
   const searchKey = createSearchKey(latitude, longitude, radius, type);
 
-  // OPTIMIZED: Query with smart caching and error handling
   const {
     data,
     isLoading: loading,
@@ -39,7 +35,6 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
         return { places: [], count: 0 };
       }
 
-      // Prevent duplicate simultaneous requests
       if (isSearchingRef.current) {
         console.log('🔄 Search already in progress, skipping duplicate request');
         return lastSearchParamsRef.current?.data || { places: [], count: 0 };
@@ -59,7 +54,7 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
         const result = await placesAPI.getNearbyPlaces(latitude, longitude, {
           radius,
           type,
-          limit: 25 // Get more venues for better coverage
+          limit: 25
         });
 
         console.log('✅ Italian venues fetched successfully:', {
@@ -67,11 +62,9 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
           places: result.places?.length || 0
         });
 
-        // ENHANCED: Process and enhance Italian venue data
         const enhancedPlaces = result.places.map(place => {
           const formatted = apiUtils.formatPlace(place);
           
-          // Calculate distance if user location is available
           if (latitude && longitude && formatted.location) {
             const distance = apiUtils.calculateDistance(
               latitude,
@@ -83,37 +76,32 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
             formatted.formattedDistance = apiUtils.formatDistance(distance);
           }
 
-          // ENHANCED: Add Italian venue specific properties
+          // UPDATED: Italian venue specific properties (no pub)
           formatted.emoji = getItalianVenueEmoji(formatted.type, formatted.name);
           formatted.displayType = getItalianVenueDisplayType(formatted.type);
           formatted.isVeryClose = formatted.distance && formatted.distance < 200;
           formatted.walkingTime = getWalkingTime(formatted.distance);
           
-          // Add rating stars for Italian display
           if (formatted.rating) {
             formatted.ratingStars = '★'.repeat(Math.floor(formatted.rating)) + 
                                    '☆'.repeat(5 - Math.floor(formatted.rating));
             formatted.ratingText = `${formatted.rating}/5`;
           }
 
-          // ENHANCED: Add Italian-specific attributes
           formatted.features = detectItalianFeatures(formatted.name, formatted.type);
 
           return formatted;
         });
 
-        // IMPROVED: Smart sorting for Italian context
+        // UPDATED: Smart sorting for Italian context (no pub priority)
         enhancedPlaces.sort((a, b) => {
-          // Very close places (< 200m) sorted by rating first
           if (a.isVeryClose && b.isVeryClose) {
             return (b.rating || 0) - (a.rating || 0);
           }
           
-          // Close places (< 500m) get priority
           if (a.distance < 500 && b.distance >= 500) return -1;
           if (b.distance < 500 && a.distance >= 500) return 1;
           
-          // Otherwise sort by distance
           return (a.distance || Infinity) - (b.distance || Infinity);
         });
 
@@ -128,7 +116,6 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
           }
         };
 
-        // Cache the search params and result
         lastSearchParamsRef.current = {
           params: { latitude, longitude, radius, type },
           data: enhancedResult,
@@ -146,12 +133,11 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
     },
     {
       enabled: !!(latitude && longitude && searchKey),
-      staleTime: 5 * 60 * 1000, // 5 minutes for Italian venues
-      cacheTime: 15 * 60 * 1000, // 15 minutes cache
+      staleTime: 5 * 60 * 1000,
+      cacheTime: 15 * 60 * 1000,
       refetchOnWindowFocus: false,
       refetchOnMount: false,
       retry: (failureCount, error) => {
-        // Don't retry on rate limiting or client errors
         if (error?.response?.status === 429) {
           console.log('🛑 Rate limited, not retrying');
           return false;
@@ -176,39 +162,35 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
     }
   );
 
-  // ENHANCED: Italian venue emoji mapping
+  // UPDATED: Italian venue emoji mapping (removed pub emoji)
   const getItalianVenueEmoji = (type, name) => {
     const nameLower = (name || '').toLowerCase();
     
-    // Specific Italian venue detection
     if (nameLower.includes('gelateria') || nameLower.includes('gelato')) return '🍦';
     if (nameLower.includes('pizzeria') || nameLower.includes('pizza')) return '🍕';
     if (nameLower.includes('pasticceria') || nameLower.includes('dolc')) return '🧁';
     if (nameLower.includes('panetteria') || nameLower.includes('pane')) return '🥖';
-    if (nameLower.includes('birreria') || nameLower.includes('pub')) return '🍺';
-    if (nameLower.includes('vineria') || nameLower.includes('enoteca')) return '🍷';
     if (nameLower.includes('caffè') || nameLower.includes('caffe')) return '☕';
     
-    // Default by type
+    // REMOVED: pub-specific emojis
+    
     switch (type) {
-      case 'pub': return '🍺';
       case 'restaurant': return '🍽️';
       case 'cafe':
       default: return '☕';
     }
   };
 
-  // ENHANCED: Italian venue display types
+  // UPDATED: Italian venue display types (removed pub)
   const getItalianVenueDisplayType = (type) => {
     switch (type) {
       case 'cafe': return 'Bar/Caffetteria';
-      case 'pub': return 'Pub/Locale Notturno';
       case 'restaurant': return 'Ristorante';
       default: return 'Locale';
     }
   };
 
-  // ENHANCED: Detect Italian venue features
+  // Detect Italian venue features
   const detectItalianFeatures = (name, type) => {
     const nameLower = (name || '').toLowerCase();
     const features = [];
@@ -223,11 +205,10 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
     return features;
   };
 
-  // ENHANCED: Calculate walking time for Italian context
+  // Calculate walking time
   const getWalkingTime = (distance) => {
     if (!distance) return null;
     
-    // Walking speed: 5 km/h average
     const walkingSpeedKmh = 5;
     const timeMinutes = Math.round((distance / 1000) * (60 / walkingSpeedKmh));
     
@@ -245,13 +226,13 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
   const userLocation = data?.userLocation || null;
   const searchStats = data?.searchStats || { veryClose: 0, walkable: 0, total: 0 };
 
-  // ENHANCED: Helper functions for Italian venues
+  // Helper functions for Italian venues
   const getVenuesByType = (venueType) => {
     return cafes.filter(place => place.type === venueType);
   };
 
   const getVenuesWithinWalkingDistance = (maxMinutes = 10) => {
-    const maxDistance = (maxMinutes / 60) * 5 * 1000; // 5 km/h walking speed
+    const maxDistance = (maxMinutes / 60) * 5 * 1000;
     return cafes.filter(place => place.distance && place.distance <= maxDistance);
   };
 
@@ -278,14 +259,14 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
     );
   };
 
-  // ENHANCED: Italian venue statistics
+  // UPDATED: Italian venue statistics (removed pub stats)
   const getItalianVenueStats = () => {
     const stats = {
       total: count,
       byType: {
         caffeterias: getVenuesByType('cafe').length,
-        pubs: getVenuesByType('pub').length,
         restaurants: getVenuesByType('restaurant').length
+        // REMOVED: pubs: getVenuesByType('pub').length
       },
       byDistance: {
         veryClose: searchStats.veryClose,
@@ -297,14 +278,12 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
       topRated: getTopRatedVenues(4.5, 5)
     };
 
-    // Calculate average rating
     const ratedVenues = cafes.filter(place => place.rating);
     if (ratedVenues.length > 0) {
       stats.avgRating = ratedVenues.reduce((sum, place) => sum + place.rating, 0) / ratedVenues.length;
       stats.avgRating = Math.round(stats.avgRating * 10) / 10;
     }
 
-    // Count features
     cafes.forEach(place => {
       if (place.features) {
         place.features.forEach(feature => {
@@ -339,12 +318,12 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
     isEmpty: !loading && count === 0,
     isRefreshing: isFetching && !loading,
     
-    // Italian venue specific helpers
+    // UPDATED: Italian venue specific helpers (removed pub helpers)
     getCaffeterias: () => getVenuesByType('cafe'),
-    getPubs: () => getVenuesByType('pub'),
     getRestaurants: () => getVenuesByType('restaurant'),
+    // REMOVED: getPubs: () => getVenuesByType('pub'),
     getVeryCloseVenues: () => cafes.filter(p => p.isVeryClose),
-    getWalkableVenues: () => getVenuesWithinWalkingDistance(15), // 15 minutes walking
+    getWalkableVenues: () => getVenuesWithinWalkingDistance(15),
     
     // Performance indicators
     performance: {
@@ -355,7 +334,7 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
   };
 };
 
-// ENHANCED: Hook for searching Italian venues by text
+// UPDATED: Hook for searching Italian venues by text (no pub support)
 export const usePlaceSearch = (query, userLocation = null) => {
   const {
     data,
@@ -378,7 +357,6 @@ export const usePlaceSearch = (query, userLocation = null) => {
           limit: 15
         });
 
-        // Process places for Italian context
         const enhancedPlaces = result.places.map(place => {
           const formatted = apiUtils.formatPlace(place);
           
@@ -404,16 +382,13 @@ export const usePlaceSearch = (query, userLocation = null) => {
           return formatted;
         });
 
-        // Sort by relevance for Italian venues
         enhancedPlaces.sort((a, b) => {
-          // Exact name matches first
           const aNameMatch = a.name.toLowerCase().includes(query.toLowerCase());
           const bNameMatch = b.name.toLowerCase().includes(query.toLowerCase());
           
           if (aNameMatch && !bNameMatch) return -1;
           if (!aNameMatch && bNameMatch) return 1;
           
-          // Then by distance
           return (a.distance || Infinity) - (b.distance || Infinity);
         });
 
@@ -428,8 +403,8 @@ export const usePlaceSearch = (query, userLocation = null) => {
     },
     {
       enabled: !!(query && query.trim().length >= 2),
-      staleTime: 3 * 60 * 1000, // 3 minutes for search results
-      cacheTime: 10 * 60 * 1000, // 10 minutes
+      staleTime: 3 * 60 * 1000,
+      cacheTime: 10 * 60 * 1000,
       refetchOnWindowFocus: false,
       retry: 1
     }
@@ -438,7 +413,6 @@ export const usePlaceSearch = (query, userLocation = null) => {
   const getItalianVenueDisplayType = (type) => {
     switch (type) {
       case 'cafe': return 'Bar/Caffetteria';
-      case 'pub': return 'Pub/Locale Notturno';
       case 'restaurant': return 'Ristorante';
       default: return 'Locale';
     }
@@ -455,7 +429,7 @@ export const usePlaceSearch = (query, userLocation = null) => {
   };
 };
 
-// ENHANCED: Hook for getting Italian venue details
+// UPDATED: Hook for getting Italian venue details (no pub support)
 export const usePlaceDetails = (placeId, userLocation = null) => {
   const {
     data: place,
@@ -477,7 +451,6 @@ export const usePlaceDetails = (placeId, userLocation = null) => {
 
       const formatted = apiUtils.formatPlace(result.place);
       
-      // Add distance and Italian enhancements
       if (userLocation && formatted.location) {
         const distance = apiUtils.calculateDistance(
           userLocation.latitude,
@@ -501,8 +474,8 @@ export const usePlaceDetails = (placeId, userLocation = null) => {
     },
     {
       enabled: !!placeId,
-      staleTime: 10 * 60 * 1000, // 10 minutes for detailed data
-      cacheTime: 30 * 60 * 1000, // 30 minutes
+      staleTime: 10 * 60 * 1000,
+      cacheTime: 30 * 60 * 1000,
       refetchOnWindowFocus: false,
       retry: 2
     }
@@ -511,8 +484,7 @@ export const usePlaceDetails = (placeId, userLocation = null) => {
   const getItalianVenueDisplayType = (type) => {
     switch (type) {
       case 'cafe': return 'Bar/Caffetteria';
-      case 'pub': return 'Pub/Locale Notturno'; 
-      case 'restaurant': return 'Ristorante';
+      case 'restaurant': return 'Ristorante'; 
       default: return 'Locale';
     }
   };

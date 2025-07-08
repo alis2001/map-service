@@ -1,5 +1,5 @@
-// components/MapControls.js - FIXED VERSION for Italian Caffeterias
-// Location: /map-service/frontend/src/components/MapControls.js
+// components/MapControls.js - COMPLETE UPDATED VERSION - Removed Pubs
+// Location: /frontend/src/components/MapControls.js
 
 import React, { useState } from 'react';
 
@@ -40,7 +40,7 @@ const MapControls = ({
     }
   };
 
-  // FIXED: Updated type options for Italian venues
+  // UPDATED: Type options - removed pub option
   const typeOptions = [
     { 
       value: 'cafe', 
@@ -49,17 +49,12 @@ const MapControls = ({
       description: 'Bar italiani, caffetterie e gelaterie'
     },
     { 
-      value: 'pub', 
-      label: '🍺 Pub/Birrerie', 
-      emoji: '🍺',
-      description: 'Pub, birrerie e locali notturni'
-    },
-    { 
       value: 'restaurant', 
       label: '🍽️ Ristoranti', 
       emoji: '🍽️',
       description: 'Ristoranti, pizzerie e trattorie'
     }
+    // REMOVED: pub option
   ];
 
   const radiusOptions = [
@@ -189,7 +184,7 @@ const MapControls = ({
           </button>
         </div>
 
-        {/* Quick Filters for Italian Venues */}
+        {/* UPDATED: Quick Filters - removed pub filter */}
         <div className="quick-filters">
           <div className="filter-label">Filtri rapidi:</div>
           <div className="filter-buttons">
@@ -207,17 +202,18 @@ const MapControls = ({
             >
               ☕ Caffè
             </button>
+            {/* REMOVED: Pub filter button */}
             <button 
-              className={`filter-button ${cafeType === 'pub' ? 'active' : ''}`}
-              onClick={() => handleTypeChange('pub')}
-              title="Pub e locali notturni"
+              className={`filter-button ${cafeType === 'restaurant' ? 'active' : ''}`}
+              onClick={() => handleTypeChange('restaurant')}
+              title="Ristoranti e pizzerie"
             >
-              🍺 Pub
+              🍽️ Ristoranti
             </button>
           </div>
         </div>
 
-        {/* Italian Venue Info */}
+        {/* UPDATED: Italian Venue Info - removed pub info */}
         <div className="venue-info">
           <div className="info-card">
             <div className="info-icon">ℹ️</div>
@@ -225,8 +221,8 @@ const MapControls = ({
               <div className="info-title">Locali italiani</div>
               <div className="info-text">
                 {cafeType === 'cafe' && 'I bar italiani servono caffè, aperitivi e spuntini tutto il giorno.'}
-                {cafeType === 'pub' && 'Pub e locali notturni per la vita serale e cocktail.'}
                 {cafeType === 'restaurant' && 'Ristoranti, pizzerie e osterie per pranzo e cena.'}
+                {/* REMOVED: pub info */}
               </div>
             </div>
           </div>

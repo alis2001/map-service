@@ -1,4 +1,4 @@
-// utils/validators.js
+// utils/validators.js - COMPLETE UPDATED VERSION - Removed Pub Support
 // Location: /backend/utils/validators.js
 
 const logger = require('./logger');
@@ -106,9 +106,9 @@ const isValidPriceLevel = (priceLevel) => {
          priceLevel <= BUSINESS_LIMITS.priceLevel.max;
 };
 
-// Business logic validation
+// UPDATED: Business logic validation (removed pub support)
 const isValidPlaceType = (type) => {
-  const validTypes = ['cafe', 'bar', 'restaurant'];
+  const validTypes = ['cafe', 'restaurant']; // REMOVED 'pub'
   return isString(type) && validTypes.includes(type.toLowerCase());
 };
 
@@ -221,6 +221,7 @@ const validateUserData = (userData) => {
   };
 };
 
+// UPDATED: Search params validation (removed pub support)
 const validateSearchParams = (searchParams) => {
   const errors = [];
   
@@ -245,8 +246,9 @@ const validateSearchParams = (searchParams) => {
     errors.push(`Invalid radius: must be between ${BUSINESS_LIMITS.searchRadius.min} and ${BUSINESS_LIMITS.searchRadius.max} meters`);
   }
   
+  // UPDATED: Place type validation (removed pub)
   if (type !== undefined && !isValidPlaceType(type)) {
-    errors.push('Invalid place type: must be cafe, bar, or restaurant');
+    errors.push('Invalid place type: must be cafe or restaurant'); // REMOVED 'or pub'
   }
   
   if (limit !== undefined && (!isNumber(limit) || !Number.isInteger(limit) || limit < 1 || limit > 50)) {
@@ -352,7 +354,7 @@ module.exports = {
   isValidRating,
   isValidPriceLevel,
   
-  // Business validators
+  // Business validators (UPDATED: removed pub support)
   isValidPlaceType,
   isValidSortOrder,
   isValidSortField,
