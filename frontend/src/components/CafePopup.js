@@ -1,4 +1,4 @@
-// components/CafePopup.js
+// components/CafePopup.js - UPDATED VERSION - No Pub Support
 // Location: /map-service/frontend/src/components/CafePopup.js
 
 import React, { useState, useEffect } from 'react';
@@ -83,6 +83,36 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
     }
   };
 
+  // UPDATED: Italian venue type display (no pub support)
+  const getItalianVenueTypeDisplay = (type) => {
+    switch (type) {
+      case 'cafe': return 'Caffetteria/Bar';
+      case 'restaurant': return 'Ristorante';
+      default: return 'Locale';
+    }
+  };
+
+  // UPDATED: Italian venue emoji mapping (no pub emojis)
+  const getItalianVenueEmoji = (venue) => {
+    const nameLower = (venue.name || '').toLowerCase();
+    
+    // Specific Italian venue types
+    if (nameLower.includes('gelateria') || nameLower.includes('gelato')) return '🍦';
+    if (nameLower.includes('pizzeria') || nameLower.includes('pizza')) return '🍕';
+    if (nameLower.includes('pasticceria') || nameLower.includes('dolc')) return '🧁';
+    if (nameLower.includes('panetteria') || nameLower.includes('pane')) return '🥖';
+    if (nameLower.includes('caffè') || nameLower.includes('caffe')) return '☕';
+    
+    // REMOVED: All pub-related emoji logic
+    
+    // Default based on type
+    switch (venue.type || venue.placeType) {
+      case 'restaurant': return '🍽️';
+      case 'cafe':
+      default: return '☕';
+    }
+  };
+
   const handleDirections = () => {
     const destination = `${placeData.location.latitude},${placeData.location.longitude}`;
     const url = `https://www.google.com/maps/dir/?api=1&destination=${destination}`;
@@ -111,11 +141,13 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
         {/* Header */}
         <div className="popup-header">
           <div className="header-content">
-            <div className="cafe-emoji">{placeData.emoji || '☕'}</div>
+            <div className="cafe-emoji">{getItalianVenueEmoji(placeData)}</div>
             <div className="header-text">
               <h2 className="cafe-name">{placeData.name}</h2>
               <div className="cafe-meta">
-                <span className="cafe-type">{placeData.type === 'cafe' ? 'Caffetteria' : placeData.type === 'bar' ? 'Bar' : 'Ristorante'}</span>
+                <span className="cafe-type">
+                  {getItalianVenueTypeDisplay(placeData.type || placeData.placeType)}
+                </span>
                 {placeData.distance && (
                   <>
                     <span className="meta-separator">•</span>
@@ -224,6 +256,19 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
                   </div>
                 </div>
               )}
+
+              {/* UPDATED: Italian venue type information */}
+              <div className="info-item">
+                <div className="info-icon">
+                  {getItalianVenueEmoji(placeData)}
+                </div>
+                <div className="info-text">
+                  <div className="info-label">Tipo di locale</div>
+                  <div className="info-value">
+                    {getItalianVenueTypeDisplay(placeData.type || placeData.placeType)}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -315,6 +360,26 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
               🌐 Sito
             </button>
           )}
+        </div>
+
+        {/* UPDATED: Italian venue tips (no pub information) */}
+        <div className="venue-tips" style={{
+          background: 'rgba(79, 70, 229, 0.05)',
+          margin: '0 20px 20px 20px',
+          padding: '12px',
+          borderRadius: '12px',
+          fontSize: '12px',
+          color: '#6B7280'
+        }}>
+          <div style={{ fontWeight: '600', marginBottom: '4px', color: '#4F46E5' }}>
+            💡 Consiglio locale
+          </div>
+          {(placeData.type || placeData.placeType) === 'cafe' && 
+            'I bar italiani servono caffè eccellente e aperitivi dalle 18:00.'
+          }
+          {(placeData.type || placeData.placeType) === 'restaurant' && 
+            'I ristoranti italiani spesso aprono alle 19:30 per cena.'
+          }
         </div>
       </div>
     </div>

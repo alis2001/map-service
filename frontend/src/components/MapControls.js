@@ -1,4 +1,4 @@
-// components/MapControls.js - COMPLETE UPDATED VERSION - Removed Pubs
+// components/MapControls.js - UPDATED VERSION - With Data Attributes for Styling
 // Location: /frontend/src/components/MapControls.js
 
 import React, { useState } from 'react';
@@ -40,7 +40,7 @@ const MapControls = ({
     }
   };
 
-  // UPDATED: Type options - removed pub option
+  // Italian venue type options (no pub support)
   const typeOptions = [
     { 
       value: 'cafe', 
@@ -54,7 +54,6 @@ const MapControls = ({
       emoji: '🍽️',
       description: 'Ristoranti, pizzerie e trattorie'
     }
-    // REMOVED: pub option
   ];
 
   const radiusOptions = [
@@ -103,12 +102,13 @@ const MapControls = ({
 
         {/* Type Selector */}
         <div className="control-group">
-          <label className="control-label">Tipo di locale</label>
+          <label className="control-label">Tipo di locale italiano</label>
           <div className="type-buttons">
             {typeOptions.map(option => (
               <button
                 key={option.value}
                 className={`type-button ${cafeType === option.value ? 'active' : ''}`}
+                data-type={option.value}
                 onClick={() => handleTypeChange(option.value)}
                 title={option.description}
               >
@@ -123,7 +123,7 @@ const MapControls = ({
           
           {/* Type Description */}
           <div className="type-description">
-            {typeOptions.find(t => t.value === cafeType)?.description || 'Seleziona un tipo di locale'}
+            {typeOptions.find(t => t.value === cafeType)?.description || 'Seleziona un tipo di locale italiano'}
           </div>
         </div>
 
@@ -177,16 +177,16 @@ const MapControls = ({
           <button
             className="action-button refresh-button"
             onClick={handleRefresh}
-            title="Aggiorna dati"
+            title="Aggiorna locali italiani"
           >
             <span className="button-icon">🔄</span>
             <span className="button-text">Aggiorna</span>
           </button>
         </div>
 
-        {/* UPDATED: Quick Filters - removed pub filter */}
+        {/* Italian Quick Filters */}
         <div className="quick-filters">
-          <div className="filter-label">Filtri rapidi:</div>
+          <div className="filter-label">Filtri rapidi italiani:</div>
           <div className="filter-buttons">
             <button 
               className={`filter-button ${searchRadius === 500 ? 'active' : ''}`}
@@ -202,7 +202,6 @@ const MapControls = ({
             >
               ☕ Caffè
             </button>
-            {/* REMOVED: Pub filter button */}
             <button 
               className={`filter-button ${cafeType === 'restaurant' ? 'active' : ''}`}
               onClick={() => handleTypeChange('restaurant')}
@@ -213,127 +212,29 @@ const MapControls = ({
           </div>
         </div>
 
-        {/* UPDATED: Italian Venue Info - removed pub info */}
+        {/* Italian Venue Info */}
         <div className="venue-info">
           <div className="info-card">
-            <div className="info-icon">ℹ️</div>
+            <div className="info-icon">🇮🇹</div>
             <div className="info-content">
-              <div className="info-title">Locali italiani</div>
+              <div className="info-title">Locali italiani autentici</div>
               <div className="info-text">
-                {cafeType === 'cafe' && 'I bar italiani servono caffè, aperitivi e spuntini tutto il giorno.'}
-                {cafeType === 'restaurant' && 'Ristoranti, pizzerie e osterie per pranzo e cena.'}
-                {/* REMOVED: pub info */}
+                {cafeType === 'cafe' && 'I bar italiani servono caffè eccellente, aperitivi e spuntini tutto il giorno. Perfetti per colazione o pausa caffè.'}
+                {cafeType === 'restaurant' && 'Ristoranti autentici, pizzerie e osterie per pranzo e cena. Scopri la vera cucina italiana.'}
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Status Indicator */}
+      {/* Italian Status Indicator */}
       <div className="status-indicator">
         <div className={`status-dot ${hasUserLocation ? 'connected' : 'disconnected'}`} />
         <span className="status-text">
           {hasUserLocation ? 'GPS attivo' : 'GPS non disponibile'}
         </span>
+        <span className="venue-context"> • Locali italiani</span>
       </div>
-
-      {/* Additional Styles */}
-      <style jsx>{`
-        .type-indicator {
-          position: absolute;
-          top: 4px;
-          right: 4px;
-          font-size: 8px;
-          color: white;
-        }
-
-        .type-description {
-          font-size: 12px;
-          color: #6B7280;
-          margin-top: 8px;
-          padding: 8px;
-          background: rgba(79, 70, 229, 0.05);
-          border-radius: 8px;
-          font-style: italic;
-        }
-
-        .location-status {
-          font-size: 12px;
-          color: #10B981;
-          font-weight: bold;
-        }
-
-        .filter-button.active {
-          background: var(--gradient-primary);
-          color: white;
-          border-color: transparent;
-          transform: translateY(-1px);
-          box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
-        }
-
-        .venue-info {
-          border-top: 1px solid rgba(0, 0, 0, 0.1);
-          padding-top: 12px;
-          margin-top: 12px;
-        }
-
-        .info-card {
-          display: flex;
-          gap: 8px;
-          background: rgba(79, 70, 229, 0.05);
-          padding: 12px;
-          border-radius: 12px;
-          border: 1px solid rgba(79, 70, 229, 0.1);
-        }
-
-        .info-icon {
-          font-size: 16px;
-          flex-shrink: 0;
-        }
-
-        .info-content {
-          flex: 1;
-        }
-
-        .info-title {
-          font-size: 12px;
-          font-weight: 600;
-          color: #4F46E5;
-          margin-bottom: 4px;
-        }
-
-        .info-text {
-          font-size: 11px;
-          color: #6B7280;
-          line-height: 1.4;
-        }
-
-        .stats-item:last-child {
-          margin-left: auto;
-        }
-
-        .controls-panel {
-          max-width: 320px;
-          min-width: 280px;
-        }
-
-        @media (max-width: 768px) {
-          .controls-panel {
-            max-width: none;
-            min-width: auto;
-          }
-          
-          .filter-buttons {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-          }
-          
-          .filter-button:last-child {
-            grid-column: 1 / -1;
-          }
-        }
-      `}</style>
     </div>
   );
 };

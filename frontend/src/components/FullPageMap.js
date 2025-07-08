@@ -1,4 +1,4 @@
-// components/FullPageMap.js - OPTIMIZED VERSION with Smart Movement Detection
+// components/FullPageMap.js - IMPROVED VERSION - Better Google Maps Handling
 // Location: /map-service/frontend/src/components/FullPageMap.js
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
@@ -35,14 +35,38 @@ const FullPageMap = ({
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState(null);
   const [mapInitialized, setMapInitialized] = useState(false);
+  const [googleMapsReady, setGoogleMapsReady] = useState(false);
   
-  // OPTIMIZED: Smart movement detection with geographic zones
+  // Smart movement detection
   const lastSearchLocationRef = useRef(null);
   const isUserDraggingRef = useRef(false);
   const debounceTimeoutRef = useRef(null);
   const immediateSearchTimeoutRef = useRef(null);
 
-  // OPTIMIZED: Smart zone-based movement detection for responsive updates
+  // IMPROVED: Check for Google Maps availability
+  const checkGoogleMapsAvailability = useCallback(() => {
+    return new Promise((resolve) => {
+      const checkInterval = setInterval(() => {
+        if (window.google && window.google.maps && window.google.maps.Map) {
+          clearInterval(checkInterval);
+          setGoogleMapsReady(true);
+          resolve(true);
+        }
+      }, 100);
+      
+      // Timeout after 10 seconds
+      setTimeout(() => {
+        clearInterval(checkInterval);
+        if (!window.google || !window.google.maps) {
+          console.error('❌ Google Maps API failed to load within 10 seconds');
+          setMapError('Google Maps API non disponibile. Ricarica la pagina.');
+          resolve(false);
+        }
+      }, 10000);
+    });
+  }, []);
+
+  // Smart zone-based movement detection for responsive updates
   const shouldTriggerNewSearch = useCallback((newCenter) => {
     if (!lastSearchLocationRef.current) {
       return true; // First search
@@ -63,7 +87,7 @@ const FullPageMap = ({
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const distance = R * c;
 
-    // OPTIMIZED: Dynamic threshold based on search radius for better responsiveness
+    // Dynamic threshold based on search radius for better responsiveness
     const dynamicThreshold = Math.max(searchRadius * 0.3, 200); // 30% of search radius, min 200m
     const hasMovedSignificantly = distance > dynamicThreshold;
 
@@ -77,7 +101,7 @@ const FullPageMap = ({
     return hasMovedSignificantly;
   }, [searchRadius]);
 
-  // OPTIMIZED: Adaptive debouncing for better user experience
+  // Adaptive debouncing for better user experience
   const debouncedCenterChange = useCallback((newCenter) => {
     // Clear existing timeouts
     if (debounceTimeoutRef.current) {
@@ -87,7 +111,7 @@ const FullPageMap = ({
       clearTimeout(immediateSearchTimeoutRef.current);
     }
 
-    // OPTIMIZED: Adaptive delay based on movement distance
+    // Adaptive delay based on movement distance
     const shouldSearch = shouldTriggerNewSearch(newCenter);
     const delay = shouldSearch ? 800 : 1500; // Faster response for significant moves
 
@@ -103,19 +127,28 @@ const FullPageMap = ({
     }, delay);
   }, [onCenterChange, shouldTriggerNewSearch]);
 
-  // Initialize Google Map ONLY ONCE
+  // IMPROVED: Initialize Google Map with better error handling
   useEffect(() => {
     if (mapInitialized || !mapRef.current) return;
 
-    const initMap = () => {
-      if (!window.google || !window.google.maps) {
-        console.error('Google Maps API not loaded');
-        setMapError('Google Maps API non disponibile');
-        return;
-      }
-
+    const initMap = async () => {
       try {
-        console.log('🗺️ Initializing Google Map ONCE...');
+        console.log('🗺️ Waiting for Google Maps API...');
+        
+        // Wait for Google Maps to be ready
+        const isReady = await checkGoogleMapsAvailability();
+        if (!isReady) {
+          return;
+        }
+
+        console.log('🗺️ Initializing Google Map...');
+
+        // IMPROVED: Validate mapRef.current exists
+        if (!mapRef.current) {
+          console.error('❌ Map container ref is null');
+          setMapError('Contenitore mappa non trovato');
+          return;
+        }
 
         const mapOptions = {
           center: { lat: center.lat, lng: center.lng },
@@ -133,22 +166,96 @@ const FullPageMap = ({
           rotateControl: false,
           fullscreenControl: !isEmbedMode,
           
-          // OPTIMIZED: Improved styling for Italian venues
+          // IMPROVED: Italian Coffee Shop & Restaurant Theme
           styles: [
             {
-              featureType: 'poi.business',
-              elementType: 'labels',
-              stylers: [{ visibility: 'simplified' }] // Show some business labels
+              "featureType": "all",
+              "elementType": "all",
+              "stylers": [
+                { "saturation": -5 },
+                { "lightness": 8 }
+              ]
             },
             {
-              featureType: 'poi.government',
-              elementType: 'labels',
-              stylers: [{ visibility: 'off' }]
+              "featureType": "water",
+              "elementType": "geometry.fill",
+              "stylers": [
+                { "color": "#89CDF1" },
+                { "saturation": -20 }
+              ]
             },
             {
-              featureType: 'transit.station',
-              elementType: 'labels',
-              stylers: [{ visibility: 'simplified' }]
+              "featureType": "landscape",
+              "elementType": "geometry.fill",
+              "stylers": [
+                { "color": "#F5F3F0" },
+                { "lightness": 15 }
+              ]
+            },
+            {
+              "featureType": "road",
+              "elementType": "geometry.fill",
+              "stylers": [
+                { "color": "#FFFFFF" }
+              ]
+            },
+            {
+              "featureType": "road",
+              "elementType": "geometry.stroke",
+              "stylers": [
+                { "color": "#E0DDD8" },
+                { "weight": 1 }
+              ]
+            },
+            // Italian coffee shops and restaurants prominently displayed
+            {
+              "featureType": "poi.business",
+              "elementType": "labels.icon",
+              "stylers": [
+                { "visibility": "simplified" },
+                { "saturation": 20 }
+              ]
+            },
+            // Highlight food & drink establishments
+            {
+              "featureType": "poi.food",
+              "elementType": "labels.icon",
+              "stylers": [
+                { "visibility": "on" },
+                { "saturation": 15 },
+                { "lightness": -5 }
+              ]
+            },
+            // Parks and greenery for Italian ambiance
+            {
+              "featureType": "poi.park",
+              "elementType": "geometry.fill",
+              "stylers": [
+                { "color": "#D4E6B7" }
+              ]
+            },
+            // Enhanced styling for Italian context
+            {
+              "featureType": "poi.place_of_worship",
+              "elementType": "labels",
+              "stylers": [
+                { "visibility": "simplified" }
+              ]
+            },
+            // Clean, elegant Italian aesthetic
+            {
+              "featureType": "administrative",
+              "elementType": "labels.text.fill",
+              "stylers": [
+                { "color": "#8B7355" }
+              ]
+            },
+            // Warm building colors
+            {
+              "featureType": "poi.government",
+              "stylers": [
+                { "visibility": "simplified" }
+              ]
             }
           ],
           
@@ -159,9 +266,17 @@ const FullPageMap = ({
           scrollwheel: true
         };
 
-        googleMapRef.current = new window.google.maps.Map(mapRef.current, mapOptions);
+        // IMPROVED: Create map with error handling
+        try {
+          googleMapRef.current = new window.google.maps.Map(mapRef.current, mapOptions);
+          console.log('✅ Google Map instance created successfully');
+        } catch (mapCreationError) {
+          console.error('❌ Failed to create Google Map instance:', mapCreationError);
+          setMapError('Errore nella creazione della mappa');
+          return;
+        }
 
-        // OPTIMIZED: Improved event listeners with proper drag detection
+        // Event listeners with proper drag detection
         googleMapRef.current.addListener('dragstart', () => {
           console.log('🗺️ User started dragging map');
           isUserDraggingRef.current = true;
@@ -183,12 +298,11 @@ const FullPageMap = ({
               lat: newCenter.lat(),
               lng: newCenter.lng()
             });
-          }, 500); // Wait 500ms after drag ends
+          }, 500);
         });
 
-        // OPTIMIZED: Only listen to idle events for zoom changes
+        // Listen to idle events for zoom changes
         googleMapRef.current.addListener('idle', () => {
-          // This fires when map stops moving/zooming
           if (!isUserDraggingRef.current) {
             const newCenter = googleMapRef.current.getCenter();
             const currentZoom = googleMapRef.current.getZoom();
@@ -211,17 +325,26 @@ const FullPageMap = ({
           }
         });
 
-        googleMapRef.current.addListener('tilesloaded', () => {
-          console.log('✅ Google Map loaded successfully');
-          setMapLoaded(true);
-          setMapError(null);
+        // IMPROVED: Better tiles loaded detection
+        const tilesLoadedPromise = new Promise((resolve) => {
+          const listener = googleMapRef.current.addListener('tilesloaded', () => {
+            window.google.maps.event.removeListener(listener);
+            resolve();
+          });
           
-          // Set initial search location
-          lastSearchLocationRef.current = { lat: center.lat, lng: center.lng };
+          // Fallback timeout
+          setTimeout(resolve, 5000);
         });
 
+        await tilesLoadedPromise;
+
+        console.log('✅ Google Map loaded successfully');
+        setMapLoaded(true);
+        setMapError(null);
         setMapInitialized(true);
-        console.log('✅ Google Map initialized');
+        
+        // Set initial search location
+        lastSearchLocationRef.current = { lat: center.lat, lng: center.lng };
 
       } catch (error) {
         console.error('❌ Failed to initialize Google Map:', error);
@@ -229,22 +352,10 @@ const FullPageMap = ({
       }
     };
 
-    // Check if Google Maps API is ready
-    if (window.google && window.google.maps) {
-      initMap();
-    } else {
-      const checkGoogleMaps = () => {
-        if (window.google && window.google.maps) {
-          initMap();
-        } else {
-          setTimeout(checkGoogleMaps, 100);
-        }
-      };
-      checkGoogleMaps();
-    }
-  }, []); // Empty dependency array - only run once!
+    initMap();
+  }, [mapInitialized, center.lat, center.lng, zoom, isEmbedMode, checkGoogleMapsAvailability, debouncedCenterChange, selectedCafe, onClosePopup]);
 
-  // OPTIMIZED: Update map center only for external changes (not user-initiated)
+  // Update map center only for external changes (not user-initiated)
   useEffect(() => {
     if (googleMapRef.current && mapLoaded && mapInitialized && !isUserDraggingRef.current) {
       const currentCenter = googleMapRef.current.getCenter();
@@ -252,7 +363,7 @@ const FullPageMap = ({
       
       const newCenter = { lat: center.lat, lng: center.lng };
       
-      // OPTIMIZED: Only update if this is an external change (e.g., location found)
+      // Only update if this is an external change (e.g., location found)
       const isExternalChange = !lastSearchLocationRef.current || 
         (Math.abs(currentCenter?.lat() - newCenter.lat) > 0.01 || 
          Math.abs(currentCenter?.lng() - newCenter.lng) > 0.01);
@@ -271,7 +382,7 @@ const FullPageMap = ({
     }
   }, [center.lat, center.lng, zoom, mapLoaded, mapInitialized]);
 
-  // OPTIMIZED: Update user location marker with better styling
+  // Update user location marker with better styling
   useEffect(() => {
     if (!googleMapRef.current || !mapLoaded || !userLocation) return;
 
@@ -280,7 +391,7 @@ const FullPageMap = ({
       userMarkerRef.current.setMap(null);
     }
 
-    // OPTIMIZED: Improved user marker with accuracy circle
+    // IMPROVED: User marker with accuracy indicator
     const userMarker = new window.google.maps.Marker({
       position: { 
         lat: userLocation.latitude, 
@@ -291,9 +402,9 @@ const FullPageMap = ({
       icon: {
         url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
           <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="14" cy="14" r="12" fill="#4F46E5" stroke="#ffffff" stroke-width="3"/>
+            <circle cx="14" cy="14" r="12" fill="#6F4E37" stroke="#ffffff" stroke-width="3"/>
             <circle cx="14" cy="14" r="4" fill="#ffffff"/>
-            <circle cx="14" cy="14" r="13" fill="none" stroke="#4F46E5" stroke-width="1" opacity="0.3"/>
+            <circle cx="14" cy="14" r="13" fill="none" stroke="#6F4E37" stroke-width="1" opacity="0.3"/>
             ${userLocation.accuracy < 50 ? '<circle cx="14" cy="14" r="2" fill="#10B981"/>' : ''}
           </svg>
         `),
@@ -308,7 +419,7 @@ const FullPageMap = ({
     console.log('📍 User location marker updated');
   }, [userLocation, mapLoaded]);
 
-  // OPTIMIZED: Update search radius circle only when radius or location changes
+  // Update search radius circle
   useEffect(() => {
     if (!googleMapRef.current || !mapLoaded || !userLocation || !searchRadius) return;
 
@@ -317,7 +428,7 @@ const FullPageMap = ({
       radiusCircleRef.current.setMap(null);
     }
 
-    // OPTIMIZED: Only show radius circle if user location is accurate
+    // Only show radius circle if user location is accurate
     if (userLocation.accuracy && userLocation.accuracy < 1000) {
       const circle = new window.google.maps.Circle({
         center: { 
@@ -326,9 +437,9 @@ const FullPageMap = ({
         },
         radius: searchRadius,
         map: googleMapRef.current,
-        fillColor: userLocation.source === 'gps' ? '#4F46E5' : '#F59E0B',
+        fillColor: userLocation.source === 'gps' ? '#6F4E37' : '#F59E0B',
         fillOpacity: 0.08,
-        strokeColor: userLocation.source === 'gps' ? '#4F46E5' : '#F59E0B',
+        strokeColor: userLocation.source === 'gps' ? '#6F4E37' : '#F59E0B',
         strokeOpacity: 0.3,
         strokeWeight: 2,
         clickable: false
@@ -339,11 +450,11 @@ const FullPageMap = ({
     }
   }, [userLocation, searchRadius, mapLoaded]);
 
-  // OPTIMIZED: Improved cafe markers with better performance
+  // IMPROVED: Italian venue markers (NO PUB MARKERS)
   useEffect(() => {
     if (!googleMapRef.current || !mapLoaded) return;
 
-    console.log('☕ Updating cafe markers:', cafes.length);
+    console.log('☕ Updating Italian venue markers:', cafes.length);
 
     // Clear existing markers efficiently
     markersRef.current.forEach(marker => {
@@ -351,7 +462,7 @@ const FullPageMap = ({
     });
     markersRef.current.clear();
 
-    // OPTIMIZED: Batch marker creation with clustering for better performance
+    // Create new markers
     const bounds = new window.google.maps.LatLngBounds();
     let markersAdded = 0;
     
@@ -366,27 +477,62 @@ const FullPageMap = ({
         lng: cafe.location.longitude
       };
 
-      const marker = new window.google.maps.Marker({
-        position: position,
-        map: googleMapRef.current,
-        title: `${cafe.name}${cafe.rating ? ` (${cafe.rating}⭐)` : ''}${cafe.distance ? ` - ${cafe.formattedDistance}` : ''}`,
-        icon: {
-          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-            <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M16 0C7.163 0 0 7.163 0 16C0 24.837 16 40 16 40S32 24.837 32 16C32 7.163 24.837 0 16 0Z" fill="${getMarkerColor(cafe)}"/>
-              <circle cx="16" cy="16" r="8" fill="white"/>
-              <text x="16" y="20" text-anchor="middle" font-size="12" fill="${getMarkerColor(cafe)}">${getMarkerEmoji(cafe)}</text>
-              ${cafe.distance && cafe.distance < 200 ? '<circle cx="16" cy="16" r="11" fill="none" stroke="#10B981" stroke-width="2" opacity="0.6"/>' : ''}
-            </svg>
-          `),
-          scaledSize: new window.google.maps.Size(32, 40),
-          anchor: new window.google.maps.Point(16, 40)
-        },
-        zIndex: cafe.distance ? Math.round(1000 - cafe.distance / 10) : 500,
-        // OPTIMIZED: Only animate very close cafes
-        animation: cafe.distance && cafe.distance < 200 ? 
-          window.google.maps.Animation.BOUNCE : null
-      });
+      // IMPROVED: Use AdvancedMarkerElement if available, fallback to Marker
+      let marker;
+      
+      try {
+        // Try to use the new AdvancedMarkerElement (if available)
+        if (window.google.maps.marker && window.google.maps.marker.AdvancedMarkerElement) {
+          const markerElement = document.createElement('div');
+          markerElement.innerHTML = `
+            <div style="
+              background: ${getItalianVenueMarkerColor(cafe)};
+              color: white;
+              padding: 8px 12px;
+              border-radius: 20px;
+              font-size: 18px;
+              font-weight: bold;
+              box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+              border: 2px solid white;
+              cursor: pointer;
+              transition: transform 0.2s ease;
+            " onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
+              ${getItalianVenueEmoji(cafe)} ${cafe.name.length > 15 ? cafe.name.substring(0, 15) + '...' : cafe.name}
+            </div>
+          `;
+
+          marker = new window.google.maps.marker.AdvancedMarkerElement({
+            position: position,
+            map: googleMapRef.current,
+            title: `${cafe.name}${cafe.rating ? ` (${cafe.rating}⭐)` : ''}${cafe.distance ? ` - ${cafe.formattedDistance}` : ''}`,
+            content: markerElement
+          });
+        } else {
+          throw new Error('AdvancedMarkerElement not available');
+        }
+      } catch (advancedMarkerError) {
+        // Fallback to traditional Marker
+        marker = new window.google.maps.Marker({
+          position: position,
+          map: googleMapRef.current,
+          title: `${cafe.name}${cafe.rating ? ` (${cafe.rating}⭐)` : ''}${cafe.distance ? ` - ${cafe.formattedDistance}` : ''}`,
+          icon: {
+            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+              <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M16 0C7.163 0 0 7.163 0 16C0 24.837 16 40 16 40S32 24.837 32 16C32 7.163 24.837 0 16 0Z" fill="${getItalianVenueMarkerColor(cafe)}"/>
+                <circle cx="16" cy="16" r="8" fill="white"/>
+                <text x="16" y="20" text-anchor="middle" font-size="12" fill="${getItalianVenueMarkerColor(cafe)}">${getItalianVenueEmoji(cafe)}</text>
+                ${cafe.distance && cafe.distance < 200 ? '<circle cx="16" cy="16" r="11" fill="none" stroke="#10B981" stroke-width="2" opacity="0.6"/>' : ''}
+              </svg>
+            `),
+            scaledSize: new window.google.maps.Size(32, 40),
+            anchor: new window.google.maps.Point(16, 40)
+          },
+          zIndex: cafe.distance ? Math.round(1000 - cafe.distance / 10) : 500,
+          animation: cafe.distance && cafe.distance < 200 ? 
+            window.google.maps.Animation.BOUNCE : null
+        });
+      }
 
       // Add click listener
       marker.addListener('click', () => {
@@ -400,35 +546,38 @@ const FullPageMap = ({
       markersAdded++;
     });
 
-    console.log('✅ Cafe markers updated:', markersAdded);
+    console.log('✅ Italian venue markers updated:', markersAdded);
   }, [cafes, mapLoaded, onCafeSelect]);
 
-  // Helper functions for markers
-  const getMarkerColor = (cafe) => {
-    if (cafe.placeType === 'pub' || (cafe.types && cafe.types.includes('night_club'))) {
-      return '#EF4444'; // Red for pubs/nightlife
-    }
-    
+  // Helper functions for Italian venues only (NO PUBS)
+  const getItalianVenueMarkerColor = (cafe) => {
     if (cafe.distance && cafe.distance < 200) return '#10B981'; // Very close - green
     if (cafe.distance && cafe.distance < 500) return '#F59E0B'; // Close - amber
     if (cafe.rating && cafe.rating >= 4.5) return '#8B5CF6';     // High rated - purple
+    if (cafe.type === 'restaurant') return '#CE2B37';           // Restaurants - Italian red
     
-    return '#6366F1'; // Default - indigo for cafeterias/bars
+    return '#6F4E37'; // Default - coffee brown for cafeterias
   };
 
-  const getMarkerEmoji = (cafe) => {
-    if (cafe.placeType === 'pub' || (cafe.types && cafe.types.includes('night_club'))) {
-      return '🍺'; // Beer for pubs
-    }
+  // Italian venue emoji mapping (NO PUB EMOJIS)
+  const getItalianVenueEmoji = (cafe) => {
+    // Check for specific Italian venue types first
+    const nameLower = (cafe.name || '').toLowerCase();
     
-    if (cafe.placeType === 'restaurant') {
-      return '🍽️'; // Restaurant
-    }
+    if (nameLower.includes('gelateria') || nameLower.includes('gelato')) return '🍦';
+    if (nameLower.includes('pizzeria') || nameLower.includes('pizza')) return '🍕';
+    if (nameLower.includes('pasticceria') || nameLower.includes('dolc')) return '🧁';
+    if (nameLower.includes('panetteria') || nameLower.includes('pane')) return '🥖';
     
-    return '☕'; // Coffee for cafeterias (including bars)
+    // Default based on type
+    switch (cafe.type || cafe.placeType) {
+      case 'restaurant': return '🍽️'; // Restaurant
+      case 'cafe':
+      default: return '☕'; // Coffee for cafeterias (including Italian bars)
+    }
   };
 
-  // OPTIMIZED: Comprehensive cleanup
+  // Comprehensive cleanup
   useEffect(() => {
     return () => {
       // Clear all timeouts
@@ -458,6 +607,7 @@ const FullPageMap = ({
     setMapError(null);
     setMapLoaded(false);
     setMapInitialized(false);
+    setGoogleMapsReady(false);
     window.location.reload();
   }, []);
 
@@ -488,7 +638,7 @@ const FullPageMap = ({
         style={{ 
           width: '100%', 
           height: '100%',
-          backgroundColor: '#f0f9ff'
+          backgroundColor: '#F5F5DC'
         }}
       />
 
@@ -508,10 +658,10 @@ const FullPageMap = ({
       )}
 
       {/* Loading Overlay */}
-      {(loading || !mapLoaded) && (
+      {(loading || !mapLoaded || !googleMapsReady) && (
         <MapLoadingOverlay 
           loading={loading}
-          mapLoaded={mapLoaded}
+          mapLoaded={mapLoaded && googleMapsReady}
           cafesCount={cafes.length}
         />
       )}
@@ -546,8 +696,9 @@ const FullPageMap = ({
           fontSize: '12px',
           zIndex: 1000
         }}>
-          <div>Map: {mapLoaded ? '✅' : '⏳'}</div>
-          <div>Cafes: {cafes.length}</div>
+          <div>Maps Ready: {googleMapsReady ? '✅' : '⏳'}</div>
+          <div>Map Loaded: {mapLoaded ? '✅' : '⏳'}</div>
+          <div>Italian Venues: {cafes.length}</div>
           <div>Dragging: {isUserDraggingRef.current ? '🖱️' : '✋'}</div>
           <div>Last Search: {lastSearchLocationRef.current ? 
             `${lastSearchLocationRef.current.lat.toFixed(3)}, ${lastSearchLocationRef.current.lng.toFixed(3)}` : 'None'}</div>

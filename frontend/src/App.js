@@ -1,4 +1,4 @@
-// App.js - FIXED VERSION with Better Location Permission Handling
+// App.js - UPDATED VERSION - No Pub Support  
 // Location: /map-service/frontend/src/App.js
 
 import React, { useState, useEffect } from 'react';
@@ -40,7 +40,9 @@ function MapApp() {
   });
   const [zoom, setZoom] = useState(parseInt(process.env.REACT_APP_DEFAULT_ZOOM) || 15);
   const [searchRadius, setSearchRadius] = useState(1500);
-  const [cafeType, setCafeType] = useState('cafe');
+  
+  // UPDATED: Default to 'cafe' instead of any pub option
+  const [cafeType, setCafeType] = useState('cafe'); // Only cafe or restaurant allowed
   const [showControls, setShowControls] = useState(true);
 
   // Custom hooks
@@ -99,7 +101,8 @@ function MapApp() {
       });
     }
 
-    if (embedType) {
+    // UPDATED: Only allow cafe or restaurant types
+    if (embedType && ['cafe', 'restaurant'].includes(embedType)) {
       setCafeType(embedType);
     }
 
@@ -112,22 +115,22 @@ function MapApp() {
     }
   }, []);
 
-  // FIXED: Only show loading screen for initial app load, not location issues
+  // Only show loading screen for initial app load, not location issues
   if (locationLoading && !userLocation && !isEmbedMode && !mapCenter.lat) {
     return (
       <LoadingScreen 
-        message="Inizializzazione mappa..."
-        subMessage="Preparazione del servizio di localizzazione"
+        message="Inizializzazione mappa caffè e ristoranti..."
+        subMessage="Preparazione del servizio di localizzazione italiana"
       />
     );
   }
 
-  // Handle cafe selection
-  const handleCafeSelect = (cafe) => {
-    setSelectedCafe(cafe);
+  // Handle venue selection (cafe or restaurant only)
+  const handleCafeSelect = (venue) => {
+    setSelectedCafe(venue);
     setMapCenter({
-      lat: cafe.location.latitude,
-      lng: cafe.location.longitude
+      lat: venue.location.latitude,
+      lng: venue.location.longitude
     });
     setZoom(17);
   };
@@ -137,14 +140,17 @@ function MapApp() {
     setMapCenter(newCenter);
   };
 
-  // Handle search options change
+  // UPDATED: Handle search options change (no pub support)
   const handleSearchChange = (options) => {
     if (options.radius !== undefined) {
       setSearchRadius(options.radius);
     }
     if (options.type !== undefined) {
-      setCafeType(options.type);
-      setSelectedCafe(null);
+      // Validate that type is only cafe or restaurant
+      if (['cafe', 'restaurant'].includes(options.type)) {
+        setCafeType(options.type);
+        setSelectedCafe(null);
+      }
     }
   };
 
@@ -153,8 +159,7 @@ function MapApp() {
     setSelectedCafe(null);
   };
 
-  // FIXED: Better location request handling
-  // OPTIMIZED: Simplified location handling
+  // Better location request handling
   const handleLocationRequest = () => {
     console.log('📍 User requested location');
     clearPermissionDenied();
@@ -164,17 +169,6 @@ function MapApp() {
   const handleContinueWithoutGPS = () => {
     console.log('📍 User chose to continue without GPS');
     clearPermissionDenied();
-    // Ensure we have some location even if user declined
-    if (!userLocation) {
-      // Force default location
-      const defaultLoc = {
-        latitude: 45.0703,
-        longitude: 7.6869,
-        source: 'default',
-        city: 'Torino'
-      };
-      // You'll need to pass this up or handle it in the geolocation hook
-    }
   };
 
   return (
@@ -202,9 +196,8 @@ function MapApp() {
         locationError={locationError}
       />
 
-      {/* FIXED: Location Permission Modal - Show on first visit or when permission needed */}
-      {/* OPTIMIZED: Only show modal if user explicitly denied permission */}
-      {(error?.code === 'PERMISSION_DENIED' && !userLocation) && !isEmbedMode && (
+      {/* Location Permission Modal - Show on first visit or when permission needed */}
+      {(locationError?.code === 'PERMISSION_DENIED' && !userLocation) && !isEmbedMode && (
         <div className="modal-overlay">
           <div className="modal-card">
             <div className="modal-header">
@@ -212,7 +205,7 @@ function MapApp() {
             </div>
             <div className="modal-content">
               <p>
-                Per trovare i migliori caffè nelle vicinanze, abbiamo bisogno 
+                Per trovare i migliori caffè e ristoranti nelle vicinanze, abbiamo bisogno 
                 di accedere alla tua posizione. Puoi anche continuare e cercare 
                 manualmente spostando la mappa.
               </p>
@@ -255,7 +248,7 @@ function MapApp() {
         </div>
       )}
 
-      {/* FIXED: Status indicator for location */}
+      {/* Status indicator for location */}
       {!isEmbedMode && (
         <div style={{
           position: 'fixed',
@@ -285,6 +278,8 @@ function MapApp() {
              userLocation?.source === 'ip' ? '🌐 Posizione IP' :
              userLocation?.source === 'cache' ? '💾 Posizione salvata' :
              '📍 Posizione predefinita'}
+             {/* UPDATED: Show Italian venue context */}
+             {' • Caffè e Ristoranti'}
           </span>
           {userLocation?.accuracy && userLocation.accuracy < 100 && (
             <span style={{ color: '#10B981', fontWeight: '600' }}>

@@ -4,10 +4,10 @@
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
+    <meta name="theme-color" content="#6F4E37" />
     <meta
       name="description"
-      content="Find the best coffee shops and bars near you with real-time location and detailed information"
+      content="Find the best Italian coffee shops and restaurants near you with real-time location and detailed information"
     />
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
@@ -17,12 +17,24 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- Google Maps API -->
-    <script async defer
-      src="https://maps.googleapis.com/maps/api/js?key=%REACT_APP_GOOGLE_MAPS_API_KEY%&libraries=places,geometry">
+    <!-- UPDATED: Async Google Maps API Loading -->
+    <script>
+      function initGoogleMaps() {
+        console.log('🗺️ Google Maps API loaded asynchronously');
+        // Maps API is now ready, React will handle initialization
+      }
+      
+      // Load Google Maps API asynchronously
+      (function() {
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '%REACT_APP_GOOGLE_MAPS_API_KEY%'}&libraries=places,geometry&loading=async&callback=initGoogleMaps`;
+        script.async = true;
+        script.defer = true;
+        document.head.appendChild(script);
+      })();
     </script>
     
-    <title>CoffeeFinder - Discover Great Coffee & Bars Nearby</title>
+    <title>CoffeeFinder - Discover Great Italian Coffee & Restaurants Nearby</title>
     
     <style>
       /* Loading screen styles */
@@ -32,7 +44,7 @@
         left: 0;
         width: 100%;
         height: 100%;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, #6F4E37 0%, #DEB887 100%);
         display: flex;
         justify-content: center;
         align-items: center;
@@ -89,7 +101,7 @@
           sans-serif;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
-        background-color: #f8fafc;
+        background-color: #F5F5DC;
       }
       
       #root {
@@ -106,7 +118,7 @@
       <div class="loader-content">
         <div class="loader-spinner"></div>
         <div class="loader-text">CoffeeFinder</div>
-        <div class="loader-subtext">Loading your perfect coffee spots...</div>
+        <div class="loader-subtext">Loading Italian coffee & restaurant finder...</div>
       </div>
     </div>
     

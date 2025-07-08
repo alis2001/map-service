@@ -1,4 +1,4 @@
-// services/apiService.js
+// services/apiService.js - UPDATED VERSION - No Pub Support
 // Location: /map-service/frontend/src/services/apiService.js
 
 import axios from 'axios';
@@ -78,16 +78,22 @@ api.interceptors.response.use(
 
 // Places API functions
 export const placesAPI = {
-  // Get nearby cafes/bars
+  // UPDATED: Get nearby Italian venues (cafes/restaurants only)
   async getNearbyPlaces(latitude, longitude, options = {}) {
     try {
       const params = {
         latitude,
         longitude,
         radius: options.radius || 1500,
-        type: options.type || 'cafe',
+        type: options.type || 'cafe', // Only 'cafe' or 'restaurant' allowed
         limit: options.limit || 20
       };
+
+      // UPDATED: Validate type to ensure no pub requests
+      if (!['cafe', 'restaurant'].includes(params.type)) {
+        console.warn(`Invalid place type "${params.type}", defaulting to cafe`);
+        params.type = 'cafe';
+      }
 
       const response = await api.get('/api/v1/places/nearby', { params });
       
@@ -98,12 +104,12 @@ export const placesAPI = {
         userLocation: response.data.data?.userLocation
       };
     } catch (error) {
-      console.error('Failed to fetch nearby places:', error);
+      console.error('Failed to fetch nearby Italian venues:', error);
       throw error;
     }
   },
 
-  // Search places by text
+  // Search Italian venues by text
   async searchPlaces(query, options = {}) {
     try {
       const params = {
@@ -126,7 +132,7 @@ export const placesAPI = {
         count: response.data.data?.count || 0
       };
     } catch (error) {
-      console.error('Failed to search places:', error);
+      console.error('Failed to search Italian venues:', error);
       throw error;
     }
   },
@@ -152,9 +158,12 @@ export const placesAPI = {
     }
   },
 
-  // Get popular places by type
+  // UPDATED: Get popular Italian venues by type (no pub support)
   async getPopularPlaces(type = 'cafe', options = {}) {
     try {
+      // UPDATED: Validate type to ensure no pub requests
+      const validType = ['cafe', 'restaurant'].includes(type) ? type : 'cafe';
+      
       const params = {
         limit: options.limit || 10,
         minRating: options.minRating || 4.0,
@@ -167,7 +176,7 @@ export const placesAPI = {
         params[key] === undefined && delete params[key]
       );
 
-      const response = await api.get(`/api/v1/places/popular/${type}`, { params });
+      const response = await api.get(`/api/v1/places/popular/${validType}`, { params });
       
       return {
         success: true,
@@ -175,7 +184,7 @@ export const placesAPI = {
         count: response.data.data?.count || 0
       };
     } catch (error) {
-      console.error('Failed to fetch popular places:', error);
+      console.error('Failed to fetch popular Italian venues:', error);
       throw error;
     }
   },
@@ -183,8 +192,14 @@ export const placesAPI = {
   // Batch search multiple locations
   async batchSearch(locations) {
     try {
+      // UPDATED: Validate all location types
+      const validatedLocations = locations.map(location => ({
+        ...location,
+        type: ['cafe', 'restaurant'].includes(location.type) ? location.type : 'cafe'
+      }));
+
       const response = await api.post('/api/v1/places/batch-search', {
-        locations
+        locations: validatedLocations
       });
       
       return {
@@ -201,12 +216,15 @@ export const placesAPI = {
   // Get places within geographic bounds
   async getPlacesWithinBounds(bounds, options = {}) {
     try {
+      // UPDATED: Validate type
+      const validType = ['cafe', 'restaurant'].includes(options.type) ? options.type : 'cafe';
+      
       const params = {
         northLat: bounds.north,
         southLat: bounds.south,
         eastLng: bounds.east,
         westLng: bounds.west,
-        type: options.type || 'cafe',
+        type: validType,
         limit: options.limit || 50
       };
 
@@ -342,14 +360,14 @@ export const apiUtils = {
     }
   },
 
-  // Get place type emoji
+  // UPDATED: Get Italian venue type emoji (no pub support)
   getTypeEmoji(type) {
     const typeEmojis = {
-      cafe: '☕',
-      bar: '🍺',
-      restaurant: '🍽️',
-      bakery: '🥐',
-      default: '📍'
+      cafe: '☕',        // Italian cafeterias/bars
+      restaurant: '🍽️', // Restaurants
+      bakery: '🥐',     // Bakeries
+      default: '📍'     // Default
+      // REMOVED: pub/bar emojis
     };
     
     return typeEmojis[type] || typeEmojis.default;
@@ -366,6 +384,70 @@ export const apiUtils = {
     return '★'.repeat(fullStars) + 
            (hasHalfStar ? '☆' : '') + 
            '☆'.repeat(emptyStars);
+  },
+
+  // UPDATED: Get Italian venue display name (no pub support)
+  getItalianVenueDisplayName(type) {
+    switch (type) {
+      case 'cafe': return 'Bar/Caffetteria';
+      case 'restaurant': return 'Ristorante';
+      default: return 'Locale';
+    }
+  },
+
+  // UPDATED: Validate Italian venue type (no pub support)
+  isValidItalianVenueType(type) {
+    return ['cafe', 'restaurant'].includes(type);
+  },
+
+  // Get Italian venue features
+  getItalianVenueFeatures(place) {
+    const features = [];
+    const nameLower = (place.name || '').toLowerCase();
+    
+    if (nameLower.includes('wifi') || nameLower.includes('internet')) {
+      features.push('📶 WiFi');
+    }
+    if (nameLower.includes('terrazza') || nameLower.includes('giardino')) {
+      features.push('🌿 Esterno');
+    }
+    if (nameLower.includes('colazione') || nameLower.includes('breakfast')) {
+      features.push('🌅 Colazione');
+    }
+    if (nameLower.includes('aperitivo')) {
+      features.push('🍸 Aperitivo');
+    }
+    if (nameLower.includes('pizza')) {
+      features.push('🍕 Pizza');
+    }
+    if (nameLower.includes('gelato') || nameLower.includes('gelateria')) {
+      features.push('🍦 Gelato');
+    }
+    if (nameLower.includes('musica') || nameLower.includes('live')) {
+      features.push('🎵 Musica');
+    }
+    
+    return features;
+  },
+
+  // Format opening hours for Italian context
+  formatItalianOpeningHours(openingHours) {
+    if (!openingHours || !openingHours.weekdayText) {
+      return null;
+    }
+
+    return openingHours.weekdayText.map(text => {
+      return text
+        .replace(/Monday/g, 'Lunedì')
+        .replace(/Tuesday/g, 'Martedì')
+        .replace(/Wednesday/g, 'Mercoledì')
+        .replace(/Thursday/g, 'Giovedì')
+        .replace(/Friday/g, 'Venerdì')
+        .replace(/Saturday/g, 'Sabato')
+        .replace(/Sunday/g, 'Domenica')
+        .replace(/Closed/g, 'Chiuso')
+        .replace(/Open 24 hours/g, 'Aperto 24 ore');
+    });
   }
 };
 
