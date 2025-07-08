@@ -1,4 +1,4 @@
-// components/FullPageMap.js - IMPROVED VERSION - Better Google Maps Handling
+// components/FullPageMap.js - IMPROVED VERSION - Better Google Maps Loading
 // Location: /map-service/frontend/src/components/FullPageMap.js
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
@@ -36,6 +36,7 @@ const FullPageMap = ({
   const [mapError, setMapError] = useState(null);
   const [mapInitialized, setMapInitialized] = useState(false);
   const [googleMapsReady, setGoogleMapsReady] = useState(false);
+  const [googleMapsError, setGoogleMapsError] = useState(null);
   
   // Smart movement detection
   const lastSearchLocationRef = useRef(null);
@@ -43,26 +44,69 @@ const FullPageMap = ({
   const debounceTimeoutRef = useRef(null);
   const immediateSearchTimeoutRef = useRef(null);
 
-  // IMPROVED: Check for Google Maps availability
+  // IMPROVED: Better Google Maps availability checking
   const checkGoogleMapsAvailability = useCallback(() => {
     return new Promise((resolve) => {
+      // Check if already loaded
+      if (window.google && window.google.maps && window.google.maps.Map) {
+        console.log('✅ Google Maps already available');
+        setGoogleMapsReady(true);
+        resolve(true);
+        return;
+      }
+
+      // Listen for the custom event from index.html
+      const handleGoogleMapsLoaded = () => {
+        console.log('✅ Google Maps loaded via event');
+        setGoogleMapsReady(true);
+        setGoogleMapsError(null);
+        resolve(true);
+        cleanup();
+      };
+
+      const handleGoogleMapsError = (event) => {
+        console.error('❌ Google Maps loading error:', event.detail);
+        setGoogleMapsError(event.detail.message || 'Failed to load Google Maps');
+        setGoogleMapsReady(false);
+        resolve(false);
+        cleanup();
+      };
+
+      const cleanup = () => {
+        window.removeEventListener('googleMapsLoaded', handleGoogleMapsLoaded);
+        window.removeEventListener('googleMapsError', handleGoogleMapsError);
+        clearTimeout(timeoutId);
+      };
+
+      // Add event listeners
+      window.addEventListener('googleMapsLoaded', handleGoogleMapsLoaded);
+      window.addEventListener('googleMapsError', handleGoogleMapsError);
+
+      // Set timeout for loading
+      const timeoutId = setTimeout(() => {
+        console.error('❌ Google Maps loading timeout after 15 seconds');
+        setGoogleMapsError('Google Maps failed to load within 15 seconds. Please check your internet connection and API key.');
+        setGoogleMapsReady(false);
+        resolve(false);
+        cleanup();
+      }, 15000); // Increased timeout to 15 seconds
+
+      // Check periodically if Google Maps becomes available
       const checkInterval = setInterval(() => {
         if (window.google && window.google.maps && window.google.maps.Map) {
-          clearInterval(checkInterval);
+          console.log('✅ Google Maps detected via polling');
           setGoogleMapsReady(true);
+          setGoogleMapsError(null);
           resolve(true);
+          cleanup();
+          clearInterval(checkInterval);
         }
-      }, 100);
-      
-      // Timeout after 10 seconds
+      }, 500);
+
+      // Clean up interval after timeout
       setTimeout(() => {
         clearInterval(checkInterval);
-        if (!window.google || !window.google.maps) {
-          console.error('❌ Google Maps API failed to load within 10 seconds');
-          setMapError('Google Maps API non disponibile. Ricarica la pagina.');
-          resolve(false);
-        }
-      }, 10000);
+      }, 15000);
     });
   }, []);
 
@@ -133,7 +177,7 @@ const FullPageMap = ({
 
     const initMap = async () => {
       try {
-        console.log('🗺️ Waiting for Google Maps API...');
+        console.log('🗺️ Initializing Google Map...');
         
         // Wait for Google Maps to be ready
         const isReady = await checkGoogleMapsAvailability();
@@ -141,12 +185,12 @@ const FullPageMap = ({
           return;
         }
 
-        console.log('🗺️ Initializing Google Map...');
+        console.log('🗺️ Creating Google Map instance...');
 
         // IMPROVED: Validate mapRef.current exists
         if (!mapRef.current) {
           console.error('❌ Map container ref is null');
-          setMapError('Contenitore mappa non trovato');
+          setMapError('Map container not found');
           return;
         }
 
@@ -207,7 +251,6 @@ const FullPageMap = ({
                 { "weight": 1 }
               ]
             },
-            // Italian coffee shops and restaurants prominently displayed
             {
               "featureType": "poi.business",
               "elementType": "labels.icon",
@@ -216,7 +259,6 @@ const FullPageMap = ({
                 { "saturation": 20 }
               ]
             },
-            // Highlight food & drink establishments
             {
               "featureType": "poi.food",
               "elementType": "labels.icon",
@@ -226,7 +268,6 @@ const FullPageMap = ({
                 { "lightness": -5 }
               ]
             },
-            // Parks and greenery for Italian ambiance
             {
               "featureType": "poi.park",
               "elementType": "geometry.fill",
@@ -234,7 +275,6 @@ const FullPageMap = ({
                 { "color": "#D4E6B7" }
               ]
             },
-            // Enhanced styling for Italian context
             {
               "featureType": "poi.place_of_worship",
               "elementType": "labels",
@@ -242,7 +282,6 @@ const FullPageMap = ({
                 { "visibility": "simplified" }
               ]
             },
-            // Clean, elegant Italian aesthetic
             {
               "featureType": "administrative",
               "elementType": "labels.text.fill",
@@ -250,7 +289,6 @@ const FullPageMap = ({
                 { "color": "#8B7355" }
               ]
             },
-            // Warm building colors
             {
               "featureType": "poi.government",
               "stylers": [
@@ -266,13 +304,13 @@ const FullPageMap = ({
           scrollwheel: true
         };
 
-        // IMPROVED: Create map with error handling
+        // IMPROVED: Create map with better error handling
         try {
           googleMapRef.current = new window.google.maps.Map(mapRef.current, mapOptions);
           console.log('✅ Google Map instance created successfully');
         } catch (mapCreationError) {
           console.error('❌ Failed to create Google Map instance:', mapCreationError);
-          setMapError('Errore nella creazione della mappa');
+          setMapError('Error creating map instance');
           return;
         }
 
@@ -333,7 +371,7 @@ const FullPageMap = ({
           });
           
           // Fallback timeout
-          setTimeout(resolve, 5000);
+          setTimeout(resolve, 3000);
         });
 
         await tilesLoadedPromise;
@@ -348,7 +386,7 @@ const FullPageMap = ({
 
       } catch (error) {
         console.error('❌ Failed to initialize Google Map:', error);
-        setMapError('Errore nell\'inizializzazione della mappa');
+        setMapError('Failed to initialize map: ' + error.message);
       }
     };
 
@@ -398,7 +436,7 @@ const FullPageMap = ({
         lng: userLocation.longitude 
       },
       map: googleMapRef.current,
-      title: `La tua posizione (±${Math.round(userLocation.accuracy || 0)}m)`,
+      title: `Your location (±${Math.round(userLocation.accuracy || 0)}m)`,
       icon: {
         url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
           <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -477,62 +515,27 @@ const FullPageMap = ({
         lng: cafe.location.longitude
       };
 
-      // IMPROVED: Use AdvancedMarkerElement if available, fallback to Marker
-      let marker;
-      
-      try {
-        // Try to use the new AdvancedMarkerElement (if available)
-        if (window.google.maps.marker && window.google.maps.marker.AdvancedMarkerElement) {
-          const markerElement = document.createElement('div');
-          markerElement.innerHTML = `
-            <div style="
-              background: ${getItalianVenueMarkerColor(cafe)};
-              color: white;
-              padding: 8px 12px;
-              border-radius: 20px;
-              font-size: 18px;
-              font-weight: bold;
-              box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-              border: 2px solid white;
-              cursor: pointer;
-              transition: transform 0.2s ease;
-            " onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
-              ${getItalianVenueEmoji(cafe)} ${cafe.name.length > 15 ? cafe.name.substring(0, 15) + '...' : cafe.name}
-            </div>
-          `;
-
-          marker = new window.google.maps.marker.AdvancedMarkerElement({
-            position: position,
-            map: googleMapRef.current,
-            title: `${cafe.name}${cafe.rating ? ` (${cafe.rating}⭐)` : ''}${cafe.distance ? ` - ${cafe.formattedDistance}` : ''}`,
-            content: markerElement
-          });
-        } else {
-          throw new Error('AdvancedMarkerElement not available');
-        }
-      } catch (advancedMarkerError) {
-        // Fallback to traditional Marker
-        marker = new window.google.maps.Marker({
-          position: position,
-          map: googleMapRef.current,
-          title: `${cafe.name}${cafe.rating ? ` (${cafe.rating}⭐)` : ''}${cafe.distance ? ` - ${cafe.formattedDistance}` : ''}`,
-          icon: {
-            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-              <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M16 0C7.163 0 0 7.163 0 16C0 24.837 16 40 16 40S32 24.837 32 16C32 7.163 24.837 0 16 0Z" fill="${getItalianVenueMarkerColor(cafe)}"/>
-                <circle cx="16" cy="16" r="8" fill="white"/>
-                <text x="16" y="20" text-anchor="middle" font-size="12" fill="${getItalianVenueMarkerColor(cafe)}">${getItalianVenueEmoji(cafe)}</text>
-                ${cafe.distance && cafe.distance < 200 ? '<circle cx="16" cy="16" r="11" fill="none" stroke="#10B981" stroke-width="2" opacity="0.6"/>' : ''}
-              </svg>
-            `),
-            scaledSize: new window.google.maps.Size(32, 40),
-            anchor: new window.google.maps.Point(16, 40)
-          },
-          zIndex: cafe.distance ? Math.round(1000 - cafe.distance / 10) : 500,
-          animation: cafe.distance && cafe.distance < 200 ? 
-            window.google.maps.Animation.BOUNCE : null
-        });
-      }
+      // Use traditional Marker (most compatible)
+      const marker = new window.google.maps.Marker({
+        position: position,
+        map: googleMapRef.current,
+        title: `${cafe.name}${cafe.rating ? ` (${cafe.rating}⭐)` : ''}${cafe.distance ? ` - ${cafe.formattedDistance}` : ''}`,
+        icon: {
+          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+            <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M16 0C7.163 0 0 7.163 0 16C0 24.837 16 40 16 40S32 24.837 32 16C32 7.163 24.837 0 16 0Z" fill="${getItalianVenueMarkerColor(cafe)}"/>
+              <circle cx="16" cy="16" r="8" fill="white"/>
+              <text x="16" y="20" text-anchor="middle" font-size="12" fill="${getItalianVenueMarkerColor(cafe)}">${getItalianVenueEmoji(cafe)}</text>
+              ${cafe.distance && cafe.distance < 200 ? '<circle cx="16" cy="16" r="11" fill="none" stroke="#10B981" stroke-width="2" opacity="0.6"/>' : ''}
+            </svg>
+          `),
+          scaledSize: new window.google.maps.Size(32, 40),
+          anchor: new window.google.maps.Point(16, 40)
+        },
+        zIndex: cafe.distance ? Math.round(1000 - cafe.distance / 10) : 500,
+        animation: cafe.distance && cafe.distance < 200 ? 
+          window.google.maps.Animation.BOUNCE : null
+      });
 
       // Add click listener
       marker.addListener('click', () => {
@@ -605,24 +608,39 @@ const FullPageMap = ({
   // Handle retry map loading
   const handleRetryMap = useCallback(() => {
     setMapError(null);
+    setGoogleMapsError(null);
     setMapLoaded(false);
     setMapInitialized(false);
     setGoogleMapsReady(false);
+    
+    // Reload the page to reinitialize Google Maps
     window.location.reload();
   }, []);
 
-  if (mapError) {
+  // Determine the error message to show
+  const errorMessage = mapError || googleMapsError;
+
+  if (errorMessage) {
     return (
       <div className="map-error-container">
         <div className="map-error-content">
           <div className="error-icon">🗺️❌</div>
-          <h3>Errore Mappa</h3>
-          <p>{mapError}</p>
+          <h3>Google Maps Error</h3>
+          <p>{errorMessage}</p>
+          <div className="error-details">
+            <h4>Possible solutions:</h4>
+            <ul>
+              <li>Check your internet connection</li>
+              <li>Verify your Google Maps API key is valid</li>
+              <li>Ensure Places API is enabled in your Google Cloud Console</li>
+              <li>Check if your API key has proper domain restrictions</li>
+            </ul>
+          </div>
           <button 
             className="btn-apple-base btn-primary"
             onClick={handleRetryMap}
           >
-            Riprova
+            🔄 Reload Page
           </button>
         </div>
       </div>
@@ -678,8 +696,8 @@ const FullPageMap = ({
       {/* Error Message */}
       {error && (
         <div className="map-error-toast">
-          <span>❌ {error.message || 'Errore nel caricamento dei dati'}</span>
-          <button onClick={onRefresh}>Riprova</button>
+          <span>❌ {error.message || 'Error loading data'}</span>
+          <button onClick={onRefresh}>Retry</button>
         </div>
       )}
 
@@ -700,8 +718,6 @@ const FullPageMap = ({
           <div>Map Loaded: {mapLoaded ? '✅' : '⏳'}</div>
           <div>Italian Venues: {cafes.length}</div>
           <div>Dragging: {isUserDraggingRef.current ? '🖱️' : '✋'}</div>
-          <div>Last Search: {lastSearchLocationRef.current ? 
-            `${lastSearchLocationRef.current.lat.toFixed(3)}, ${lastSearchLocationRef.current.lng.toFixed(3)}` : 'None'}</div>
         </div>
       )}
     </div>

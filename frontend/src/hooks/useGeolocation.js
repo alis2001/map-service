@@ -1,93 +1,88 @@
-// hooks/useGeolocation.js - FIXED VERSION with Immediate Default Location
-// Location: /map-service/frontend/src/hooks/useGeolocation.js
+// hooks/useGeolocation.js - FIXED VERSION - Actually Track User's Real Location
+// Location: /frontend/src/hooks/useGeolocation.js
 
 import { useState, useEffect, useCallback } from 'react';
 
 export const useGeolocation = () => {
   const [location, setLocation] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Start with loading = true
   const [error, setError] = useState(null);
   const [watchId, setWatchId] = useState(null);
   const [permissionGranted, setPermissionGranted] = useState(false);
 
-  // OPTIMIZED: Geolocation options for better accuracy
+  // Geolocation options for better accuracy
   const options = {
     enableHighAccuracy: true,
-    timeout: 10000, // 10 seconds timeout
+    timeout: 15000, // 15 seconds timeout
     maximumAge: 5 * 60 * 1000 // 5 minutes cache
   };
 
-  // OPTIMIZED: Use Italian default immediately without delay
-  const useItalianDefault = useCallback(() => {
-    const defaultLocation = {
+  // Turin fallback only as last resort
+  const setTurinFallback = useCallback(() => {
+    const fallbackLocation = {
       latitude: 45.0703,
       longitude: 7.6869,
       accuracy: 50000,
       timestamp: new Date().toISOString(),
-      source: 'default',
+      source: 'fallback',
       city: 'Torino',
-      country: 'Italy'
+      country: 'Italy',
+      note: 'Using fallback location - enable GPS for better experience'
     };
 
-    console.log('📍 Using Italian default location:', defaultLocation);
-    setLocation(defaultLocation);
-    setLoading(false); // Stop loading
-    setError(null); // Clear error
-    setPermissionGranted(false); // Mark as no permission but working
-    
-    // Cache default location
-    try {
-      const locationWithExpiry = {
-        ...defaultLocation,
-        expiresAt: Date.now() + (60 * 60 * 1000) // 1 hour expiry for default
-      };
-      localStorage.setItem('lastKnownLocation', JSON.stringify(locationWithExpiry));
-    } catch (e) {
-      console.warn('Failed to cache default location:', e);
-    }
+    console.log('📍 Using Turin fallback location as last resort:', fallbackLocation);
+    setLocation(fallbackLocation);
+    setLoading(false);
+    setError(null);
+    setPermissionGranted(false);
   }, []);
 
-  // OPTIMIZED: Faster IP geolocation with shorter timeout
+  // IMPROVED: IP geolocation as intermediate fallback
   const tryIPGeolocation = useCallback(async () => {
     try {
-      console.log('🌐 Trying IP-based geolocation...');
+      console.log('🌐 Attempting IP-based geolocation...');
+      setLoading(true);
       
       const providers = [
-        'https://ipapi.co/json/',
-        'https://ipinfo.io/json',
-        'http://ip-api.com/json'
+        { url: 'https://ipapi.co/json/', type: 'ipapi' },
+        { url: 'https://ipinfo.io/json', type: 'ipinfo' },
+        { url: 'http://ip-api.com/json', type: 'ipapi_com' }
       ];
 
       for (const provider of providers) {
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+          const timeoutId = setTimeout(() => controller.abort(), 5000);
           
-          const response = await fetch(provider, { 
+          const response = await fetch(provider.url, { 
             signal: controller.signal
           });
           clearTimeout(timeoutId);
           
           const data = await response.json();
-
           let latitude, longitude, city, country;
 
-          if (provider.includes('ipapi.co')) {
-            latitude = data.latitude;
-            longitude = data.longitude;
-            city = data.city;
-            country = data.country_name;
-          } else if (provider.includes('ipinfo.io')) {
-            const [lat, lng] = (data.loc || '').split(',');
-            latitude = parseFloat(lat);
-            longitude = parseFloat(lng);
-            city = data.city;
-            country = data.country;
-          } else if (provider.includes('ip-api.com')) {
-            latitude = data.lat;
-            longitude = data.lon;
-            city = data.city;
-            country = data.country;
+          // Parse different provider formats
+          switch (provider.type) {
+            case 'ipapi':
+              latitude = data.latitude;
+              longitude = data.longitude;
+              city = data.city;
+              country = data.country_name;
+              break;
+            case 'ipinfo':
+              const [lat, lng] = (data.loc || '').split(',');
+              latitude = parseFloat(lat);
+              longitude = parseFloat(lng);
+              city = data.city;
+              country = data.country;
+              break;
+            case 'ipapi_com':
+              latitude = data.lat;
+              longitude = data.lon;
+              city = data.city;
+              country = data.country;
+              break;
           }
 
           if (latitude && longitude && !isNaN(latitude) && !isNaN(longitude)) {
@@ -99,15 +94,16 @@ export const useGeolocation = () => {
               source: 'ip',
               city,
               country,
-              provider: provider.split('/')[2]
+              provider: provider.type,
+              note: 'Location based on IP address - enable GPS for precise location'
             };
 
-            console.log('📍 IP-based location found:', ipLocation);
+            console.log('✅ IP-based location found:', ipLocation);
             setLocation(ipLocation);
             setLoading(false);
             setError(null);
             
-            // Cache IP location but with shorter expiry
+            // Cache IP location
             try {
               const locationWithExpiry = {
                 ...ipLocation,
@@ -118,10 +114,10 @@ export const useGeolocation = () => {
               console.warn('Failed to cache IP location:', e);
             }
             
-            return;
+            return true;
           }
         } catch (providerError) {
-          console.warn(`IP provider ${provider} failed:`, providerError);
+          console.warn(`IP provider ${provider.type} failed:`, providerError);
           continue;
         }
       }
@@ -129,12 +125,13 @@ export const useGeolocation = () => {
       throw new Error('All IP geolocation providers failed');
 
     } catch (ipError) {
-      console.warn('All IP geolocation methods failed, using Italian default:', ipError);
-      useItalianDefault();
+      console.warn('IP geolocation failed, using Turin fallback:', ipError);
+      setTurinFallback();
+      return false;
     }
-  }, [useItalianDefault]);
+  }, [setTurinFallback]);
 
-  // OPTIMIZED: Better cached location handling with immediate fallback
+  // Check cached location but prioritize fresh GPS
   const checkCachedLocation = useCallback(() => {
     try {
       const cachedLocation = localStorage.getItem('lastKnownLocation');
@@ -142,49 +139,45 @@ export const useGeolocation = () => {
       
       if (permissionStatus === 'true') {
         setPermissionGranted(true);
-        setError(null);
       }
       
       if (cachedLocation) {
         const parsedLocation = JSON.parse(cachedLocation);
         
-        // Use cached location even if expired (better than nothing)
+        // Use cached location temporarily while we try to get fresh GPS
         if (parsedLocation.latitude && parsedLocation.longitude) {
-          console.log('📍 Using cached location (may be expired)');
+          console.log('📍 Using cached location temporarily');
           setLocation({
             ...parsedLocation,
-            source: 'cache'
+            source: 'cache',
+            note: 'Cached location - requesting fresh GPS data'
           });
-          setError(null);
           return true;
         }
       }
       
-      // If no cached location, use default immediately
-      console.log('📍 No cached location, using default');
-      useItalianDefault();
       return false;
     } catch (e) {
       console.warn('Failed to retrieve cached location:', e);
-      useItalianDefault();
+      return false;
     }
-    return false;
-  }, [useItalianDefault]);
+  }, []);
 
-  // Success callback with improved validation and persistence
+  // SUCCESS: GPS location obtained
   const onSuccess = useCallback((position) => {
     const coords = position.coords;
     
-    console.log('📍 Geolocation success:', {
+    console.log('✅ GPS location success:', {
       latitude: coords.latitude,
       longitude: coords.longitude,
       accuracy: coords.accuracy,
       timestamp: new Date(position.timestamp).toISOString()
     });
 
-    // Validate coordinates are reasonable (not 0,0 or extreme values)
+    // Validate coordinates
     if (coords.latitude === 0 && coords.longitude === 0) {
-      console.warn('📍 Invalid coordinates (0,0) received, keeping current location');
+      console.warn('📍 Invalid coordinates (0,0) received');
+      tryIPGeolocation();
       return;
     }
 
@@ -196,7 +189,8 @@ export const useGeolocation = () => {
       source: 'gps',
       isAccurate: coords.accuracy < 100,
       heading: coords.heading,
-      speed: coords.speed
+      speed: coords.speed,
+      note: `GPS location with ${Math.round(coords.accuracy)}m accuracy`
     };
 
     setLocation(newLocation);
@@ -204,7 +198,7 @@ export const useGeolocation = () => {
     setError(null);
     setPermissionGranted(true);
 
-    // Store both location and permission status
+    // Store GPS location and permission status
     try {
       const locationWithExpiry = {
         ...newLocation,
@@ -213,13 +207,13 @@ export const useGeolocation = () => {
       localStorage.setItem('lastKnownLocation', JSON.stringify(locationWithExpiry));
       localStorage.setItem('locationPermissionGranted', 'true');
       localStorage.setItem('lastLocationUpdate', Date.now().toString());
-      console.log('📍 GPS location and permission status cached');
+      console.log('💾 GPS location cached successfully');
     } catch (e) {
       console.warn('Failed to store location in localStorage:', e);
     }
-  }, []);
+  }, [tryIPGeolocation]);
 
-  // OPTIMIZED: Better error handling with permission tracking
+  // ERROR: GPS failed
   const onError = useCallback((error) => {
     console.error('❌ Geolocation error:', error);
     
@@ -228,22 +222,35 @@ export const useGeolocation = () => {
 
     switch (error.code) {
       case error.PERMISSION_DENIED:
-        errorMessage = 'Accesso alla posizione negato.';
+        errorMessage = 'GPS access denied by user';
         errorCode = 'PERMISSION_DENIED';
         localStorage.setItem('locationPermissionGranted', 'denied');
         setPermissionGranted(false);
+        // Try IP geolocation if GPS denied
+        console.log('📍 GPS denied, trying IP geolocation...');
+        setTimeout(() => tryIPGeolocation(), 1000);
         break;
+        
       case error.POSITION_UNAVAILABLE:
-        errorMessage = 'Posizione GPS non disponibile.';
+        errorMessage = 'GPS position unavailable';
         errorCode = 'POSITION_UNAVAILABLE';
+        // Try IP geolocation if GPS unavailable
+        console.log('📍 GPS unavailable, trying IP geolocation...');
+        setTimeout(() => tryIPGeolocation(), 1000);
         break;
+        
       case error.TIMEOUT:
-        errorMessage = 'Timeout GPS.';
+        errorMessage = 'GPS timeout';
         errorCode = 'TIMEOUT';
+        // Try IP geolocation if GPS times out
+        console.log('📍 GPS timeout, trying IP geolocation...');
+        setTimeout(() => tryIPGeolocation(), 1000);
         break;
+        
       default:
-        errorMessage = 'Errore di geolocalizzazione.';
+        errorMessage = 'GPS error occurred';
         errorCode = 'UNKNOWN_ERROR';
+        setTimeout(() => tryIPGeolocation(), 1000);
         break;
     }
 
@@ -252,55 +259,46 @@ export const useGeolocation = () => {
       code: errorCode,
       originalError: error
     });
-    setLoading(false);
 
-    // For non-permission errors, silently continue with current location
-    if (error.code !== error.PERMISSION_DENIED) {
-      console.log('📍 GPS failed, continuing with current location or using IP fallback');
-      if (!location) {
-        tryIPGeolocation();
-      }
-    }
-  }, [location, tryIPGeolocation]);
-
-  // OPTIMIZED: More intelligent position request
-  const requestLocation = useCallback(() => {
-    // Check if user previously denied permission
-    const permissionStatus = localStorage.getItem('locationPermissionGranted');
+    // Don't set loading to false here - let IP geolocation handle it
     
-    if (permissionStatus === 'denied') {
-      console.log('📍 User previously denied permission, not requesting again');
-      return;
-    }
+  }, [tryIPGeolocation]);
 
+  // REQUEST: Get user's GPS location
+  const requestLocation = useCallback(() => {
+    console.log('📍 Requesting user GPS location...');
+    
     if (!navigator.geolocation) {
-      const notSupportedError = {
-        message: 'La geolocalizzazione non è supportata da questo browser',
+      console.error('❌ Geolocation not supported');
+      setError({
+        message: 'Geolocation not supported by this browser',
         code: 'NOT_SUPPORTED'
-      };
-      setError(notSupportedError);
+      });
       setLoading(false);
+      // Try IP geolocation as fallback
+      setTimeout(() => tryIPGeolocation(), 1000);
       return;
     }
 
     setLoading(true);
     setError(null);
 
-    console.log('📍 Requesting geolocation...');
-    
-    // Try high accuracy first, then fallback to lower accuracy
+    // Clear any permission denied status for retry
+    localStorage.removeItem('locationPermissionGranted');
+
+    // Try high accuracy GPS first
     navigator.geolocation.getCurrentPosition(
       onSuccess, 
       (error) => {
         if (error.code === error.TIMEOUT && options.enableHighAccuracy) {
-          console.log('📍 High accuracy failed, trying standard accuracy...');
+          console.log('📍 High accuracy GPS failed, trying standard accuracy...');
           navigator.geolocation.getCurrentPosition(
             onSuccess,
             onError,
             {
               ...options,
               enableHighAccuracy: false,
-              timeout: 8000
+              timeout: 10000
             }
           );
         } else {
@@ -309,25 +307,40 @@ export const useGeolocation = () => {
       }, 
       options
     );
-  }, [onSuccess, onError, options]);
+  }, [onSuccess, onError, options, tryIPGeolocation]);
 
-  // OPTIMIZED: Initialize location immediately without waiting for permission
+  // INITIALIZATION: Try to get user's actual location on mount
   useEffect(() => {
-    if (!location && !loading) {
-      console.log('🔍 Initializing location immediately...');
-      
-      // First check cached location, if none use default immediately
-      const hasCachedLocation = checkCachedLocation();
-      
-      // Try to get GPS in background if geolocation is enabled
-      if (process.env.REACT_APP_ENABLE_GEOLOCATION === 'true') {
-        setTimeout(() => {
-          console.log('📍 Trying GPS in background...');
-          requestLocation();
-        }, 2000); // Try GPS after 2 seconds in background
-      }
+    console.log('🔍 Initializing geolocation...');
+    
+    // Check permission status first
+    const permissionStatus = localStorage.getItem('locationPermissionGranted');
+    
+    if (permissionStatus === 'denied') {
+      console.log('📍 GPS previously denied, trying IP geolocation directly');
+      tryIPGeolocation();
+      return;
     }
-  }, []); // Run only once on mount
+
+    // Load cached location temporarily
+    const hasCachedLocation = checkCachedLocation();
+    
+    // ALWAYS try to get fresh GPS location (this is the key fix)
+    console.log('🎯 Attempting to get user\'s actual GPS location...');
+    requestLocation();
+    
+    // If no cached location and GPS takes too long, fallback to IP after 8 seconds
+    if (!hasCachedLocation) {
+      const fallbackTimer = setTimeout(() => {
+        if (loading) {
+          console.log('📍 GPS taking too long, trying IP geolocation...');
+          tryIPGeolocation();
+        }
+      }, 8000);
+      
+      return () => clearTimeout(fallbackTimer);
+    }
+  }, []);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -338,18 +351,22 @@ export const useGeolocation = () => {
     };
   }, [watchId]);
 
-  // Clear permission denied status (for retry button)
+  // Clear permission denied status
   const clearPermissionDenied = useCallback(() => {
     localStorage.removeItem('locationPermissionGranted');
     setPermissionGranted(false);
     setError(null);
-  }, []);
+    setLoading(true);
+    
+    // Retry getting GPS location
+    requestLocation();
+  }, [requestLocation]);
 
-  // Start watching position
+  // Start watching position (for continuous tracking)
   const startWatching = useCallback(() => {
     if (!navigator.geolocation || watchId || !permissionGranted) return;
 
-    console.log('📍 Starting position watch...');
+    console.log('📍 Starting GPS position watching...');
     const id = navigator.geolocation.watchPosition(onSuccess, onError, {
       ...options,
       timeout: 30000,
@@ -361,7 +378,7 @@ export const useGeolocation = () => {
 
   const stopWatching = useCallback(() => {
     if (watchId) {
-      console.log('📍 Stopping position watch...');
+      console.log('📍 Stopping GPS position watching...');
       navigator.geolocation.clearWatch(watchId);
       setWatchId(null);
     }
@@ -390,15 +407,15 @@ export const useGeolocation = () => {
     return {
       ...location,
       formattedCoords: `${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`,
-      accuracyText: location.accuracy < 50 ? 'Precisione alta' : 
-                   location.accuracy < 200 ? 'Precisione buona' : 
-                   location.accuracy < 1000 ? 'Precisione media' : 'Precisione bassa',
+      accuracyText: location.accuracy < 50 ? 'High precision' : 
+                   location.accuracy < 200 ? 'Good precision' : 
+                   location.accuracy < 1000 ? 'Medium precision' : 'Low precision',
       sourceText: {
         gps: 'GPS',
-        ip: 'Indirizzo IP',
-        cache: 'Posizione salvata',
-        default: 'Posizione predefinita'
-      }[location.source] || 'Sconosciuta',
+        ip: 'IP Address',
+        cache: 'Cached',
+        fallback: 'Default Location'
+      }[location.source] || 'Unknown',
       isReliable: location.source === 'gps' && location.accuracy < 100
     };
   }, [location]);
@@ -416,12 +433,15 @@ export const useGeolocation = () => {
     formatLocation,
     clearPermissionDenied,
     
-    // New helper methods
+    // Helper methods
     hasReliableLocation: location?.source === 'gps' && location?.accuracy < 100,
     hasAnyLocation: !!location,
     isHighAccuracy: location?.accuracy && location.accuracy < 50,
+    isUsingFallback: location?.source === 'fallback',
+    isUsingGPS: location?.source === 'gps',
+    isUsingIP: location?.source === 'ip',
     
-    // OPTIMIZED: Better error state detection - only show modal for explicit permission denial
+    // Show modal only for explicit permission denial
     shouldShowLocationModal: error?.code === 'PERMISSION_DENIED' && 
                             localStorage.getItem('locationPermissionGranted') === 'denied'
   };

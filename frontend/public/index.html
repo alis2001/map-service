@@ -17,23 +17,6 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- UPDATED: Async Google Maps API Loading -->
-    <script>
-      function initGoogleMaps() {
-        console.log('🗺️ Google Maps API loaded asynchronously');
-        // Maps API is now ready, React will handle initialization
-      }
-      
-      // Load Google Maps API asynchronously
-      (function() {
-        const script = document.createElement('script');
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '%REACT_APP_GOOGLE_MAPS_API_KEY%'}&libraries=places,geometry&loading=async&callback=initGoogleMaps`;
-        script.async = true;
-        script.defer = true;
-        document.head.appendChild(script);
-      })();
-    </script>
-    
     <title>CoffeeFinder - Discover Great Italian Coffee & Restaurants Nearby</title>
     
     <style>
@@ -125,6 +108,94 @@
     <!-- React Root -->
     <div id="root"></div>
     
+    <!-- FIXED: Google Maps Script Loading -->
+    <script>
+      // Global configuration for Google Maps
+      window.GOOGLE_MAPS_CONFIG = {
+        apiKey: '%REACT_APP_GOOGLE_MAPS_API_KEY%',
+        libraries: ['places', 'geometry'],
+        loading: 'async'
+      };
+
+      // Global callback for Google Maps initialization
+      window.initGoogleMaps = function() {
+        console.log('🗺️ Google Maps API loaded successfully');
+        window.googleMapsLoaded = true;
+        
+        // Dispatch custom event to notify React components
+        window.dispatchEvent(new CustomEvent('googleMapsLoaded'));
+      };
+
+      // Error callback for Google Maps authentication failure
+      window.gm_authFailure = function() {
+        console.error('❌ Google Maps authentication failed');
+        console.error('🔑 Please check your API key configuration');
+        
+        // Dispatch error event
+        window.dispatchEvent(new CustomEvent('googleMapsError', {
+          detail: { 
+            type: 'auth_failure',
+            message: 'Google Maps authentication failed. Please check your API key.' 
+          }
+        }));
+      };
+
+      // Load Google Maps API script
+      function loadGoogleMapsAPI() {
+        // Check if already loaded
+        if (window.google && window.google.maps) {
+          console.log('🗺️ Google Maps already loaded');
+          window.initGoogleMaps();
+          return;
+        }
+
+        console.log('🔄 Loading Google Maps API...');
+        
+        const script = document.createElement('script');
+        const apiKey = window.GOOGLE_MAPS_CONFIG.apiKey;
+        
+        // Validate API key format
+        if (!apiKey || apiKey.startsWith('%') || apiKey === 'your_api_key_here') {
+          console.error('❌ Invalid Google Maps API key');
+          window.dispatchEvent(new CustomEvent('googleMapsError', {
+            detail: { 
+              type: 'invalid_key',
+              message: 'Invalid or missing Google Maps API key' 
+            }
+          }));
+          return;
+        }
+
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=${window.GOOGLE_MAPS_CONFIG.libraries.join(',')}&loading=${window.GOOGLE_MAPS_CONFIG.loading}&callback=initGoogleMaps`;
+        script.async = true;
+        script.defer = true;
+        
+        // Handle script loading errors
+        script.onerror = function() {
+          console.error('❌ Failed to load Google Maps API script');
+          window.dispatchEvent(new CustomEvent('googleMapsError', {
+            detail: { 
+              type: 'script_load_error',
+              message: 'Failed to load Google Maps API script' 
+            }
+          }));
+        };
+
+        script.onload = function() {
+          console.log('✅ Google Maps API script loaded');
+        };
+
+        document.head.appendChild(script);
+      }
+
+      // Start loading Google Maps when DOM is ready
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', loadGoogleMapsAPI);
+      } else {
+        loadGoogleMapsAPI();
+      }
+    </script>
+    
     <script>
       // Remove loading screen once React loads
       window.addEventListener('load', function() {
@@ -136,18 +207,23 @@
             loader.style.opacity = '0';
             loader.style.transition = 'opacity 0.5s ease-out';
             setTimeout(() => {
-              loader.remove();
+              if (loader.parentNode) {
+                loader.remove();
+              }
               body.classList.remove('loading');
             }, 500);
           }
         }, 1000); // Minimum 1 second loading time for better UX
       });
-      
-      // Handle Google Maps loading errors
-      window.gm_authFailure = function() {
-        console.error('Google Maps authentication failed');
-        alert('Google Maps failed to load. Please check your API key configuration.');
-      };
+
+      // Global error handlers
+      window.addEventListener('error', function(event) {
+        console.error('🚨 Global JavaScript error:', event.error);
+      });
+
+      window.addEventListener('unhandledrejection', function(event) {
+        console.error('🚨 Unhandled promise rejection:', event.reason);
+      });
     </script>
   </body>
 </html>
