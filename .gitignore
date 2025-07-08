@@ -1,0 +1,169 @@
+
+# .gitignore
+# Location: /map-service/.gitignore (root directory)
+
+# ==========================================
+# IMPORTANT: Keep these files for project continuity
+# ==========================================
+# These files WILL BE TRACKED in git:
+# - All source code (.js, .json, .md files)
+# - Configuration files (.env.example, docker-compose.yml, Dockerfile)
+# - Database schema (prisma/schema.prisma)
+# - All backend structure (routes/, controllers/, etc.)
+# - Package.json and package-lock.json
+# - README.md and documentation
+
+# ==========================================
+# Node.js Dependencies (IGNORE)
+# ==========================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# ==========================================
+# Environment & Secrets (IGNORE)
+# ==========================================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# But keep example files
+!.env.example
+
+# ==========================================
+# Logs & Runtime (IGNORE)
+# ==========================================
+logs/
+*.log
+lerna-debug.log*
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# ==========================================
+# Database Files (IGNORE)
+# ==========================================
+*.db
+*.sqlite
+*.sqlite3
+
+# Keep schema and migration files
+!prisma/schema.prisma
+!prisma/migrations/
+!migrations/
+
+# ==========================================
+# Docker Volumes & Data (IGNORE)
+# ==========================================
+postgres_data/
+redis_data/
+map_db_data/
+map_redis_data/
+
+# Keep Docker configuration files
+!docker-compose.yml
+!backend/Dockerfile
+!frontend/Dockerfile
+!.dockerignore
+
+# ==========================================
+# IDE & OS Files (IGNORE)
+# ==========================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ==========================================
+# Build & Cache (IGNORE)
+# ==========================================
+dist/
+build/
+coverage/
+.nyc_output/
+.cache/
+.parcel-cache/
+.next/
+.nuxt/
+
+# ==========================================
+# Temporary Files (IGNORE)
+# ==========================================
+*.tmp
+*.temp
+.tmp/
+
+# ==========================================
+# Redis & Database Dumps (IGNORE)
+# ==========================================
+dump.rdb
+*.dump
+
+# ==========================================
+# PROJECT STRUCTURE PRESERVED FOR CONTINUITY
+# ==========================================
+# These files will be tracked in git for project continuation:
+# 
+# map-service/
+# ├── backend/
+# │   ├── server.js              ✅ TRACKED - Main Express server
+# │   ├── package.json           ✅ TRACKED - Dependencies list
+# │   ├── .env.example           ✅ TRACKED - Environment template
+# │   ├── .env.template          ✅ TRACKED - Working config (sanitized)
+# │   ├── Dockerfile             ✅ TRACKED - Container setup
+# │   ├── .dockerignore          ✅ TRACKED - Docker ignore rules
+# │   ├── config/
+# │   │   ├── prisma.js          ✅ TRACKED - Database client
+# │   │   ├── redis.js           ✅ TRACKED - Cache configuration
+# │   │   └── googlePlaces.js    ✅ TRACKED - API integration
+# │   ├── middleware/
+# │   │   ├── errorHandler.js    ✅ TRACKED - Error handling
+# │   │   ├── notFound.js        ✅ TRACKED - 404 handler
+# │   │   ├── auth.js            ✅ TRACKED - Authentication
+# │   │   └── validation.js      ✅ TRACKED - Input validation
+# │   ├── routes/
+# │   │   ├── authRoutes.js      ✅ TRACKED - Auth endpoints
+# │   │   ├── locationRoutes.js  ✅ TRACKED - Location tracking
+# │   │   └── placesRoutes.js    ✅ TRACKED - Places API
+# │   ├── controllers/           ✅ TRACKED - Business logic
+# │   ├── models/               ✅ TRACKED - Data models
+# │   ├── services/             ✅ TRACKED - External services
+# │   ├── utils/
+# │   │   ├── logger.js         ✅ TRACKED - Logging system
+# │   │   ├── validators.js     ✅ TRACKED - Input validators
+# │   │   └── helpers.js        ✅ TRACKED - Utility functions
+# │   ├── prisma/
+# │   │   └── schema.prisma     ✅ TRACKED - Database schema
+# │   └── migrations/           ✅ TRACKED - DB migrations
+# ├── frontend/                 ✅ TRACKED - React app (when created)
+# ├── docker-compose.yml        ✅ TRACKED - Container orchestration
+# ├── README.md                 ✅ TRACKED - Documentation
+# ├── PROJECT_STATUS.md         ✅ TRACKED - Development progress
+# ├── .gitignore               ✅ TRACKED - Git ignore rules
+# └── package.json             ✅ TRACKED - Root dependencies
+#
+# EXCLUDED (❌ NOT TRACKED):
+# ├── node_modules/            ❌ NOT TRACKED - Dependencies
+# ├── .env                     ❌ NOT TRACKED - Actual secrets
+# ├── logs/                    ❌ NOT TRACKED - Log files
+# ├── postgres_data/           ❌ NOT TRACKED - DB volume
+# ├── redis_data/             ❌ NOT TRACKED - Cache volume
+# └── *.log                   ❌ NOT TRACKED - Log files
+#
+# FOR CHAT CONTINUATION:
+# All Docker configs, templates, and source code will be visible
+# .env.template shows exact working configuration (sanitized)
+# PROJECT_STATUS.md shows current development phase

@@ -1,0 +1,20 @@
+# .dockerignore
+# Location: /backend/.dockerignore
+
+node_modules
+npm-debug.log
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.git
+.gitignore
+README.md
+.nyc_output
+coverage
+.vscode
+.idea
+*.log
+logs
+.DS_Store
+Thumbs.db

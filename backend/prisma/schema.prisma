@@ -1,0 +1,114 @@
+// prisma/schema.prisma
+// Location: /backend/prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  username  String?  @unique
+  password  String
+  firstName String?
+  lastName  String?
+  avatar    String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  locations UserLocation[]
+  favorites FavoritePlace[]
+
+  @@map("users")
+}
+
+model UserLocation {
+  id        String   @id @default(cuid())
+  userId    String
+  latitude  Float
+  longitude Float
+  accuracy  Float?
+  timestamp DateTime @default(now())
+  address   String?
+  city      String?
+  country   String?
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_locations")
+}
+
+model Place {
+  id              String  @id @default(cuid())
+  googlePlaceId   String  @unique
+  name            String
+  address         String
+  latitude        Float
+  longitude       Float
+  placeType       String  // 'cafe' or 'bar'
+  rating          Float?
+  priceLevel      Int?
+  phoneNumber     String?
+  website         String?
+  openingHours    Json?
+  photos          Json?
+  businessStatus  String?
+  isActive        Boolean @default(true)
+  lastUpdated     DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  favorites FavoritePlace[]
+  reviews   PlaceReview[]
+
+  @@map("places")
+}
+
+model FavoritePlace {
+  id      String @id @default(cuid())
+  userId  String
+  placeId String
+  addedAt DateTime @default(now())
+
+  // Relations
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  place Place @relation(fields: [placeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, placeId])
+  @@map("favorite_places")
+}
+
+model PlaceReview {
+  id       String @id @default(cuid())
+  placeId  String
+  userId   String
+  rating   Int    @db.SmallInt
+  comment  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  place Place @relation(fields: [placeId], references: [id], onDelete: Cascade)
+
+  @@map("place_reviews")
+}
+
+model CacheEntry {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("cache_entries")
+}

@@ -1,0 +1,98 @@
+# docker-compose.yml
+# Location: /map-service/docker-compose.yml (root directory)
+
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  map-db:
+    image: postgres:15-alpine
+    container_name: map-service-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: map_service
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin5026
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5433:5432"
+    volumes:
+      - map_db_data:/var/lib/postgresql/data
+    networks:
+      - map-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d map_service"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  map-redis:
+    image: redis:7-alpine
+    container_name: map-service-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - map_redis_data:/data
+    networks:
+      - map-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend Service
+  map-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: map-service-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 5001
+      HOST: 0.0.0.0
+      FRONTEND_URL: http://localhost:3001
+      DB_HOST: map-db
+      DB_PORT: 5432
+      DB_NAME: map_service
+      DB_USER: postgres
+      DB_PASSWORD: admin5026
+      DATABASE_URL: postgresql://postgres:admin5026@map-db:5432/map_service
+      REDIS_HOST: map-redis
+      REDIS_PORT: 6379
+      JWT_SECRET: caffis_jwt_secret_2024_super_secure_key_xY9mN3pQ7rT2wK5vL8bC
+      JWT_EXPIRE: 7d
+      GOOGLE_PLACES_API_KEY: AIzaSyDD3X_K3n9WM6WpZCg40QA_hZqxK3HUDsQ
+      RATE_LIMIT_WINDOW: 900000
+      RATE_LIMIT_MAX: 100
+      LOG_LEVEL: info
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - map-network
+    depends_on:
+      map-db:
+        condition: service_healthy
+      map-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  map-network:
+    driver: bridge
+
+volumes:
+  map_db_data:
+    driver: local
+  map_redis_data:
+    driver: local
