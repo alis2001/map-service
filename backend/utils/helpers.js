@@ -1,4 +1,4 @@
-// utils/helpers.js
+// utils/helpers.js - FIXED VERSION with Complete API Utils
 // Location: /backend/utils/helpers.js
 
 const logger = require('./logger');
@@ -111,6 +111,7 @@ const formatPlace = (place, userLocation = null) => {
       longitude: place.longitude
     },
     placeType: place.placeType,
+    type: place.placeType, // Alias for compatibility
     rating: place.rating,
     priceLevel: place.priceLevel,
     phoneNumber: place.phoneNumber,
@@ -118,6 +119,7 @@ const formatPlace = (place, userLocation = null) => {
     businessStatus: place.businessStatus,
     openingHours: place.openingHours,
     photos: place.photos || [],
+    photoUrls: place.photoUrls || {},
     lastUpdated: place.lastUpdated
   };
   
@@ -129,6 +131,7 @@ const formatPlace = (place, userLocation = null) => {
       place.latitude,
       place.longitude
     );
+    formatted.formattedDistance = formatDistance(formatted.distance);
   }
   
   return formatted;
@@ -403,6 +406,80 @@ const logError = (error, context = {}) => {
   });
 };
 
+// FIXED: API Utils object for Google Places service
+const apiUtils = {
+  // Format place data for display
+  formatPlace(place) {
+    return formatPlace(place);
+  },
+
+  // Calculate distance between two points (Haversine formula)
+  calculateDistance(lat1, lng1, lat2, lng2) {
+    return calculateDistance(lat1, lng1, lat2, lng2);
+  },
+
+  // Format distance for display
+  formatDistance(distanceInMeters) {
+    return formatDistance(distanceInMeters);
+  },
+
+  // Get place type emoji
+  getTypeEmoji(type) {
+    const typeEmojis = {
+      cafe: '☕',
+      bar: '🍺',
+      pub: '🍺',
+      restaurant: '🍽️',
+      bakery: '🥐',
+      default: '📍'
+    };
+    
+    return typeEmojis[type] || typeEmojis.default;
+  },
+
+  // Get rating stars
+  getRatingStars(rating) {
+    if (!rating) return '';
+    
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 >= 0.5;
+    const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+    
+    return '★'.repeat(fullStars) + 
+           (hasHalfStar ? '☆' : '') + 
+           '☆'.repeat(emptyStars);
+  },
+
+  // Format opening hours for Italian context
+  formatOpeningHours(openingHours) {
+    if (!openingHours) return null;
+
+    const formatted = {
+      openNow: openingHours.open_now || openingHours.openNow || false,
+      periods: openingHours.periods || [],
+      weekdayText: openingHours.weekday_text || openingHours.weekdayText || []
+    };
+
+    // Translate to Italian if needed
+    if (formatted.weekdayText && formatted.weekdayText.length > 0) {
+      formatted.weekdayTextItalian = formatted.weekdayText.map(text => {
+        return text
+          .replace(/Monday/g, 'Lunedì')
+          .replace(/Tuesday/g, 'Martedì')
+          .replace(/Wednesday/g, 'Mercoledì')
+          .replace(/Thursday/g, 'Giovedì')
+          .replace(/Friday/g, 'Venerdì')
+          .replace(/Saturday/g, 'Sabato')
+          .replace(/Sunday/g, 'Domenica')
+          .replace(/Closed/g, 'Chiuso')
+          .replace(/Open 24 hours/g, 'Aperto 24 ore');
+      });
+    }
+
+    return formatted;
+  }
+};
+
 module.exports = {
   // Response helpers
   successResponse,
@@ -468,5 +545,8 @@ module.exports = {
   
   // Logging helpers
   logRequest,
-  logError
+  logError,
+
+  // FIXED: Export apiUtils for Google Places service
+  apiUtils
 };

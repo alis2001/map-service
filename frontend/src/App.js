@@ -1,4 +1,4 @@
-// App.js - Full-Page Map Component
+// App.js - FIXED VERSION with Better Location Permission Handling
 // Location: /map-service/frontend/src/App.js
 
 import React, { useState, useEffect } from 'react';
@@ -48,7 +48,10 @@ function MapApp() {
     location: userLocation, 
     loading: locationLoading, 
     error: locationError,
-    requestLocation 
+    permissionGranted,
+    shouldShowLocationModal,
+    requestLocation,
+    clearPermissionDenied
   } = useGeolocation();
 
   const {
@@ -60,7 +63,8 @@ function MapApp() {
 
   // Update map center when user location is obtained
   useEffect(() => {
-    if (userLocation) {
+    if (userLocation && userLocation.source === 'gps') {
+      console.log('📍 Updating map center to user location:', userLocation);
       setMapCenter({
         lat: userLocation.latitude,
         lng: userLocation.longitude
@@ -108,30 +112,24 @@ function MapApp() {
     }
   }, []);
 
-  // Show loading screen while initializing (only if not embed mode)
-  if (locationLoading && !userLocation && !isEmbedMode) {
+  // FIXED: Only show loading screen for initial app load, not location issues
+  if (locationLoading && !userLocation && !isEmbedMode && !mapCenter.lat) {
     return (
       <LoadingScreen 
-        message="Rilevamento posizione..."
-        subMessage="Stiamo trovando i migliori caffè nelle vicinanze"
+        message="Inizializzazione mappa..."
+        subMessage="Preparazione del servizio di localizzazione"
       />
     );
   }
 
-  // Handle location permission denied
-  const handleLocationRequest = () => {
-    requestLocation();
-  };
-
   // Handle cafe selection
   const handleCafeSelect = (cafe) => {
     setSelectedCafe(cafe);
-    // Center map on selected cafe with smooth animation
     setMapCenter({
       lat: cafe.location.latitude,
       lng: cafe.location.longitude
     });
-    setZoom(17); // Zoom in closer when selecting a cafe
+    setZoom(17);
   };
 
   // Handle map center change (when user drags the map)
@@ -146,13 +144,27 @@ function MapApp() {
     }
     if (options.type !== undefined) {
       setCafeType(options.type);
-      setSelectedCafe(null); // Clear selection when changing type
+      setSelectedCafe(null);
     }
   };
 
   // Handle close popup
   const handleClosePopup = () => {
     setSelectedCafe(null);
+  };
+
+  // FIXED: Better location request handling
+  const handleLocationRequest = () => {
+    // Clear any previous permission denied status
+    clearPermissionDenied();
+    // Request location again
+    requestLocation();
+  };
+
+  // FIXED: Handle continue without GPS
+  const handleContinueWithoutGPS = () => {
+    // Just close the modal and continue with current location
+    clearPermissionDenied();
   };
 
   return (
@@ -180,8 +192,8 @@ function MapApp() {
         locationError={locationError}
       />
 
-      {/* Location Permission Modal (only if not embed mode) */}
-      {locationError && !isEmbedMode && (
+      {/* FIXED: Location Permission Modal - Show on first visit or when permission needed */}
+      {(!userLocation && !locationLoading && (shouldShowLocationModal || (!permissionGranted && !userLocation))) && !isEmbedMode && (
         <div className="modal-overlay">
           <div className="modal-card">
             <div className="modal-header">
@@ -190,25 +202,84 @@ function MapApp() {
             <div className="modal-content">
               <p>
                 Per trovare i migliori caffè nelle vicinanze, abbiamo bisogno 
-                di accedere alla tua posizione. Puoi anche cercare manualmente 
-                spostando la mappa.
+                di accedere alla tua posizione. Puoi anche continuare e cercare 
+                manualmente spostando la mappa.
               </p>
+              
+              {/* Show current status */}
+              <div style={{
+                marginTop: '12px',
+                padding: '8px 12px',
+                background: 'rgba(79, 70, 229, 0.05)',
+                borderRadius: '8px',
+                fontSize: '14px',
+                color: '#6B7280'
+              }}>
+                {userLocation ? (
+                  <span>✅ Posizione attuale: {userLocation.city || 'Rilevata'} 
+                    ({userLocation.source === 'gps' ? 'GPS' : 
+                      userLocation.source === 'ip' ? 'IP' : 'Predefinita'})
+                  </span>
+                ) : (
+                  <span>📍 In attesa di localizzazione...</span>
+                )}
+              </div>
             </div>
             <div className="modal-actions">
               <button 
                 className="btn-apple-base btn-primary"
                 onClick={handleLocationRequest}
+                disabled={locationLoading}
               >
-                Riprova
+                {locationLoading ? 'Rilevamento...' : 'Abilita GPS'}
               </button>
               <button 
                 className="btn-apple-base btn-secondary"
-                onClick={() => window.location.reload()}
+                onClick={handleContinueWithoutGPS}
               >
                 Continua senza GPS
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* FIXED: Status indicator for location */}
+      {!isEmbedMode && (
+        <div style={{
+          position: 'fixed',
+          bottom: '16px',
+          left: '16px',
+          background: 'rgba(255, 255, 255, 0.9)',
+          backdropFilter: 'blur(10px)',
+          padding: '8px 12px',
+          borderRadius: '20px',
+          fontSize: '12px',
+          color: '#6B7280',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+          zIndex: 1000
+        }}>
+          <div style={{
+            width: '8px',
+            height: '8px',
+            borderRadius: '50%',
+            background: userLocation?.source === 'gps' ? '#10B981' : 
+                        userLocation?.source === 'ip' ? '#F59E0B' : '#6B7280'
+          }} />
+          <span>
+            {userLocation?.source === 'gps' ? '📍 GPS attivo' :
+             userLocation?.source === 'ip' ? '🌐 Posizione IP' :
+             userLocation?.source === 'cache' ? '💾 Posizione salvata' :
+             '📍 Posizione predefinita'}
+          </span>
+          {userLocation?.accuracy && userLocation.accuracy < 100 && (
+            <span style={{ color: '#10B981', fontWeight: '600' }}>
+              ±{Math.round(userLocation.accuracy)}m
+            </span>
+          )}
         </div>
       )}
     </div>

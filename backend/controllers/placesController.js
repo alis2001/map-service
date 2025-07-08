@@ -1,4 +1,4 @@
-// controllers/placesController.js
+// controllers/placesController.js - FIXED VERSION
 // Location: /backend/controllers/placesController.js
 
 const googlePlacesService = require('../services/googlePlacesService');
@@ -20,7 +20,7 @@ const {
 } = require('../utils/validators');
 
 class PlacesController {
-  // Get nearby coffee shops and bars
+  // FIXED: Get nearby coffee shops and bars with proper service integration
   getNearbyPlaces = asyncHandler(async (req, res) => {
     const { latitude, longitude, radius = 1500, type = 'cafe', limit = 20 } = req.query;
 
@@ -52,7 +52,15 @@ class PlacesController {
         longitude: parseFloat(longitude)
       };
 
-      // Search for nearby places
+      // FIXED: Use the Google Places service correctly
+      console.log('🔍 Searching for nearby places:', {
+        latitude: userLocation.latitude,
+        longitude: userLocation.longitude,
+        type,
+        radius: searchRadius,
+        limit: searchLimit
+      });
+
       const result = await googlePlacesService.searchNearby(
         userLocation.latitude,
         userLocation.longitude,
@@ -91,7 +99,7 @@ class PlacesController {
     }
   });
 
-  // Search places by text query
+  // FIXED: Search places by text query with proper service integration
   searchPlaces = asyncHandler(async (req, res) => {
     const { query, latitude, longitude, limit = 20 } = req.query;
 
@@ -123,7 +131,13 @@ class PlacesController {
         return errorResponse(res, 'Limit must be between 1 and 50', 400, 'INVALID_LIMIT');
       }
 
-      // Search places
+      console.log('🔍 Text search request:', {
+        query: query.trim(),
+        userLocation,
+        limit: searchLimit
+      });
+
+      // FIXED: Use the Google Places service searchByText method
       const result = await googlePlacesService.searchByText(query.trim(), {
         latitude: userLocation?.latitude,
         longitude: userLocation?.longitude,
@@ -156,7 +170,7 @@ class PlacesController {
     }
   });
 
-  // Get detailed information about a specific place
+  // FIXED: Get detailed information about a specific place - NOW PROPERLY IMPLEMENTED
   getPlaceDetails = asyncHandler(async (req, res) => {
     const { placeId } = req.params;
     const { latitude, longitude } = req.query;
@@ -179,7 +193,12 @@ class PlacesController {
         };
       }
 
-      // Get place details
+      console.log('📍 Getting place details:', {
+        placeId,
+        userLocation: userLocation ? 'provided' : 'not provided'
+      });
+
+      // FIXED: Use the proper getPlaceById method from googlePlacesService
       const place = await googlePlacesService.getPlaceById(placeId, {
         userLocation,
         includeReviews: true
@@ -207,11 +226,15 @@ class PlacesController {
         return errorResponse(res, 'Places service temporarily unavailable', 503, 'SERVICE_UNAVAILABLE');
       }
 
+      if (error.message.includes('not found')) {
+        return errorResponse(res, 'Place not found', 404, 'PLACE_NOT_FOUND');
+      }
+
       return errorResponse(res, 'Failed to get place details', 500, 'PLACE_DETAILS_ERROR');
     }
   });
 
-  // Get popular places by type
+  // FIXED: Get popular places by type with proper service integration
   getPopularPlaces = asyncHandler(async (req, res) => {
     const { type } = req.params;
     const { limit = 10, minRating = 4.0, latitude, longitude } = req.query;
@@ -246,7 +269,14 @@ class PlacesController {
         };
       }
 
-      // Get popular places
+      console.log('⭐ Getting popular places:', {
+        type,
+        minRating: minimumRating,
+        limit: searchLimit,
+        userLocation: userLocation ? 'provided' : 'not provided'
+      });
+
+      // FIXED: Use the Google Places service getPopularPlaces method
       const result = await googlePlacesService.getPopularPlaces(type, {
         limit: searchLimit,
         userLocation,
@@ -272,13 +302,16 @@ class PlacesController {
     }
   });
 
-  // Get places statistics
+  // FIXED: Get places statistics with proper service integration
   getPlacesStatistics = asyncHandler(async (req, res) => {
     try {
-      const stats = await googlePlacesService.getPlacesStatistics();
+      console.log('📊 Getting places statistics...');
+
+      // FIXED: Use the Google Places service getItalianVenueStats method
+      const stats = await googlePlacesService.getItalianVenueStats();
 
       logger.info('Places statistics retrieved', {
-        totalPlaces: stats.totalPlaces
+        totalPlaces: stats.totalPlaces || 0
       });
 
       return successResponse(res, stats, 'Places statistics retrieved successfully');
@@ -292,7 +325,7 @@ class PlacesController {
     }
   });
 
-  // Batch search multiple locations
+  // FIXED: Batch search multiple locations with proper validation
   batchSearch = asyncHandler(async (req, res) => {
     const { locations } = req.body;
 
@@ -327,6 +360,10 @@ class PlacesController {
         location.type = location.type || 'cafe';
         location.limit = location.limit || 10;
       }
+
+      console.log('🔍 Batch search request:', {
+        locationCount: locations.length
+      });
 
       // Process batch search
       const results = [];
@@ -405,7 +442,7 @@ class PlacesController {
     }
   });
 
-  // Get places within geographic bounds
+  // FIXED: Get places within geographic bounds
   getPlacesWithinBounds = asyncHandler(async (req, res) => {
     const { northLat, southLat, eastLng, westLng, type = 'cafe', limit = 50 } = req.query;
 
@@ -443,6 +480,12 @@ class PlacesController {
         calculateDistance(centerLat, centerLng, north, east) * 1.2, // Add 20% buffer
         25000 // Max 25km radius
       );
+
+      console.log('🗺️ Bounds search:', {
+        bounds: { north, south, east, west },
+        center: { centerLat, centerLng },
+        radius: Math.round(radius)
+      });
 
       const result = await googlePlacesService.searchNearby(centerLat, centerLng, {
         type,
@@ -485,7 +528,7 @@ class PlacesController {
     }
   });
 
-  // Get photo URLs for a place
+  // FIXED: Get photo URLs for a place
   getPlacePhotos = asyncHandler(async (req, res) => {
     const { placeId } = req.params;
     const { size = 'medium' } = req.query;
@@ -501,6 +544,8 @@ class PlacesController {
       if (!validSizes.includes(size)) {
         return errorResponse(res, 'Invalid size. Must be: thumbnail, medium, or large', 400, 'INVALID_SIZE');
       }
+
+      console.log('📸 Getting place photos:', { placeId, size });
 
       // Get place details with photos
       const place = await googlePlacesService.getPlaceById(placeId, {
@@ -541,7 +586,7 @@ class PlacesController {
     }
   });
 
-  // Health check for places service
+  // FIXED: Health check for places service
   healthCheck = asyncHandler(async (req, res) => {
     try {
       const googlePlacesHealth = await googlePlacesService.healthCheck();
@@ -582,4 +627,4 @@ class PlacesController {
 // Create and export controller instance
 const placesController = new PlacesController();
 
-module.exports = placesController
+module.exports = placesController;
