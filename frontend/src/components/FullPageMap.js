@@ -1,4 +1,4 @@
-// components/FullPageMap.js - FIXED VERSION with Smart Movement Detection
+// components/FullPageMap.js - OPTIMIZED VERSION with Smart Movement Detection
 // Location: /map-service/frontend/src/components/FullPageMap.js
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
@@ -36,13 +36,13 @@ const FullPageMap = ({
   const [mapError, setMapError] = useState(null);
   const [mapInitialized, setMapInitialized] = useState(false);
   
-  // FIXED: Improved debouncing with distance-based threshold
-  const debounceTimeoutRef = useRef(null);
+  // OPTIMIZED: Smart movement detection with geographic zones
   const lastSearchLocationRef = useRef(null);
   const isUserDraggingRef = useRef(false);
-  const mapIdleTimeoutRef = useRef(null);
+  const debounceTimeoutRef = useRef(null);
+  const immediateSearchTimeoutRef = useRef(null);
 
-  // FIXED: Smart movement detection - only trigger search for significant moves
+  // OPTIMIZED: Smart zone-based movement detection for responsive updates
   const shouldTriggerNewSearch = useCallback((newCenter) => {
     if (!lastSearchLocationRef.current) {
       return true; // First search
@@ -63,42 +63,44 @@ const FullPageMap = ({
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const distance = R * c;
 
-    // FIXED: Only trigger new search if moved more than 500 meters (meaningful distance)
-    const significantDistance = 500; // meters
-    const hasMovedSignificantly = distance > significantDistance;
+    // OPTIMIZED: Dynamic threshold based on search radius for better responsiveness
+    const dynamicThreshold = Math.max(searchRadius * 0.3, 200); // 30% of search radius, min 200m
+    const hasMovedSignificantly = distance > dynamicThreshold;
 
     console.log('🗺️ Movement check:', {
       distance: Math.round(distance),
-      threshold: significantDistance,
+      threshold: Math.round(dynamicThreshold),
+      searchRadius,
       shouldSearch: hasMovedSignificantly
     });
 
     return hasMovedSignificantly;
-  }, []);
+  }, [searchRadius]);
 
-  // FIXED: Debounced center change with smart distance detection
+  // OPTIMIZED: Adaptive debouncing for better user experience
   const debouncedCenterChange = useCallback((newCenter) => {
     // Clear existing timeouts
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
     }
-    if (mapIdleTimeoutRef.current) {
-      clearTimeout(mapIdleTimeoutRef.current);
+    if (immediateSearchTimeoutRef.current) {
+      clearTimeout(immediateSearchTimeoutRef.current);
     }
 
-    // FIXED: Only process if user stopped dragging and moved significantly
+    // OPTIMIZED: Adaptive delay based on movement distance
+    const shouldSearch = shouldTriggerNewSearch(newCenter);
+    const delay = shouldSearch ? 800 : 1500; // Faster response for significant moves
+
     debounceTimeoutRef.current = setTimeout(() => {
-      if (!isUserDraggingRef.current && shouldTriggerNewSearch(newCenter)) {
-        console.log('🗺️ Significant map movement detected, triggering search');
+      if (!isUserDraggingRef.current && shouldSearch) {
+        console.log('🗺️ Triggering optimized search');
         lastSearchLocationRef.current = newCenter;
         
         if (onCenterChange) {
           onCenterChange(newCenter);
         }
-      } else {
-        console.log('🗺️ Minor map movement, no search triggered');
       }
-    }, 2000); // Wait 2 seconds after user stops moving
+    }, delay);
   }, [onCenterChange, shouldTriggerNewSearch]);
 
   // Initialize Google Map ONLY ONCE
@@ -113,7 +115,7 @@ const FullPageMap = ({
       }
 
       try {
-        console.log('🗺️ Initializing Google Map...');
+        console.log('🗺️ Initializing Google Map ONCE...');
 
         const mapOptions = {
           center: { lat: center.lat, lng: center.lng },
@@ -131,7 +133,7 @@ const FullPageMap = ({
           rotateControl: false,
           fullscreenControl: !isEmbedMode,
           
-          // FIXED: Improved styling for Italian venues
+          // OPTIMIZED: Improved styling for Italian venues
           styles: [
             {
               featureType: 'poi.business',
@@ -159,7 +161,7 @@ const FullPageMap = ({
 
         googleMapRef.current = new window.google.maps.Map(mapRef.current, mapOptions);
 
-        // FIXED: Improved event listeners with proper drag detection
+        // OPTIMIZED: Improved event listeners with proper drag detection
         googleMapRef.current.addListener('dragstart', () => {
           console.log('🗺️ User started dragging map');
           isUserDraggingRef.current = true;
@@ -174,17 +176,17 @@ const FullPageMap = ({
           console.log('🗺️ User finished dragging map');
           isUserDraggingRef.current = false;
           
-          // Start the idle timeout to detect when user is really done
-          mapIdleTimeoutRef.current = setTimeout(() => {
+          // Start the search after a short delay
+          immediateSearchTimeoutRef.current = setTimeout(() => {
             const newCenter = googleMapRef.current.getCenter();
             debouncedCenterChange({
               lat: newCenter.lat(),
               lng: newCenter.lng()
             });
-          }, 1000); // Wait 1 second after drag ends
+          }, 500); // Wait 500ms after drag ends
         });
 
-        // FIXED: Only listen to idle events for zoom changes
+        // OPTIMIZED: Only listen to idle events for zoom changes
         googleMapRef.current.addListener('idle', () => {
           // This fires when map stops moving/zooming
           if (!isUserDraggingRef.current) {
@@ -242,7 +244,7 @@ const FullPageMap = ({
     }
   }, []); // Empty dependency array - only run once!
 
-  // FIXED: Update map center only for external changes (not user-initiated)
+  // OPTIMIZED: Update map center only for external changes (not user-initiated)
   useEffect(() => {
     if (googleMapRef.current && mapLoaded && mapInitialized && !isUserDraggingRef.current) {
       const currentCenter = googleMapRef.current.getCenter();
@@ -250,13 +252,13 @@ const FullPageMap = ({
       
       const newCenter = { lat: center.lat, lng: center.lng };
       
-      // FIXED: Only update if this is an external change (e.g., location found)
+      // OPTIMIZED: Only update if this is an external change (e.g., location found)
       const isExternalChange = !lastSearchLocationRef.current || 
         (Math.abs(currentCenter?.lat() - newCenter.lat) > 0.01 || 
          Math.abs(currentCenter?.lng() - newCenter.lng) > 0.01);
       
       if (isExternalChange) {
-        console.log('🗺️ External center change detected, updating map:', newCenter);
+        console.log('🗺️ Updating map center from props:', newCenter);
         googleMapRef.current.setCenter(newCenter);
         lastSearchLocationRef.current = newCenter;
         
@@ -269,7 +271,7 @@ const FullPageMap = ({
     }
   }, [center.lat, center.lng, zoom, mapLoaded, mapInitialized]);
 
-  // FIXED: Update user location marker with better styling
+  // OPTIMIZED: Update user location marker with better styling
   useEffect(() => {
     if (!googleMapRef.current || !mapLoaded || !userLocation) return;
 
@@ -278,7 +280,7 @@ const FullPageMap = ({
       userMarkerRef.current.setMap(null);
     }
 
-    // FIXED: Improved user marker with accuracy circle
+    // OPTIMIZED: Improved user marker with accuracy circle
     const userMarker = new window.google.maps.Marker({
       position: { 
         lat: userLocation.latitude, 
@@ -303,13 +305,10 @@ const FullPageMap = ({
     });
 
     userMarkerRef.current = userMarker;
-    console.log('📍 User location marker updated:', {
-      accuracy: userLocation.accuracy,
-      source: userLocation.source
-    });
+    console.log('📍 User location marker updated');
   }, [userLocation, mapLoaded]);
 
-  // FIXED: Update search radius circle only when radius or location changes
+  // OPTIMIZED: Update search radius circle only when radius or location changes
   useEffect(() => {
     if (!googleMapRef.current || !mapLoaded || !userLocation || !searchRadius) return;
 
@@ -318,7 +317,7 @@ const FullPageMap = ({
       radiusCircleRef.current.setMap(null);
     }
 
-    // FIXED: Only show radius circle if user location is accurate
+    // OPTIMIZED: Only show radius circle if user location is accurate
     if (userLocation.accuracy && userLocation.accuracy < 1000) {
       const circle = new window.google.maps.Circle({
         center: { 
@@ -336,14 +335,11 @@ const FullPageMap = ({
       });
 
       radiusCircleRef.current = circle;
-      console.log('🔍 Search radius circle updated:', {
-        radius: searchRadius,
-        source: userLocation.source
-      });
+      console.log('🔍 Search radius circle updated:', searchRadius);
     }
   }, [userLocation, searchRadius, mapLoaded]);
 
-  // FIXED: Improved cafe markers with better performance
+  // OPTIMIZED: Improved cafe markers with better performance
   useEffect(() => {
     if (!googleMapRef.current || !mapLoaded) return;
 
@@ -355,7 +351,7 @@ const FullPageMap = ({
     });
     markersRef.current.clear();
 
-    // FIXED: Batch marker creation with clustering for better performance
+    // OPTIMIZED: Batch marker creation with clustering for better performance
     const bounds = new window.google.maps.LatLngBounds();
     let markersAdded = 0;
     
@@ -387,7 +383,7 @@ const FullPageMap = ({
           anchor: new window.google.maps.Point(16, 40)
         },
         zIndex: cafe.distance ? Math.round(1000 - cafe.distance / 10) : 500,
-        // FIXED: Only animate very close cafes
+        // OPTIMIZED: Only animate very close cafes
         animation: cafe.distance && cafe.distance < 200 ? 
           window.google.maps.Animation.BOUNCE : null
       });
@@ -407,7 +403,7 @@ const FullPageMap = ({
     console.log('✅ Cafe markers updated:', markersAdded);
   }, [cafes, mapLoaded, onCafeSelect]);
 
-  // Helper functions (same as before)
+  // Helper functions for markers
   const getMarkerColor = (cafe) => {
     if (cafe.placeType === 'pub' || (cafe.types && cafe.types.includes('night_club'))) {
       return '#EF4444'; // Red for pubs/nightlife
@@ -432,15 +428,15 @@ const FullPageMap = ({
     return '☕'; // Coffee for cafeterias (including bars)
   };
 
-  // FIXED: Comprehensive cleanup
+  // OPTIMIZED: Comprehensive cleanup
   useEffect(() => {
     return () => {
       // Clear all timeouts
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current);
       }
-      if (mapIdleTimeoutRef.current) {
-        clearTimeout(mapIdleTimeoutRef.current);
+      if (immediateSearchTimeoutRef.current) {
+        clearTimeout(immediateSearchTimeoutRef.current);
       }
       
       // Cleanup markers

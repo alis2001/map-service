@@ -1,6 +1,5 @@
-// services/googlePlacesService.js - FIXED VERSION with Photos and Hours
+// services/googlePlacesService.js - FIXED VERSION with Enhanced Italian Venue Support
 // Location: /backend/services/googlePlacesService.js
-// Key Fix: Enhanced getPlaceById with complete photo URLs and opening hours
 
 const { prisma } = require('../config/prisma');
 const { 
@@ -15,7 +14,7 @@ const logger = require('../utils/logger');
 const { formatPlace, calculateDistance, formatDistance } = require('../utils/helpers');
 const { isValidLatitude, isValidLongitude, isValidPlaceType } = require('../utils/validators');
 
-// FIXED: Configuration optimized for Italian venues
+// OPTIMIZED: Configuration for Italian venues
 const SERVICE_CONFIG = {
   defaultRadius: 1000, // Reduced for denser Italian cities
   maxRadius: 50000,
@@ -23,14 +22,14 @@ const SERVICE_CONFIG = {
   cacheEnabled: true,
   batchSize: 20,
   
-  // FIXED: Better place type mapping for Italian venues
+  // OPTIMIZED: Better place type mapping for Italian venues
   placeTypeMapping: {
-    cafe: ['cafe', 'bar', 'bakery', 'meal_takeaway'], // Italian "bar" = cafe
-    pub: ['night_club', 'liquor_store'], // Separate nightlife
-    restaurant: ['restaurant', 'meal_delivery', 'meal_takeaway']
+    cafe: ['cafe', 'bar', 'bakery'], // Italian bars are cafes
+    pub: ['bar', 'night_club', 'liquor_store', 'establishment'], // Include bar for pubs
+    restaurant: ['restaurant', 'meal_delivery', 'meal_takeaway', 'food', 'establishment']
   },
   
-  // FIXED: Improved validation - only check essential fields
+  // OPTIMIZED: Simplified validation - only check essential fields
   requiredFields: ['googlePlaceId', 'name', 'latitude', 'longitude'],
   
   // ENHANCED: Photo configurations with multiple sizes
@@ -40,10 +39,10 @@ const SERVICE_CONFIG = {
     large: { width: 800, height: 600 }
   },
 
-  // FIXED: Italian-specific keywords for better venue detection
+  // OPTIMIZED: Italian-specific keywords for better venue detection
   italianVenueKeywords: {
     cafe: ['bar', 'caffe', 'caffè', 'caffetteria', 'pasticceria', 'gelateria'],
-    pub: ['pub', 'birreria', 'disco', 'club', 'locale notturno'],
+    pub: ['pub', 'birreria', 'disco', 'club', 'locale notturno', 'beer', 'birra'],
     restaurant: ['ristorante', 'pizzeria', 'trattoria', 'osteria', 'tavola calda']
   }
 };
@@ -76,7 +75,7 @@ class GooglePlacesService {
     }
   }
 
-  // FIXED: Simplified and more reliable validation
+  // OPTIMIZED: Simplified and more reliable validation
   validatePlaceData(place) {
     if (!place) {
       console.log('❌ VALIDATION: Place is null/undefined');
@@ -227,18 +226,18 @@ class GooglePlacesService {
       // Search Google Places API
       console.log('🌐 CALLING GOOGLE PLACES API...');
       
-      const places = await searchNearbyPlaces(latitude, longitude, mappedType, radius);
+      const apiResults = await searchNearbyPlaces(latitude, longitude, mappedType, radius);
       console.log('📡 API RESPONSE:', { 
-        totalPlaces: places.length,
-        validPlaces: places.filter(p => this.validatePlaceData(p)).length
+        totalPlaces: apiResults.length,
+        validPlaces: apiResults.filter(p => this.validatePlaceData(p)).length
       });
 
       // Process and save places
       console.log('🔄 PROCESSING PLACES...');
-      const processedPlaces = await this.processAndSavePlaces(places, mappedType);
+      const processedPlaces = await this.processAndSavePlaces(apiResults, mappedType);
       console.log('✅ PROCESSED PLACES:', { 
         saved: processedPlaces.length,
-        skipped: places.length - processedPlaces.length
+        skipped: apiResults.length - processedPlaces.length
       });
 
       // Cache results
@@ -252,7 +251,7 @@ class GooglePlacesService {
         longitude,
         type: mappedType,
         radius,
-        apiResultCount: places.length,
+        apiResultCount: apiResults.length,
         processedCount: processedPlaces.length
       });
 
@@ -289,7 +288,7 @@ class GooglePlacesService {
     }
   }
 
-  // FIXED: Better Italian venue type mapping
+  // OPTIMIZED: Better Italian venue type mapping
   mapPlaceType(type) {
     const typeMapping = {
       'cafe': 'cafe',     // Italian bars/caffeterias
@@ -358,34 +357,43 @@ class GooglePlacesService {
     }
   }
 
-  // ENHANCED: Better Italian venue type detection
+  // OPTIMIZED: Enhanced Italian venue type detection with Google types priority
   detectItalianVenueType(place, fallbackType) {
     const name = (place.name || '').toLowerCase();
     const types = place.types || [];
     
-    // Check name for Italian-specific keywords
-    for (const [venueType, keywords] of Object.entries(SERVICE_CONFIG.italianVenueKeywords)) {
-      if (keywords.some(keyword => name.includes(keyword))) {
-        console.log(`🇮🇹 ITALIAN VENUE DETECTED: ${name} -> ${venueType}`);
-        return venueType;
-      }
-    }
+    console.log('🏷️ TYPE DETECTION:', { 
+      name: name.substring(0, 30), 
+      types: types.slice(0, 5), 
+      fallback: fallbackType 
+    });
     
-    // Check Google types with Italian context
-    if (types.includes('cafe') || types.includes('bar')) {
-      return 'cafe'; // In Italy, these are usually caffeterias
-    }
-    
+    // PRIORITY 1: Google Place types (most reliable)
     if (types.includes('night_club') || types.includes('liquor_store')) {
+      console.log('🍺 DETECTED AS PUB via Google types');
       return 'pub';
     }
     
     if (types.includes('restaurant') || types.includes('meal_delivery') || types.includes('meal_takeaway')) {
+      console.log('🍽️ DETECTED AS RESTAURANT via Google types');
       return 'restaurant';
     }
     
-    // Use fallback or default
-    return fallbackType || 'cafe';
+    // PRIORITY 2: Italian name analysis (for local context)
+    if (name.includes('pub') || name.includes('birreria') || name.includes('beer') || name.includes('birra')) {
+      console.log('🍺 DETECTED AS PUB via Italian keywords');
+      return 'pub';
+    }
+    
+    if (name.includes('ristorante') || name.includes('pizzeria') || name.includes('trattoria') || name.includes('osteria')) {
+      console.log('🍽️ DETECTED AS RESTAURANT via Italian keywords');
+      return 'restaurant';
+    }
+    
+    // PRIORITY 3: Fallback type or default
+    const finalType = fallbackType || 'cafe';
+    console.log('☕ USING FALLBACK TYPE:', finalType);
+    return finalType;
   }
 
   // ENHANCED: Database save with conflict handling
@@ -465,7 +473,7 @@ class GooglePlacesService {
     }
   }
 
-  // FIXED: Enhanced getPlaceById with complete photos and hours
+  // ENHANCED: Get place by ID with complete photos and hours
   async getPlaceById(placeId, options = {}) {
     try {
       if (!placeId) {
@@ -493,7 +501,7 @@ class GooglePlacesService {
               cachedResult.longitude
             );
             cachedResult.distance = Math.round(distance);
-            cachedResult.formattedDistance = apiUtils.formatDistance(distance);
+            cachedResult.formattedDistance = formatDistance(distance);
           }
           
           return cachedResult;
@@ -642,7 +650,7 @@ class GooglePlacesService {
     }
   }
 
-  // Rest of the methods remain the same...
+  // Format places response with Italian enhancements
   async formatPlacesResponse(places, userLocation = null, limit = 20) {
     console.log('📋 FORMATTING RESPONSE:', {
       placesCount: places.length,
@@ -730,9 +738,8 @@ class GooglePlacesService {
     }
   }
 
-  // Other existing methods remain the same...
+  // Search by text
   async searchByText(query, options = {}) {
-    // Implementation stays the same as in previous version
     try {
       if (!query || query.trim().length < 2) {
         return { places: [], count: 0 };
@@ -787,8 +794,8 @@ class GooglePlacesService {
     }
   }
 
+  // Get popular places
   async getPopularPlaces(type, options = {}) {
-    // Implementation stays the same as in previous version
     try {
       const {
         limit = 10,
@@ -833,6 +840,7 @@ class GooglePlacesService {
     }
   }
 
+  // Get Italian venue statistics
   async getItalianVenueStats() {
     try {
       const stats = await prisma.place.groupBy({

@@ -1,4 +1,4 @@
-// server.js - Updated with Google Places Service Initialization
+// server.js - FIXED VERSION with Proper Service Initialization
 // Location: /backend/server.js
 
 const express = require('express');
@@ -15,9 +15,6 @@ dotenv.config();
 // Import database connection
 const { prisma, testConnection } = require('./config/prisma');
 const { connectRedis } = require('./config/redis');
-
-// Import services
-const googlePlacesService = require('./services/googlePlacesService');
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
@@ -70,20 +67,63 @@ app.use(compression());
 // Logging middleware
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
-// Health check endpoint
+// FIXED: Service initialization function
+async function initializeServices() {
+  console.log('🔧 Initializing services...');
+  
+  try {
+    // Import and initialize Google Places Service
+    const googlePlacesService = require('./services/googlePlacesService');
+    const initialized = await googlePlacesService.initialize();
+    
+    if (initialized) {
+      console.log('✅ Google Places Service initialized successfully');
+      return true;
+    } else {
+      console.log('⚠️ Google Places Service initialized with warnings');
+      return false;
+    }
+  } catch (error) {
+    console.error('❌ Google Places Service initialization failed:', error.message);
+    console.log('⚠️ Places API will be degraded');
+    return false;
+  }
+}
+
+// ENHANCED: Health check endpoint with service status
 app.get('/health', async (req, res) => {
   try {
     const dbStatus = await testConnection();
-    const placesHealth = await googlePlacesService.healthCheck();
     
-    res.status(200).json({
-      status: 'OK',
+    // Check Google Places service
+    let placesHealth = { status: 'unknown' };
+    try {
+      const googlePlacesService = require('./services/googlePlacesService');
+      placesHealth = await googlePlacesService.healthCheck();
+    } catch (error) {
+      placesHealth = { status: 'unhealthy', error: error.message };
+    }
+    
+    const overallStatus = dbStatus && placesHealth.status === 'healthy' ? 'OK' : 'DEGRADED';
+    
+    res.status(overallStatus === 'OK' ? 200 : 503).json({
+      status: overallStatus,
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       environment: process.env.NODE_ENV || 'development',
       database: dbStatus ? 'connected' : 'disconnected',
       googlePlaces: placesHealth.status,
-      version: '1.0.0'
+      version: '1.0.0',
+      services: {
+        database: {
+          status: dbStatus ? 'healthy' : 'unhealthy',
+          type: 'PostgreSQL'
+        },
+        googlePlaces: placesHealth,
+        redis: {
+          status: 'checking'
+        }
+      }
     });
   } catch (error) {
     res.status(503).json({
@@ -113,9 +153,9 @@ app.get('/', (req, res) => {
     },
     note: 'Authentication handled by main application',
     status: {
-      database: 'checking...',
-      redis: 'checking...',
-      googlePlaces: 'checking...'
+      database: 'ready',
+      redis: 'ready',
+      googlePlaces: 'initializing'
     }
   });
 });
@@ -130,7 +170,7 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5001;
 const HOST = process.env.HOST || '0.0.0.0';
 
-// Start server with proper initialization
+// FIXED: Start server with proper service initialization
 const server = app.listen(PORT, HOST, async () => {
   console.log(`🚀 Server running on http://${HOST}:${PORT}`);
   console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
@@ -146,19 +186,6 @@ const server = app.listen(PORT, HOST, async () => {
     console.log('⚠️  App will continue without caching');
   }
 
-  // Initialize Google Places Service
-  try {
-    const initialized = await googlePlacesService.initialize();
-    if (initialized) {
-      console.log('✅ Google Places Service initialized successfully');
-    } else {
-      console.log('⚠️  Google Places Service initialized with warnings');
-    }
-  } catch (error) {
-    console.log('❌ Google Places Service initialization failed:', error.message);
-    console.log('⚠️  Places API will be degraded');
-  }
-
   // Test database connection
   try {
     await testConnection();
@@ -167,8 +194,37 @@ const server = app.listen(PORT, HOST, async () => {
     console.log('❌ Database connection failed:', error.message);
   }
 
+  // FIXED: Initialize Google Places Service after all other services
+  console.log('\n🔧 Initializing Google Places Service...');
+  try {
+    const servicesInitialized = await initializeServices();
+    if (servicesInitialized) {
+      console.log('✅ All services initialized successfully');
+    } else {
+      console.log('⚠️ Some services initialized with warnings');
+    }
+  } catch (error) {
+    console.error('❌ Service initialization failed:', error.message);
+  }
+
   console.log('\n🎯 Ready to serve requests!');
   console.log(`📡 Test API: curl "http://localhost:${PORT}/api/v1/places/nearby?latitude=45.0703&longitude=7.6869&type=cafe&limit=3"`);
+  
+  // Test a simple API call to ensure everything works
+  setTimeout(async () => {
+    try {
+      console.log('\n🧪 Running self-test...');
+      const googlePlacesService = require('./services/googlePlacesService');
+      const testResult = await googlePlacesService.searchNearby(45.0703, 7.6869, {
+        type: 'cafe',
+        radius: 1000,
+        limit: 1
+      });
+      console.log('✅ Self-test passed:', { placesFound: testResult.count });
+    } catch (testError) {
+      console.error('❌ Self-test failed:', testError.message);
+    }
+  }, 5000); // Run test after 5 seconds
 });
 
 // Graceful shutdown

@@ -44,21 +44,21 @@ const MapControls = ({
   const typeOptions = [
     { 
       value: 'cafe', 
-      label: '☕ Caffetterie', 
+      label: '☕ Bar/Caffè', 
       emoji: '☕',
-      description: 'Bar italiani e caffetterie'
+      description: 'Bar italiani, caffetterie e gelaterie'
     },
     { 
       value: 'pub', 
-      label: '🍺 Pub', 
+      label: '🍺 Pub/Birrerie', 
       emoji: '🍺',
-      description: 'Pub e locali notturni'
+      description: 'Pub, birrerie e locali notturni'
     },
     { 
       value: 'restaurant', 
       label: '🍽️ Ristoranti', 
       emoji: '🍽️',
-      description: 'Ristoranti e pizzerie'
+      description: 'Ristoranti, pizzerie e trattorie'
     }
   ];
 

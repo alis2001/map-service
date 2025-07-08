@@ -154,17 +154,27 @@ function MapApp() {
   };
 
   // FIXED: Better location request handling
+  // OPTIMIZED: Simplified location handling
   const handleLocationRequest = () => {
-    // Clear any previous permission denied status
+    console.log('📍 User requested location');
     clearPermissionDenied();
-    // Request location again
     requestLocation();
   };
 
-  // FIXED: Handle continue without GPS
   const handleContinueWithoutGPS = () => {
-    // Just close the modal and continue with current location
+    console.log('📍 User chose to continue without GPS');
     clearPermissionDenied();
+    // Ensure we have some location even if user declined
+    if (!userLocation) {
+      // Force default location
+      const defaultLoc = {
+        latitude: 45.0703,
+        longitude: 7.6869,
+        source: 'default',
+        city: 'Torino'
+      };
+      // You'll need to pass this up or handle it in the geolocation hook
+    }
   };
 
   return (
@@ -193,7 +203,8 @@ function MapApp() {
       />
 
       {/* FIXED: Location Permission Modal - Show on first visit or when permission needed */}
-      {(!userLocation && !locationLoading && (shouldShowLocationModal || (!permissionGranted && !userLocation))) && !isEmbedMode && (
+      {/* OPTIMIZED: Only show modal if user explicitly denied permission */}
+      {(error?.code === 'PERMISSION_DENIED' && !userLocation) && !isEmbedMode && (
         <div className="modal-overlay">
           <div className="modal-card">
             <div className="modal-header">

@@ -1,4 +1,4 @@
-// hooks/useGeolocation.js - FIXED VERSION with Persistent Location
+// hooks/useGeolocation.js - FIXED VERSION with Immediate Default Location
 // Location: /map-service/frontend/src/hooks/useGeolocation.js
 
 import { useState, useEffect, useCallback } from 'react';
@@ -10,190 +10,64 @@ export const useGeolocation = () => {
   const [watchId, setWatchId] = useState(null);
   const [permissionGranted, setPermissionGranted] = useState(false);
 
-  // IMPROVED: More aggressive geolocation options for better accuracy
+  // OPTIMIZED: Geolocation options for better accuracy
   const options = {
     enableHighAccuracy: true,
-    timeout: 15000, // Increased to 15 seconds for better GPS lock
-    maximumAge: 5 * 60 * 1000 // 5 minutes cache for better UX
+    timeout: 10000, // 10 seconds timeout
+    maximumAge: 5 * 60 * 1000 // 5 minutes cache
   };
 
-  // FIXED: Check for cached location and permission status on mount
-  const checkCachedLocation = useCallback(() => {
-    try {
-      const cachedLocation = localStorage.getItem('lastKnownLocation');
-      const permissionStatus = localStorage.getItem('locationPermissionGranted');
-      
-      if (permissionStatus === 'true') {
-        setPermissionGranted(true);
-        setError(null); // Clear any previous errors
-      }
-      
-      if (cachedLocation) {
-        const parsedLocation = JSON.parse(cachedLocation);
-        
-        // Check if location hasn't expired (30 minutes)
-        if (parsedLocation.expiresAt && Date.now() < parsedLocation.expiresAt) {
-          console.log('📍 Using valid cached location');
-          setLocation({
-            ...parsedLocation,
-            source: 'cache'
-          });
-          setError(null);
-          return true;
-        } else {
-          console.log('📍 Cached location expired, will request fresh location');
-          localStorage.removeItem('lastKnownLocation');
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to retrieve cached location:', e);
-    }
-    return false;
-  }, []);
-
-  // Success callback with improved validation and persistence
-  const onSuccess = useCallback((position) => {
-    const coords = position.coords;
-    
-    console.log('📍 Geolocation success:', {
-      latitude: coords.latitude,
-      longitude: coords.longitude,
-      accuracy: coords.accuracy,
-      timestamp: new Date(position.timestamp).toISOString()
-    });
-
-    // IMPROVED: Validate coordinates are reasonable (not 0,0 or extreme values)
-    if (coords.latitude === 0 && coords.longitude === 0) {
-      console.warn('📍 Invalid coordinates (0,0) received, trying fallback');
-      tryIPGeolocation();
-      return;
-    }
-
-    const newLocation = {
-      latitude: coords.latitude,
-      longitude: coords.longitude,
-      accuracy: coords.accuracy,
+  // OPTIMIZED: Use Italian default immediately without delay
+  const useItalianDefault = useCallback(() => {
+    const defaultLocation = {
+      latitude: 45.0703,
+      longitude: 7.6869,
+      accuracy: 50000,
       timestamp: new Date().toISOString(),
-      source: 'gps',
-      isAccurate: coords.accuracy < 100,
-      heading: coords.heading,
-      speed: coords.speed
+      source: 'default',
+      city: 'Torino',
+      country: 'Italy'
     };
 
-    setLocation(newLocation);
-    setLoading(false);
-    setError(null);
-    setPermissionGranted(true); // Mark permission as granted
-
-    // FIXED: Store both location and permission status
+    console.log('📍 Using Italian default location:', defaultLocation);
+    setLocation(defaultLocation);
+    setLoading(false); // Stop loading
+    setError(null); // Clear error
+    setPermissionGranted(false); // Mark as no permission but working
+    
+    // Cache default location
     try {
       const locationWithExpiry = {
-        ...newLocation,
-        expiresAt: Date.now() + (30 * 60 * 1000) // 30 minutes expiry
+        ...defaultLocation,
+        expiresAt: Date.now() + (60 * 60 * 1000) // 1 hour expiry for default
       };
       localStorage.setItem('lastKnownLocation', JSON.stringify(locationWithExpiry));
-      localStorage.setItem('locationPermissionGranted', 'true');
-      localStorage.setItem('lastLocationUpdate', Date.now().toString());
-      console.log('📍 Location and permission status cached');
     } catch (e) {
-      console.warn('Failed to store location in localStorage:', e);
+      console.warn('Failed to cache default location:', e);
     }
   }, []);
 
-  // IMPROVED: Better error handling with permission tracking
-  const onError = useCallback((error) => {
-    console.error('❌ Geolocation error:', error);
-    
-    let errorMessage = '';
-    let errorCode = '';
-    let shouldRetry = false;
-
-    switch (error.code) {
-      case error.PERMISSION_DENIED:
-        errorMessage = 'Accesso alla posizione negato. Abilita la geolocalizzazione nelle impostazioni del browser.';
-        errorCode = 'PERMISSION_DENIED';
-        // FIXED: Mark permission as explicitly denied
-        localStorage.setItem('locationPermissionGranted', 'denied');
-        setPermissionGranted(false);
-        break;
-      case error.POSITION_UNAVAILABLE:
-        errorMessage = 'Posizione GPS non disponibile. Provo con la posizione IP...';
-        errorCode = 'POSITION_UNAVAILABLE';
-        shouldRetry = true;
-        break;
-      case error.TIMEOUT:
-        errorMessage = 'Timeout GPS. Provo con la posizione IP...';
-        errorCode = 'TIMEOUT';
-        shouldRetry = true;
-        break;
-      default:
-        errorMessage = 'Errore di geolocalizzazione. Provo con metodi alternativi...';
-        errorCode = 'UNKNOWN_ERROR';
-        shouldRetry = true;
-        break;
-    }
-
-    setError({
-      message: errorMessage,
-      code: errorCode,
-      originalError: error
-    });
-    setLoading(false);
-
-    // IMPROVED: Only show error modal if permission was explicitly denied
-    // For other errors, silently try fallbacks
-    if (error.code === error.PERMISSION_DENIED) {
-      // Don't auto-retry for permission denied
-      console.log('📍 Permission denied, not retrying');
-    } else if (shouldRetry) {
-      // For other errors, try fallbacks without showing modal
-      tryLastKnownLocation() || tryIPGeolocation();
-    }
-  }, []);
-
-  // IMPROVED: Try to use last known location with expiry check
-  const tryLastKnownLocation = useCallback(() => {
-    try {
-      const lastLocation = localStorage.getItem('lastKnownLocation');
-      if (lastLocation) {
-        const parsedLocation = JSON.parse(lastLocation);
-        
-        // Check if location hasn't expired
-        if (parsedLocation.expiresAt && Date.now() < parsedLocation.expiresAt) {
-          console.log('📍 Using valid cached location');
-          setLocation({
-            ...parsedLocation,
-            source: 'cache'
-          });
-          setError(null);
-          return true;
-        } else {
-          console.log('📍 Cached location expired, removing...');
-          localStorage.removeItem('lastKnownLocation');
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to retrieve cached location:', e);
-    }
-    return false;
-  }, []);
-
-  // IMPROVED: IP-based geolocation with multiple providers - ONLY as fallback
+  // OPTIMIZED: Faster IP geolocation with shorter timeout
   const tryIPGeolocation = useCallback(async () => {
     try {
-      console.log('🌐 Trying IP-based geolocation as fallback...');
+      console.log('🌐 Trying IP-based geolocation...');
       
       const providers = [
         'https://ipapi.co/json/',
-        'https://ipinfo.io/json'
+        'https://ipinfo.io/json',
+        'http://ip-api.com/json'
       ];
 
       for (const provider of providers) {
         try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+          
           const response = await fetch(provider, { 
-            timeout: 5000,
-            signal: AbortSignal.timeout(5000) 
+            signal: controller.signal
           });
+          clearTimeout(timeoutId);
+          
           const data = await response.json();
 
           let latitude, longitude, city, country;
@@ -207,6 +81,11 @@ export const useGeolocation = () => {
             const [lat, lng] = (data.loc || '').split(',');
             latitude = parseFloat(lat);
             longitude = parseFloat(lng);
+            city = data.city;
+            country = data.country;
+          } else if (provider.includes('ip-api.com')) {
+            latitude = data.lat;
+            longitude = data.lon;
             city = data.city;
             country = data.country;
           }
@@ -223,8 +102,9 @@ export const useGeolocation = () => {
               provider: provider.split('/')[2]
             };
 
-            console.log('📍 IP-based location found (fallback):', ipLocation);
+            console.log('📍 IP-based location found:', ipLocation);
             setLocation(ipLocation);
+            setLoading(false);
             setError(null);
             
             // Cache IP location but with shorter expiry
@@ -249,39 +129,147 @@ export const useGeolocation = () => {
       throw new Error('All IP geolocation providers failed');
 
     } catch (ipError) {
-      console.warn('All IP geolocation methods failed, using Turin default:', ipError);
+      console.warn('All IP geolocation methods failed, using Italian default:', ipError);
       useItalianDefault();
+    }
+  }, [useItalianDefault]);
+
+  // OPTIMIZED: Better cached location handling with immediate fallback
+  const checkCachedLocation = useCallback(() => {
+    try {
+      const cachedLocation = localStorage.getItem('lastKnownLocation');
+      const permissionStatus = localStorage.getItem('locationPermissionGranted');
+      
+      if (permissionStatus === 'true') {
+        setPermissionGranted(true);
+        setError(null);
+      }
+      
+      if (cachedLocation) {
+        const parsedLocation = JSON.parse(cachedLocation);
+        
+        // Use cached location even if expired (better than nothing)
+        if (parsedLocation.latitude && parsedLocation.longitude) {
+          console.log('📍 Using cached location (may be expired)');
+          setLocation({
+            ...parsedLocation,
+            source: 'cache'
+          });
+          setError(null);
+          return true;
+        }
+      }
+      
+      // If no cached location, use default immediately
+      console.log('📍 No cached location, using default');
+      useItalianDefault();
+      return false;
+    } catch (e) {
+      console.warn('Failed to retrieve cached location:', e);
+      useItalianDefault();
+    }
+    return false;
+  }, [useItalianDefault]);
+
+  // Success callback with improved validation and persistence
+  const onSuccess = useCallback((position) => {
+    const coords = position.coords;
+    
+    console.log('📍 Geolocation success:', {
+      latitude: coords.latitude,
+      longitude: coords.longitude,
+      accuracy: coords.accuracy,
+      timestamp: new Date(position.timestamp).toISOString()
+    });
+
+    // Validate coordinates are reasonable (not 0,0 or extreme values)
+    if (coords.latitude === 0 && coords.longitude === 0) {
+      console.warn('📍 Invalid coordinates (0,0) received, keeping current location');
+      return;
+    }
+
+    const newLocation = {
+      latitude: coords.latitude,
+      longitude: coords.longitude,
+      accuracy: coords.accuracy,
+      timestamp: new Date().toISOString(),
+      source: 'gps',
+      isAccurate: coords.accuracy < 100,
+      heading: coords.heading,
+      speed: coords.speed
+    };
+
+    setLocation(newLocation);
+    setLoading(false);
+    setError(null);
+    setPermissionGranted(true);
+
+    // Store both location and permission status
+    try {
+      const locationWithExpiry = {
+        ...newLocation,
+        expiresAt: Date.now() + (30 * 60 * 1000) // 30 minutes expiry
+      };
+      localStorage.setItem('lastKnownLocation', JSON.stringify(locationWithExpiry));
+      localStorage.setItem('locationPermissionGranted', 'true');
+      localStorage.setItem('lastLocationUpdate', Date.now().toString());
+      console.log('📍 GPS location and permission status cached');
+    } catch (e) {
+      console.warn('Failed to store location in localStorage:', e);
     }
   }, []);
 
-  // IMPROVED: Use smart Italian default based on common cities
-  const useItalianDefault = useCallback(() => {
-    const defaultLocation = {
-      latitude: 45.0703,
-      longitude: 7.6869,
-      accuracy: 50000,
-      timestamp: new Date().toISOString(),
-      source: 'default',
-      city: 'Torino',
-      country: 'Italy'
-    };
+  // OPTIMIZED: Better error handling with permission tracking
+  const onError = useCallback((error) => {
+    console.error('❌ Geolocation error:', error);
+    
+    let errorMessage = '';
+    let errorCode = '';
 
-    console.log('📍 Using Italian default location:', defaultLocation);
-    setLocation(defaultLocation);
-    setError(null); // Clear error when using default
-  }, []);
+    switch (error.code) {
+      case error.PERMISSION_DENIED:
+        errorMessage = 'Accesso alla posizione negato.';
+        errorCode = 'PERMISSION_DENIED';
+        localStorage.setItem('locationPermissionGranted', 'denied');
+        setPermissionGranted(false);
+        break;
+      case error.POSITION_UNAVAILABLE:
+        errorMessage = 'Posizione GPS non disponibile.';
+        errorCode = 'POSITION_UNAVAILABLE';
+        break;
+      case error.TIMEOUT:
+        errorMessage = 'Timeout GPS.';
+        errorCode = 'TIMEOUT';
+        break;
+      default:
+        errorMessage = 'Errore di geolocalizzazione.';
+        errorCode = 'UNKNOWN_ERROR';
+        break;
+    }
 
-  // FIXED: More intelligent position request that respects user preferences
+    setError({
+      message: errorMessage,
+      code: errorCode,
+      originalError: error
+    });
+    setLoading(false);
+
+    // For non-permission errors, silently continue with current location
+    if (error.code !== error.PERMISSION_DENIED) {
+      console.log('📍 GPS failed, continuing with current location or using IP fallback');
+      if (!location) {
+        tryIPGeolocation();
+      }
+    }
+  }, [location, tryIPGeolocation]);
+
+  // OPTIMIZED: More intelligent position request
   const requestLocation = useCallback(() => {
     // Check if user previously denied permission
     const permissionStatus = localStorage.getItem('locationPermissionGranted');
     
     if (permissionStatus === 'denied') {
       console.log('📍 User previously denied permission, not requesting again');
-      // Try cached location or IP fallback instead
-      if (!tryLastKnownLocation()) {
-        tryIPGeolocation();
-      }
       return;
     }
 
@@ -292,7 +280,6 @@ export const useGeolocation = () => {
       };
       setError(notSupportedError);
       setLoading(false);
-      tryLastKnownLocation() || tryIPGeolocation();
       return;
     }
 
@@ -313,7 +300,7 @@ export const useGeolocation = () => {
             {
               ...options,
               enableHighAccuracy: false,
-              timeout: 10000
+              timeout: 8000
             }
           );
         } else {
@@ -322,40 +309,22 @@ export const useGeolocation = () => {
       }, 
       options
     );
-  }, [onSuccess, onError, options, tryLastKnownLocation, tryIPGeolocation]);
+  }, [onSuccess, onError, options]);
 
-  // FIXED: Initialize location on mount with proper permission request
+  // OPTIMIZED: Initialize location immediately without waiting for permission
   useEffect(() => {
-    const autoLocation = process.env.REACT_APP_ENABLE_GEOLOCATION === 'true';
-    
-    if (autoLocation && !location && !loading) {
-      // First, check for cached location and permission status
+    if (!location && !loading) {
+      console.log('🔍 Initializing location immediately...');
+      
+      // First check cached location, if none use default immediately
       const hasCachedLocation = checkCachedLocation();
-      const permissionStatus = localStorage.getItem('locationPermissionGranted');
       
-      console.log('🔍 Location initialization:', {
-        hasCachedLocation,
-        permissionStatus,
-        autoLocation
-      });
-      
-      // Always try to get fresh location on first load if:
-      // 1. Permission was previously granted, OR
-      // 2. No permission status recorded (first time)
-      if (permissionStatus === 'true' || permissionStatus === null) {
-        const timer = setTimeout(() => {
-          console.log('📍 Requesting fresh location on app start');
+      // Try to get GPS in background if geolocation is enabled
+      if (process.env.REACT_APP_ENABLE_GEOLOCATION === 'true') {
+        setTimeout(() => {
+          console.log('📍 Trying GPS in background...');
           requestLocation();
-        }, 1000); // 1 second delay for better UX
-
-        return () => clearTimeout(timer);
-      } 
-      // If permission was denied, use cached or fallback
-      else if (permissionStatus === 'denied') {
-        if (!hasCachedLocation) {
-          console.log('📍 Permission denied, using fallback location');
-          tryIPGeolocation();
-        }
+        }, 2000); // Try GPS after 2 seconds in background
       }
     }
   }, []); // Run only once on mount
@@ -369,22 +338,16 @@ export const useGeolocation = () => {
     };
   }, [watchId]);
 
-  // FIXED: Better permission checking
-  const hasLocationPermission = useCallback(() => {
-    const permissionStatus = localStorage.getItem('locationPermissionGranted');
-    return permissionStatus === 'true' && permissionGranted;
-  }, [permissionGranted]);
-
-  // FIXED: Clear permission denied status (for retry button)
+  // Clear permission denied status (for retry button)
   const clearPermissionDenied = useCallback(() => {
     localStorage.removeItem('locationPermissionGranted');
     setPermissionGranted(false);
     setError(null);
   }, []);
 
-  // Keep existing methods but improve them...
+  // Start watching position
   const startWatching = useCallback(() => {
-    if (!navigator.geolocation || watchId || !hasLocationPermission()) return;
+    if (!navigator.geolocation || watchId || !permissionGranted) return;
 
     console.log('📍 Starting position watch...');
     const id = navigator.geolocation.watchPosition(onSuccess, onError, {
@@ -394,7 +357,7 @@ export const useGeolocation = () => {
     });
 
     setWatchId(id);
-  }, [watchId, onSuccess, onError, options, hasLocationPermission]);
+  }, [watchId, onSuccess, onError, options, permissionGranted]);
 
   const stopWatching = useCallback(() => {
     if (watchId) {
@@ -458,7 +421,7 @@ export const useGeolocation = () => {
     hasAnyLocation: !!location,
     isHighAccuracy: location?.accuracy && location.accuracy < 50,
     
-    // FIXED: Better error state detection
+    // OPTIMIZED: Better error state detection - only show modal for explicit permission denial
     shouldShowLocationModal: error?.code === 'PERMISSION_DENIED' && 
                             localStorage.getItem('locationPermissionGranted') === 'denied'
   };
