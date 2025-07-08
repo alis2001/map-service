@@ -14,15 +14,16 @@ dotenv.config();
 
 // Import database connection
 const { prisma, testConnection } = require('./config/prisma');
+const { connectRedis } = require('./config/redis');
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
 const notFound = require('./middleware/notFound');
 
-// Import routes (commented out for now - we'll create these step by step)
+// Import routes (only places - no auth needed)
 // const locationRoutes = require('./routes/locationRoutes');
-// const placesRoutes = require('./routes/placesRoutes');
-// const authRoutes = require('./routes/authRoutes');
+const placesRoutes = require('./routes/placesRoutes');
+// const authRoutes = require('./routes/authRoutes'); // REMOVED
 
 // Initialize Express app
 const app = express();
@@ -91,22 +92,23 @@ app.get('/health', async (req, res) => {
   }
 });
 
-// API routes (commented out for now - we'll add these step by step)
-// app.use('/api/v1/auth', authRoutes);
-// app.use('/api/v1/location', locationRoutes);
-// app.use('/api/v1/places', placesRoutes);
+// API routes (only places API)
+// app.use('/api/v1/auth', authRoutes); // REMOVED - no auth needed
+// app.use('/api/v1/location', locationRoutes); // REMOVED - no user locations
+app.use('/api/v1/places', placesRoutes); // Main places API
 
 // Root endpoint
 app.get('/', (req, res) => {
   res.json({
-    message: 'Map Service API',
+    message: 'Map Service API - Microservice for Coffee & Bar Locations',
     version: '1.0.0',
     endpoints: {
       health: '/health',
-      auth: '/api/v1/auth',
-      location: '/api/v1/location',
-      places: '/api/v1/places'
-    }
+      places: '/api/v1/places',
+      nearbyPlaces: '/api/v1/places/nearby',
+      searchPlaces: '/api/v1/places/search'
+    },
+    note: 'Authentication handled by main application'
   });
 });
 
@@ -121,11 +123,20 @@ const PORT = process.env.PORT || 5001;
 const HOST = process.env.HOST || '0.0.0.0';
 
 // Start server
-const server = app.listen(PORT, HOST, () => {
+const server = app.listen(PORT, HOST, async () => {
   console.log(`🚀 Server running on http://${HOST}:${PORT}`);
   console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🗄️  Database: ${process.env.DB_NAME || 'map_service'}`);
   console.log(`🔴 Redis: ${process.env.REDIS_HOST || 'localhost'}:${process.env.REDIS_PORT || 6379}`);
+  
+  // Connect to Redis
+  try {
+    await connectRedis();
+    console.log('✅ Redis connected successfully');
+  } catch (error) {
+    console.log('❌ Redis connection failed:', error.message);
+    console.log('⚠️  App will continue without caching');
+  }
 });
 
 // Graceful shutdown

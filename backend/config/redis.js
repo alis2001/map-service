@@ -84,13 +84,15 @@ const createRedisClient = () => {
   return client;
 };
 
-// Initialize Redis client
+// Initialize Redis client (but don't connect yet)
 const redisClient = createRedisClient();
 
 // Connect to Redis
 const connectRedis = async () => {
   try {
-    await redisClient.connect();
+    if (!redisClient.isOpen) {
+      await redisClient.connect();
+    }
     logger.info('Redis connection established successfully');
     return true;
   } catch (err) {
@@ -120,6 +122,12 @@ const cache = {
   // Set a value with optional expiration (in seconds)
   async set(key, value, expiration = 3600) {
     try {
+      // Check if Redis is connected
+      if (!redisClient.isOpen) {
+        logger.debug('Redis not connected, skipping cache set', { key });
+        return false;
+      }
+
       const serializedValue = JSON.stringify(value);
       
       if (expiration) {
@@ -142,6 +150,12 @@ const cache = {
   // Get a value from cache
   async get(key) {
     try {
+      // Check if Redis is connected
+      if (!redisClient.isOpen) {
+        logger.debug('Redis not connected, cache miss', { key });
+        return null;
+      }
+
       const value = await redisClient.get(key);
       
       if (value === null) {
