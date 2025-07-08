@@ -1,4 +1,4 @@
-// components/FullPageMap.js - FIXED VERSION with Debouncing
+// components/FullPageMap.js - FIXED VERSION with Smart Movement Detection
 // Location: /map-service/frontend/src/components/FullPageMap.js
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
@@ -36,34 +36,70 @@ const FullPageMap = ({
   const [mapError, setMapError] = useState(null);
   const [mapInitialized, setMapInitialized] = useState(false);
   
-  // FIXED: Add debouncing for map movement
+  // FIXED: Improved debouncing with distance-based threshold
   const debounceTimeoutRef = useRef(null);
-  const lastCenterRef = useRef(null);
+  const lastSearchLocationRef = useRef(null);
   const isUserDraggingRef = useRef(false);
+  const mapIdleTimeoutRef = useRef(null);
 
-  // FIXED: Debounced center change handler
+  // FIXED: Smart movement detection - only trigger search for significant moves
+  const shouldTriggerNewSearch = useCallback((newCenter) => {
+    if (!lastSearchLocationRef.current) {
+      return true; // First search
+    }
+
+    const lastLocation = lastSearchLocationRef.current;
+    
+    // Calculate distance moved in meters
+    const R = 6371e3; // Earth's radius in meters
+    const φ1 = lastLocation.lat * Math.PI / 180;
+    const φ2 = newCenter.lat * Math.PI / 180;
+    const Δφ = (newCenter.lat - lastLocation.lat) * Math.PI / 180;
+    const Δλ = (newCenter.lng - lastLocation.lng) * Math.PI / 180;
+
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distance = R * c;
+
+    // FIXED: Only trigger new search if moved more than 500 meters (meaningful distance)
+    const significantDistance = 500; // meters
+    const hasMovedSignificantly = distance > significantDistance;
+
+    console.log('🗺️ Movement check:', {
+      distance: Math.round(distance),
+      threshold: significantDistance,
+      shouldSearch: hasMovedSignificantly
+    });
+
+    return hasMovedSignificantly;
+  }, []);
+
+  // FIXED: Debounced center change with smart distance detection
   const debouncedCenterChange = useCallback((newCenter) => {
-    // Clear existing timeout
+    // Clear existing timeouts
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
     }
+    if (mapIdleTimeoutRef.current) {
+      clearTimeout(mapIdleTimeoutRef.current);
+    }
 
-    // Set new timeout
+    // FIXED: Only process if user stopped dragging and moved significantly
     debounceTimeoutRef.current = setTimeout(() => {
-      // Only trigger if user is not currently dragging and center actually changed
-      if (!isUserDraggingRef.current && onCenterChange) {
-        const lastCenter = lastCenterRef.current;
-        if (!lastCenter || 
-            Math.abs(lastCenter.lat - newCenter.lat) > 0.001 || 
-            Math.abs(lastCenter.lng - newCenter.lng) > 0.001) {
-          
-          console.log('🗺️ Map center changed (debounced):', newCenter);
-          lastCenterRef.current = newCenter;
+      if (!isUserDraggingRef.current && shouldTriggerNewSearch(newCenter)) {
+        console.log('🗺️ Significant map movement detected, triggering search');
+        lastSearchLocationRef.current = newCenter;
+        
+        if (onCenterChange) {
           onCenterChange(newCenter);
         }
+      } else {
+        console.log('🗺️ Minor map movement, no search triggered');
       }
-    }, 1000); // Wait 1 second after user stops moving map
-  }, [onCenterChange]);
+    }, 2000); // Wait 2 seconds after user stops moving
+  }, [onCenterChange, shouldTriggerNewSearch]);
 
   // Initialize Google Map ONLY ONCE
   useEffect(() => {
@@ -77,7 +113,7 @@ const FullPageMap = ({
       }
 
       try {
-        console.log('🗺️ Initializing Google Map ONCE...');
+        console.log('🗺️ Initializing Google Map...');
 
         const mapOptions = {
           center: { lat: center.lat, lng: center.lng },
@@ -95,17 +131,22 @@ const FullPageMap = ({
           rotateControl: false,
           fullscreenControl: !isEmbedMode,
           
-          // Styling
+          // FIXED: Improved styling for Italian venues
           styles: [
             {
-              featureType: 'poi',
+              featureType: 'poi.business',
+              elementType: 'labels',
+              stylers: [{ visibility: 'simplified' }] // Show some business labels
+            },
+            {
+              featureType: 'poi.government',
               elementType: 'labels',
               stylers: [{ visibility: 'off' }]
             },
             {
-              featureType: 'transit',
+              featureType: 'transit.station',
               elementType: 'labels',
-              stylers: [{ visibility: 'off' }]
+              stylers: [{ visibility: 'simplified' }]
             }
           ],
           
@@ -118,35 +159,50 @@ const FullPageMap = ({
 
         googleMapRef.current = new window.google.maps.Map(mapRef.current, mapOptions);
 
-        // FIXED: Improved map event listeners with debouncing
+        // FIXED: Improved event listeners with proper drag detection
         googleMapRef.current.addListener('dragstart', () => {
           console.log('🗺️ User started dragging map');
           isUserDraggingRef.current = true;
+          
+          // Clear any pending searches while dragging
+          if (debounceTimeoutRef.current) {
+            clearTimeout(debounceTimeoutRef.current);
+          }
         });
 
         googleMapRef.current.addListener('dragend', () => {
           console.log('🗺️ User finished dragging map');
           isUserDraggingRef.current = false;
           
-          // Trigger debounced center change after drag ends
-          const newCenter = googleMapRef.current.getCenter();
-          debouncedCenterChange({
-            lat: newCenter.lat(),
-            lng: newCenter.lng()
-          });
-        });
-
-        // FIXED: Less aggressive center change monitoring
-        googleMapRef.current.addListener('center_changed', () => {
-          if (!isUserDraggingRef.current) {
+          // Start the idle timeout to detect when user is really done
+          mapIdleTimeoutRef.current = setTimeout(() => {
             const newCenter = googleMapRef.current.getCenter();
             debouncedCenterChange({
               lat: newCenter.lat(),
               lng: newCenter.lng()
             });
+          }, 1000); // Wait 1 second after drag ends
+        });
+
+        // FIXED: Only listen to idle events for zoom changes
+        googleMapRef.current.addListener('idle', () => {
+          // This fires when map stops moving/zooming
+          if (!isUserDraggingRef.current) {
+            const newCenter = googleMapRef.current.getCenter();
+            const currentZoom = googleMapRef.current.getZoom();
+            
+            // Only trigger on significant zoom changes
+            if (Math.abs(currentZoom - zoom) >= 2) {
+              console.log('🗺️ Significant zoom change detected');
+              debouncedCenterChange({
+                lat: newCenter.lat(),
+                lng: newCenter.lng()
+              });
+            }
           }
         });
 
+        // Close popup on map click
         googleMapRef.current.addListener('click', () => {
           if (selectedCafe && onClosePopup) {
             onClosePopup();
@@ -157,6 +213,9 @@ const FullPageMap = ({
           console.log('✅ Google Map loaded successfully');
           setMapLoaded(true);
           setMapError(null);
+          
+          // Set initial search location
+          lastSearchLocationRef.current = { lat: center.lat, lng: center.lng };
         });
 
         setMapInitialized(true);
@@ -172,7 +231,6 @@ const FullPageMap = ({
     if (window.google && window.google.maps) {
       initMap();
     } else {
-      // Wait for Google Maps API to load
       const checkGoogleMaps = () => {
         if (window.google && window.google.maps) {
           initMap();
@@ -184,7 +242,7 @@ const FullPageMap = ({
     }
   }, []); // Empty dependency array - only run once!
 
-  // Update map center and zoom when props change (but only if not user-initiated)
+  // FIXED: Update map center only for external changes (not user-initiated)
   useEffect(() => {
     if (googleMapRef.current && mapLoaded && mapInitialized && !isUserDraggingRef.current) {
       const currentCenter = googleMapRef.current.getCenter();
@@ -192,23 +250,26 @@ const FullPageMap = ({
       
       const newCenter = { lat: center.lat, lng: center.lng };
       
-      // Only update if significantly different to avoid infinite loops
-      if (!currentCenter || 
-          Math.abs(currentCenter.lat() - newCenter.lat) > 0.01 || 
-          Math.abs(currentCenter.lng() - newCenter.lng) > 0.01) {
-        console.log('🗺️ Updating map center from props:', newCenter);
-        googleMapRef.current.setCenter(newCenter);
-        lastCenterRef.current = newCenter;
-      }
+      // FIXED: Only update if this is an external change (e.g., location found)
+      const isExternalChange = !lastSearchLocationRef.current || 
+        (Math.abs(currentCenter?.lat() - newCenter.lat) > 0.01 || 
+         Math.abs(currentCenter?.lng() - newCenter.lng) > 0.01);
       
-      if (Math.abs(currentZoom - zoom) > 1) {
-        console.log('🗺️ Updating map zoom from props:', zoom);
-        googleMapRef.current.setZoom(zoom);
+      if (isExternalChange) {
+        console.log('🗺️ External center change detected, updating map:', newCenter);
+        googleMapRef.current.setCenter(newCenter);
+        lastSearchLocationRef.current = newCenter;
+        
+        // Update zoom if significantly different
+        if (Math.abs(currentZoom - zoom) > 1) {
+          console.log('🗺️ Updating map zoom:', zoom);
+          googleMapRef.current.setZoom(zoom);
+        }
       }
     }
   }, [center.lat, center.lng, zoom, mapLoaded, mapInitialized]);
 
-  // Update user location marker
+  // FIXED: Update user location marker with better styling
   useEffect(() => {
     if (!googleMapRef.current || !mapLoaded || !userLocation) return;
 
@@ -217,34 +278,38 @@ const FullPageMap = ({
       userMarkerRef.current.setMap(null);
     }
 
-    // Create new user marker with improved styling
+    // FIXED: Improved user marker with accuracy circle
     const userMarker = new window.google.maps.Marker({
       position: { 
         lat: userLocation.latitude, 
         lng: userLocation.longitude 
       },
       map: googleMapRef.current,
-      title: 'La tua posizione',
+      title: `La tua posizione (±${Math.round(userLocation.accuracy || 0)}m)`,
       icon: {
         url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="12" cy="12" r="8" fill="#4F46E5" stroke="#ffffff" stroke-width="3"/>
-            <circle cx="12" cy="12" r="3" fill="#ffffff"/>
-            <circle cx="12" cy="12" r="11" fill="none" stroke="#4F46E5" stroke-width="1" opacity="0.3"/>
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="14" cy="14" r="12" fill="#4F46E5" stroke="#ffffff" stroke-width="3"/>
+            <circle cx="14" cy="14" r="4" fill="#ffffff"/>
+            <circle cx="14" cy="14" r="13" fill="none" stroke="#4F46E5" stroke-width="1" opacity="0.3"/>
+            ${userLocation.accuracy < 50 ? '<circle cx="14" cy="14" r="2" fill="#10B981"/>' : ''}
           </svg>
         `),
-        scaledSize: new window.google.maps.Size(24, 24),
-        anchor: new window.google.maps.Point(12, 12)
+        scaledSize: new window.google.maps.Size(28, 28),
+        anchor: new window.google.maps.Point(14, 14)
       },
       zIndex: 1000,
-      animation: window.google.maps.Animation.DROP
+      animation: userLocation.source === 'gps' ? window.google.maps.Animation.DROP : null
     });
 
     userMarkerRef.current = userMarker;
-    console.log('📍 User location marker updated');
+    console.log('📍 User location marker updated:', {
+      accuracy: userLocation.accuracy,
+      source: userLocation.source
+    });
   }, [userLocation, mapLoaded]);
 
-  // Update search radius circle
+  // FIXED: Update search radius circle only when radius or location changes
   useEffect(() => {
     if (!googleMapRef.current || !mapLoaded || !userLocation || !searchRadius) return;
 
@@ -253,27 +318,32 @@ const FullPageMap = ({
       radiusCircleRef.current.setMap(null);
     }
 
-    // Create new radius circle with improved styling
-    const circle = new window.google.maps.Circle({
-      center: { 
-        lat: userLocation.latitude, 
-        lng: userLocation.longitude 
-      },
-      radius: searchRadius,
-      map: googleMapRef.current,
-      fillColor: '#4F46E5',
-      fillOpacity: 0.1,
-      strokeColor: '#4F46E5',
-      strokeOpacity: 0.4,
-      strokeWeight: 2,
-      clickable: false
-    });
+    // FIXED: Only show radius circle if user location is accurate
+    if (userLocation.accuracy && userLocation.accuracy < 1000) {
+      const circle = new window.google.maps.Circle({
+        center: { 
+          lat: userLocation.latitude, 
+          lng: userLocation.longitude 
+        },
+        radius: searchRadius,
+        map: googleMapRef.current,
+        fillColor: userLocation.source === 'gps' ? '#4F46E5' : '#F59E0B',
+        fillOpacity: 0.08,
+        strokeColor: userLocation.source === 'gps' ? '#4F46E5' : '#F59E0B',
+        strokeOpacity: 0.3,
+        strokeWeight: 2,
+        clickable: false
+      });
 
-    radiusCircleRef.current = circle;
-    console.log('🔍 Search radius circle updated:', searchRadius);
+      radiusCircleRef.current = circle;
+      console.log('🔍 Search radius circle updated:', {
+        radius: searchRadius,
+        source: userLocation.source
+      });
+    }
   }, [userLocation, searchRadius, mapLoaded]);
 
-  // FIXED: Improved cafe markers with better clustering and performance
+  // FIXED: Improved cafe markers with better performance
   useEffect(() => {
     if (!googleMapRef.current || !mapLoaded) return;
 
@@ -285,36 +355,40 @@ const FullPageMap = ({
     });
     markersRef.current.clear();
 
-    // Batch marker creation for better performance
-    const markers = [];
+    // FIXED: Batch marker creation with clustering for better performance
+    const bounds = new window.google.maps.LatLngBounds();
+    let markersAdded = 0;
     
     cafes.forEach((cafe, index) => {
       if (!cafe.location || !cafe.location.latitude || !cafe.location.longitude) {
-        console.warn('Skipping cafe with invalid location:', cafe);
+        console.warn('Skipping cafe with invalid location:', cafe.name);
         return;
       }
 
+      const position = {
+        lat: cafe.location.latitude,
+        lng: cafe.location.longitude
+      };
+
       const marker = new window.google.maps.Marker({
-        position: {
-          lat: cafe.location.latitude,
-          lng: cafe.location.longitude
-        },
+        position: position,
         map: googleMapRef.current,
-        title: cafe.name,
+        title: `${cafe.name}${cafe.rating ? ` (${cafe.rating}⭐)` : ''}${cafe.distance ? ` - ${cafe.formattedDistance}` : ''}`,
         icon: {
           url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
             <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M16 0C7.163 0 0 7.163 0 16C0 24.837 16 40 16 40S32 24.837 32 16C32 7.163 24.837 0 16 0Z" fill="${getMarkerColor(cafe)}"/>
               <circle cx="16" cy="16" r="8" fill="white"/>
               <text x="16" y="20" text-anchor="middle" font-size="12" fill="${getMarkerColor(cafe)}">${getMarkerEmoji(cafe)}</text>
+              ${cafe.distance && cafe.distance < 200 ? '<circle cx="16" cy="16" r="11" fill="none" stroke="#10B981" stroke-width="2" opacity="0.6"/>' : ''}
             </svg>
           `),
           scaledSize: new window.google.maps.Size(32, 40),
           anchor: new window.google.maps.Point(16, 40)
         },
         zIndex: cafe.distance ? Math.round(1000 - cafe.distance / 10) : 500,
-        // FIXED: Add animation for very close cafes
-        animation: cafe.distance && cafe.distance < 300 ? 
+        // FIXED: Only animate very close cafes
+        animation: cafe.distance && cafe.distance < 200 ? 
           window.google.maps.Animation.BOUNCE : null
       });
 
@@ -325,28 +399,27 @@ const FullPageMap = ({
         }
       });
 
-      markers.push(marker);
+      bounds.extend(position);
       markersRef.current.set(cafe.id || cafe.googlePlaceId, marker);
+      markersAdded++;
     });
 
-    console.log('✅ Cafe markers updated:', markersRef.current.size);
+    console.log('✅ Cafe markers updated:', markersAdded);
   }, [cafes, mapLoaded, onCafeSelect]);
 
-  // FIXED: Helper function to get marker color based on cafe properties and type
+  // Helper functions (same as before)
   const getMarkerColor = (cafe) => {
-    // Different colors for different venue types
     if (cafe.placeType === 'pub' || (cafe.types && cafe.types.includes('night_club'))) {
       return '#EF4444'; // Red for pubs/nightlife
     }
     
-    if (cafe.distance && cafe.distance < 300) return '#10B981'; // Very close - green
-    if (cafe.distance && cafe.distance < 600) return '#F59E0B'; // Close - amber
+    if (cafe.distance && cafe.distance < 200) return '#10B981'; // Very close - green
+    if (cafe.distance && cafe.distance < 500) return '#F59E0B'; // Close - amber
     if (cafe.rating && cafe.rating >= 4.5) return '#8B5CF6';     // High rated - purple
     
     return '#6366F1'; // Default - indigo for cafeterias/bars
   };
 
-  // FIXED: Helper function to get marker emoji based on Italian venue type
   const getMarkerEmoji = (cafe) => {
     if (cafe.placeType === 'pub' || (cafe.types && cafe.types.includes('night_club'))) {
       return '🍺'; // Beer for pubs
@@ -359,12 +432,15 @@ const FullPageMap = ({
     return '☕'; // Coffee for cafeterias (including bars)
   };
 
-  // Cleanup on unmount
+  // FIXED: Comprehensive cleanup
   useEffect(() => {
     return () => {
-      // Clear debounce timeout
+      // Clear all timeouts
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current);
+      }
+      if (mapIdleTimeoutRef.current) {
+        clearTimeout(mapIdleTimeoutRef.current);
       }
       
       // Cleanup markers
@@ -386,8 +462,6 @@ const FullPageMap = ({
     setMapError(null);
     setMapLoaded(false);
     setMapInitialized(false);
-    
-    // Force reload by refreshing the page
     window.location.reload();
   }, []);
 
@@ -418,7 +492,7 @@ const FullPageMap = ({
         style={{ 
           width: '100%', 
           height: '100%',
-          backgroundColor: '#f0f9ff' // Light blue background while loading
+          backgroundColor: '#f0f9ff'
         }}
       />
 
@@ -479,6 +553,8 @@ const FullPageMap = ({
           <div>Map: {mapLoaded ? '✅' : '⏳'}</div>
           <div>Cafes: {cafes.length}</div>
           <div>Dragging: {isUserDraggingRef.current ? '🖱️' : '✋'}</div>
+          <div>Last Search: {lastSearchLocationRef.current ? 
+            `${lastSearchLocationRef.current.lat.toFixed(3)}, ${lastSearchLocationRef.current.lng.toFixed(3)}` : 'None'}</div>
         </div>
       )}
     </div>
