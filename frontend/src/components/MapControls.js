@@ -1,4 +1,4 @@
-// components/MapControls.js
+// components/MapControls.js - FIXED VERSION for Italian Caffeterias
 // Location: /map-service/frontend/src/components/MapControls.js
 
 import React, { useState } from 'react';
@@ -40,10 +40,26 @@ const MapControls = ({
     }
   };
 
+  // FIXED: Updated type options for Italian venues
   const typeOptions = [
-    { value: 'cafe', label: '☕ Caffè', emoji: '☕' },
-    { value: 'bar', label: '🍺 Bar', emoji: '🍺' },
-    { value: 'restaurant', label: '🍽️ Ristoranti', emoji: '🍽️' }
+    { 
+      value: 'cafe', 
+      label: '☕ Caffetterie', 
+      emoji: '☕',
+      description: 'Bar italiani e caffetterie'
+    },
+    { 
+      value: 'pub', 
+      label: '🍺 Pub', 
+      emoji: '🍺',
+      description: 'Pub e locali notturni'
+    },
+    { 
+      value: 'restaurant', 
+      label: '🍽️ Ristoranti', 
+      emoji: '🍽️',
+      description: 'Ristoranti e pizzerie'
+    }
   ];
 
   const radiusOptions = [
@@ -78,8 +94,16 @@ const MapControls = ({
           </div>
           <div className="stats-item">
             <span className="stats-icon">🎯</span>
-            <span className="stats-label">{radiusOptions.find(r => r.value === searchRadius)?.label || `${searchRadius}m`}</span>
+            <span className="stats-label">
+              {radiusOptions.find(r => r.value === searchRadius)?.label || `${searchRadius}m`}
+            </span>
           </div>
+          {hasUserLocation && (
+            <div className="stats-item">
+              <span className="stats-icon">📍</span>
+              <span className="stats-label">GPS</span>
+            </div>
+          )}
         </div>
 
         {/* Type Selector */}
@@ -91,12 +115,20 @@ const MapControls = ({
                 key={option.value}
                 className={`type-button ${cafeType === option.value ? 'active' : ''}`}
                 onClick={() => handleTypeChange(option.value)}
-                title={option.label}
+                title={option.description}
               >
                 <span className="type-emoji">{option.emoji}</span>
                 <span className="type-text">{option.label.split(' ')[1]}</span>
+                {cafeType === option.value && (
+                  <span className="type-indicator">●</span>
+                )}
               </button>
             ))}
+          </div>
+          
+          {/* Type Description */}
+          <div className="type-description">
+            {typeOptions.find(t => t.value === cafeType)?.description || 'Seleziona un tipo di locale'}
           </div>
         </div>
 
@@ -141,6 +173,9 @@ const MapControls = ({
             <span className="button-text">
               {locationLoading ? 'Rilevando...' : hasUserLocation ? 'La tua posizione' : 'Trova posizione'}
             </span>
+            {hasUserLocation && (
+              <span className="location-status">✓</span>
+            )}
           </button>
 
           {/* Refresh Button */}
@@ -154,31 +189,46 @@ const MapControls = ({
           </button>
         </div>
 
-        {/* Quick Filters */}
+        {/* Quick Filters for Italian Venues */}
         <div className="quick-filters">
           <div className="filter-label">Filtri rapidi:</div>
           <div className="filter-buttons">
             <button 
-              className="filter-button"
+              className={`filter-button ${searchRadius === 500 ? 'active' : ''}`}
               onClick={() => handleRadiusChange(500)}
               title="Solo molto vicini"
             >
               🎯 Vicini
             </button>
             <button 
-              className="filter-button"
+              className={`filter-button ${cafeType === 'cafe' ? 'active' : ''}`}
               onClick={() => handleTypeChange('cafe')}
-              title="Solo caffetterie"
+              title="Caffetterie e bar italiani"
             >
               ☕ Caffè
             </button>
             <button 
-              className="filter-button"
-              onClick={() => handleTypeChange('bar')}
-              title="Solo bar"
+              className={`filter-button ${cafeType === 'pub' ? 'active' : ''}`}
+              onClick={() => handleTypeChange('pub')}
+              title="Pub e locali notturni"
             >
-              🍺 Bar
+              🍺 Pub
             </button>
+          </div>
+        </div>
+
+        {/* Italian Venue Info */}
+        <div className="venue-info">
+          <div className="info-card">
+            <div className="info-icon">ℹ️</div>
+            <div className="info-content">
+              <div className="info-title">Locali italiani</div>
+              <div className="info-text">
+                {cafeType === 'cafe' && 'I bar italiani servono caffè, aperitivi e spuntini tutto il giorno.'}
+                {cafeType === 'pub' && 'Pub e locali notturni per la vita serale e cocktail.'}
+                {cafeType === 'restaurant' && 'Ristoranti, pizzerie e osterie per pranzo e cena.'}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -190,6 +240,104 @@ const MapControls = ({
           {hasUserLocation ? 'GPS attivo' : 'GPS non disponibile'}
         </span>
       </div>
+
+      {/* Additional Styles */}
+      <style jsx>{`
+        .type-indicator {
+          position: absolute;
+          top: 4px;
+          right: 4px;
+          font-size: 8px;
+          color: white;
+        }
+
+        .type-description {
+          font-size: 12px;
+          color: #6B7280;
+          margin-top: 8px;
+          padding: 8px;
+          background: rgba(79, 70, 229, 0.05);
+          border-radius: 8px;
+          font-style: italic;
+        }
+
+        .location-status {
+          font-size: 12px;
+          color: #10B981;
+          font-weight: bold;
+        }
+
+        .filter-button.active {
+          background: var(--gradient-primary);
+          color: white;
+          border-color: transparent;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+        }
+
+        .venue-info {
+          border-top: 1px solid rgba(0, 0, 0, 0.1);
+          padding-top: 12px;
+          margin-top: 12px;
+        }
+
+        .info-card {
+          display: flex;
+          gap: 8px;
+          background: rgba(79, 70, 229, 0.05);
+          padding: 12px;
+          border-radius: 12px;
+          border: 1px solid rgba(79, 70, 229, 0.1);
+        }
+
+        .info-icon {
+          font-size: 16px;
+          flex-shrink: 0;
+        }
+
+        .info-content {
+          flex: 1;
+        }
+
+        .info-title {
+          font-size: 12px;
+          font-weight: 600;
+          color: #4F46E5;
+          margin-bottom: 4px;
+        }
+
+        .info-text {
+          font-size: 11px;
+          color: #6B7280;
+          line-height: 1.4;
+        }
+
+        .stats-item:last-child {
+          margin-left: auto;
+        }
+
+        .controls-panel {
+          max-width: 320px;
+          min-width: 280px;
+        }
+
+        @media (max-width: 768px) {
+          .controls-panel {
+            max-width: none;
+            min-width: auto;
+          }
+          
+          .filter-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+          }
+          
+          .filter-button:last-child {
+            grid-column: 1 / -1;
+          }
+        }
+      `}</style>
     </div>
   );
 };
