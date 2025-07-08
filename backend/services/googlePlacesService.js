@@ -1,4 +1,4 @@
-// services/googlePlacesService.js
+// services/googlePlacesService.js - CRITICAL FIX
 // Location: /backend/services/googlePlacesService.js
 
 const { prisma } = require('../config/prisma');
@@ -19,7 +19,7 @@ const SERVICE_CONFIG = {
   defaultRadius: 1500,
   maxRadius: 50000,
   maxResults: 50,
-  cacheEnabled: false, // DISABLED for debugging
+  cacheEnabled: true, // ENABLE CACHE FOR PERFORMANCE
   batchSize: 20,
   
   // Place type mappings
@@ -29,8 +29,8 @@ const SERVICE_CONFIG = {
     restaurant: ['restaurant', 'meal_delivery', 'meal_takeaway']
   },
   
-  // Required fields for place validation
-  requiredFields: ['place_id', 'name'], // SIMPLIFIED - only require basic fields
+  // FIXED: Updated required fields to match actual data structure
+  requiredFields: ['googlePlaceId', 'name', 'latitude', 'longitude'], // SIMPLIFIED VALIDATION
   
   // Photo size configurations
   photoSizes: {
@@ -65,6 +65,35 @@ class GooglePlacesService {
     }
   }
 
+  // FIXED: Corrected validation logic
+  validatePlaceData(place) {
+    console.log('🔍 VALIDATING PLACE:', {
+      googlePlaceId: place.googlePlaceId,
+      name: place.name,
+      hasLatitude: place.latitude !== undefined,
+      hasLongitude: place.longitude !== undefined,
+      latitude: place.latitude,
+      longitude: place.longitude
+    });
+
+    // Check if all required fields exist and are valid
+    const isValid = place && 
+                   place.googlePlaceId && 
+                   place.name && 
+                   typeof place.latitude === 'number' && 
+                   typeof place.longitude === 'number' &&
+                   !isNaN(place.latitude) &&
+                   !isNaN(place.longitude);
+
+    console.log('✅ VALIDATION RESULT:', {
+      placeId: place.googlePlaceId,
+      isValid: isValid,
+      reason: isValid ? 'All fields valid' : 'Missing or invalid required fields'
+    });
+
+    return isValid;
+  }
+
   // Search for nearby places
   async searchNearby(latitude, longitude, options = {}) {
     try {
@@ -86,10 +115,20 @@ class GooglePlacesService {
         throw new Error('Invalid place type provided');
       }
 
+      console.log('🚀 STARTING NEARBY SEARCH:', {
+        latitude,
+        longitude,
+        type,
+        radius,
+        limit
+      });
+
       // Check cache first
       if (SERVICE_CONFIG.cacheEnabled) {
+        const cacheKey = `nearby:${latitude}:${longitude}:${radius}:${type}`;
         const cachedResults = await redisService.getNearbyPlaces(latitude, longitude, radius, type);
         if (cachedResults) {
+          console.log('📦 CACHE HIT - returning cached results');
           logger.debug('Returning cached nearby places', {
             latitude,
             longitude,
@@ -102,13 +141,18 @@ class GooglePlacesService {
       }
 
       // Search Google Places API
+      console.log('🌐 CALLING GOOGLE PLACES API...');
       const places = await searchNearbyPlaces(latitude, longitude, type, radius);
-      
-      // Process and save places to database
-      const processedPlaces = await this.processAndSavePlaces(places, type);
+      console.log('📡 API RESPONSE:', { count: places.length });
 
-      // Cache results
-      if (SERVICE_CONFIG.cacheEnabled) {
+      // Process and save places to database
+      console.log('🔄 PROCESSING PLACES...');
+      const processedPlaces = await this.processAndSavePlaces(places, type);
+      console.log('✅ PROCESSED PLACES:', { count: processedPlaces.length });
+
+      // Cache results if enabled
+      if (SERVICE_CONFIG.cacheEnabled && processedPlaces.length > 0) {
+        console.log('💾 CACHING RESULTS...');
         await redisService.cacheNearbyPlaces(latitude, longitude, radius, type, processedPlaces);
       }
 
@@ -123,6 +167,7 @@ class GooglePlacesService {
 
       return this.formatPlacesResponse(processedPlaces, userLocation, limit);
     } catch (error) {
+      console.error('❌ NEARBY SEARCH ERROR:', error);
       logger.error('Nearby places search failed', {
         latitude,
         longitude,
@@ -131,6 +176,203 @@ class GooglePlacesService {
       });
       throw error;
     }
+  }
+
+  // Process and save places to database
+  async processAndSavePlaces(places, placeType = null) {
+    try {
+      const processedPlaces = [];
+      console.log(`🔄 PROCESSING ${places.length} PLACES FROM GOOGLE API...`);
+
+      for (let i = 0; i < places.length; i++) {
+        const place = places[i];
+        console.log(`\n📍 PROCESSING PLACE ${i + 1}/${places.length}:`, {
+          googlePlaceId: place.googlePlaceId,
+          name: place.name
+        });
+
+        try {
+          // Validate place data
+          if (!this.validatePlaceData(place)) {
+            console.log('❌ PLACE VALIDATION FAILED - SKIPPING');
+            logger.warn('Invalid place data, skipping', { 
+              placeId: place.googlePlaceId,
+              name: place.name,
+              hasLatitude: !!place.latitude,
+              hasLongitude: !!place.longitude
+            });
+            continue;
+          }
+
+          console.log('✅ PLACE VALIDATION PASSED - SAVING TO DB');
+
+          // Save or update place in database
+          const savedPlace = await this.saveOrUpdatePlace(place, placeType);
+          processedPlaces.push(savedPlace);
+          
+          console.log('💾 PLACE SAVED SUCCESSFULLY');
+        } catch (error) {
+          console.log('❌ FAILED TO PROCESS PLACE:', error.message);
+          logger.warn('Failed to process individual place', {
+            placeId: place.googlePlaceId,
+            error: error.message
+          });
+          // Continue processing other places
+        }
+      }
+
+      console.log(`\n✅ PROCESSING COMPLETE: ${processedPlaces.length}/${places.length} places saved`);
+      return processedPlaces;
+    } catch (error) {
+      console.error('❌ BATCH PROCESSING ERROR:', error);
+      logger.error('Failed to process places batch', {
+        error: error.message,
+        placesCount: places.length
+      });
+      throw error;
+    }
+  }
+
+  // Save or update place in database
+  async saveOrUpdatePlace(placeData, placeType = null) {
+    try {
+      // Determine place type if not provided
+      if (!placeType) {
+        placeType = this.determinePlaceType(placeData.types || []);
+      }
+
+      console.log('💾 SAVING PLACE TO DATABASE:', {
+        googlePlaceId: placeData.googlePlaceId,
+        name: placeData.name,
+        placeType
+      });
+
+      const placeRecord = {
+        googlePlaceId: placeData.googlePlaceId,
+        name: placeData.name,
+        address: placeData.address || '',
+        latitude: placeData.latitude,
+        longitude: placeData.longitude,
+        placeType: placeType || 'cafe',
+        rating: placeData.rating || null,
+        priceLevel: placeData.priceLevel || null,
+        phoneNumber: placeData.phoneNumber || null,
+        website: placeData.website || null,
+        openingHours: placeData.openingHours || null,
+        photos: placeData.photos || [],
+        businessStatus: placeData.businessStatus || 'OPERATIONAL',
+        lastUpdated: new Date()
+      };
+
+      // Use upsert to create or update
+      const place = await prisma.place.upsert({
+        where: { googlePlaceId: placeData.googlePlaceId },
+        update: {
+          ...placeRecord,
+          updatedAt: new Date()
+        },
+        create: {
+          ...placeRecord,
+          createdAt: new Date()
+        }
+      });
+
+      console.log('✅ PLACE SAVED TO DATABASE:', {
+        id: place.id,
+        googlePlaceId: place.googlePlaceId,
+        name: place.name
+      });
+
+      logger.debug('Place saved/updated in database', {
+        googlePlaceId: place.googlePlaceId,
+        name: place.name
+      });
+
+      return place;
+    } catch (error) {
+      console.error('❌ DATABASE SAVE ERROR:', error);
+      logger.error('Failed to save place to database', {
+        googlePlaceId: placeData.googlePlaceId,
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  // Get place from database
+  async getPlaceFromDatabase(googlePlaceId) {
+    try {
+      const place = await prisma.place.findUnique({
+        where: { googlePlaceId }
+      });
+
+      return place;
+    } catch (error) {
+      logger.error('Failed to get place from database', {
+        googlePlaceId,
+        error: error.message
+      });
+      return null;
+    }
+  }
+
+  // Check if place data should be refreshed
+  shouldRefreshPlaceData(place) {
+    if (!place.lastUpdated) return true;
+    
+    // Refresh if data is older than 24 hours
+    const dayOld = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    return place.lastUpdated < dayOld;
+  }
+
+  // Determine place type from Google Place types
+  determinePlaceType(types) {
+    // Check each type category
+    for (const [category, googleTypes] of Object.entries(SERVICE_CONFIG.placeTypeMapping)) {
+      if (types.some(type => googleTypes.includes(type))) {
+        return category;
+      }
+    }
+    
+    // Default to cafe if no specific type found
+    return 'cafe';
+  }
+
+  // Format places response
+  formatPlacesResponse(places, userLocation = null, limit = 20) {
+    console.log('📋 FORMATTING RESPONSE:', {
+      placesCount: places.length,
+      hasUserLocation: !!userLocation,
+      limit
+    });
+
+    let formattedPlaces = places.map(place => formatPlace(place, userLocation));
+
+    // Sort by distance if user location provided
+    if (userLocation && userLocation.latitude && userLocation.longitude) {
+      formattedPlaces = formattedPlaces.sort((a, b) => (a.distance || 0) - (b.distance || 0));
+    }
+
+    // Apply limit
+    if (limit && formattedPlaces.length > limit) {
+      formattedPlaces = formattedPlaces.slice(0, limit);
+    }
+
+    const response = {
+      places: formattedPlaces,
+      count: formattedPlaces.length,
+      userLocation: userLocation ? {
+        latitude: userLocation.latitude,
+        longitude: userLocation.longitude
+      } : null
+    };
+
+    console.log('✅ RESPONSE FORMATTED:', {
+      finalCount: response.count,
+      hasUserLocation: !!response.userLocation
+    });
+
+    return response;
   }
 
   // Get detailed information about a specific place
@@ -170,6 +412,29 @@ class GooglePlacesService {
       });
       throw error;
     }
+  }
+
+  // Format single place response
+  formatPlaceResponse(place, userLocation = null, includeReviews = true) {
+    const formatted = formatPlace(place, userLocation);
+
+    // Add photo URLs
+    if (place.photos && Array.isArray(place.photos)) {
+      formatted.photoUrls = {
+        thumbnail: place.photos.map(photo => 
+          getPhotoUrl(photo.photoReference, 
+            SERVICE_CONFIG.photoSizes.thumbnail.width,
+            SERVICE_CONFIG.photoSizes.thumbnail.height)
+        ).filter(url => url),
+        medium: place.photos.map(photo => 
+          getPhotoUrl(photo.photoReference,
+            SERVICE_CONFIG.photoSizes.medium.width,
+            SERVICE_CONFIG.photoSizes.medium.height)
+        ).filter(url => url)
+      };
+    }
+
+    return formatted;
   }
 
   // Search places by text query
@@ -225,221 +490,6 @@ class GooglePlacesService {
     }
   }
 
-  // Process and save places to database
-  async processAndSavePlaces(places, placeType = null) {
-    try {
-      const processedPlaces = [];
-
-      for (const place of places) {
-        try {
-          // Validate required fields
-          if (!this.validatePlaceData(place)) {
-            logger.warn('Invalid place data, skipping', { 
-              placeId: place.googlePlaceId 
-            });
-            continue;
-          }
-
-          // Save or update place in database
-          const savedPlace = await this.saveOrUpdatePlace(place, placeType);
-          processedPlaces.push(savedPlace);
-        } catch (error) {
-          logger.warn('Failed to process individual place', {
-            placeId: place.googlePlaceId,
-            error: error.message
-          });
-          // Continue processing other places
-        }
-      }
-
-      return processedPlaces;
-    } catch (error) {
-      logger.error('Failed to process places batch', {
-        error: error.message,
-        placesCount: places.length
-      });
-      throw error;
-    }
-  }
-
-  // Save or update place in database
-  async saveOrUpdatePlace(placeData, placeType = null) {
-    try {
-      // Determine place type if not provided
-      if (!placeType) {
-        placeType = this.determinePlaceType(placeData.types || []);
-      }
-
-      const placeRecord = {
-        googlePlaceId: placeData.googlePlaceId,
-        name: placeData.name,
-        address: placeData.address,
-        latitude: placeData.latitude,
-        longitude: placeData.longitude,
-        placeType: placeType || 'cafe',
-        rating: placeData.rating || null,
-        priceLevel: placeData.priceLevel || null,
-        phoneNumber: placeData.phoneNumber || null,
-        website: placeData.website || null,
-        openingHours: placeData.openingHours || null,
-        photos: placeData.photos || [],
-        businessStatus: placeData.businessStatus || 'OPERATIONAL',
-        lastUpdated: new Date()
-      };
-
-      // Use upsert to create or update
-      const place = await prisma.place.upsert({
-        where: { googlePlaceId: placeData.googlePlaceId },
-        update: {
-          ...placeRecord,
-          updatedAt: new Date()
-        },
-        create: {
-          ...placeRecord,
-          createdAt: new Date()
-        }
-      });
-
-      logger.debug('Place saved/updated in database', {
-        googlePlaceId: place.googlePlaceId,
-        name: place.name
-      });
-
-      return place;
-    } catch (error) {
-      logger.error('Failed to save place to database', {
-        googlePlaceId: placeData.googlePlaceId,
-        error: error.message
-      });
-      throw error;
-    }
-  }
-
-  // Get place from database
-  async getPlaceFromDatabase(googlePlaceId) {
-    try {
-      const place = await prisma.place.findUnique({
-        where: { googlePlaceId },
-        include: {
-          reviews: {
-            take: 5,
-            orderBy: { createdAt: 'desc' },
-            include: {
-              user: {
-                select: { id: true, username: true, firstName: true, lastName: true }
-              }
-            }
-          },
-          favorites: {
-            take: 1,
-            select: { userId: true }
-          }
-        }
-      });
-
-      return place;
-    } catch (error) {
-      logger.error('Failed to get place from database', {
-        googlePlaceId,
-        error: error.message
-      });
-      return null;
-    }
-  }
-
-  // Check if place data should be refreshed
-  shouldRefreshPlaceData(place) {
-    if (!place.lastUpdated) return true;
-    
-    // Refresh if data is older than 24 hours
-    const dayOld = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    return place.lastUpdated < dayOld;
-  }
-
-  // Validate place data from Google Places API
-  validatePlaceData(place) {
-    return SERVICE_CONFIG.requiredFields.every(field => {
-      return place.hasOwnProperty(field) && place[field] !== null && place[field] !== undefined;
-    });
-  }
-
-  // Determine place type from Google Place types
-  determinePlaceType(types) {
-    // Check each type category
-    for (const [category, googleTypes] of Object.entries(SERVICE_CONFIG.placeTypeMapping)) {
-      if (types.some(type => googleTypes.includes(type))) {
-        return category;
-      }
-    }
-    
-    // Default to cafe if no specific type found
-    return 'cafe';
-  }
-
-  // Format places response
-  formatPlacesResponse(places, userLocation = null, limit = 20) {
-    let formattedPlaces = places.map(place => formatPlace(place, userLocation));
-
-    // Sort by distance if user location provided
-    if (userLocation && userLocation.latitude && userLocation.longitude) {
-      formattedPlaces = formattedPlaces.sort((a, b) => (a.distance || 0) - (b.distance || 0));
-    }
-
-    // Apply limit
-    if (limit && formattedPlaces.length > limit) {
-      formattedPlaces = formattedPlaces.slice(0, limit);
-    }
-
-    return {
-      places: formattedPlaces,
-      count: formattedPlaces.length,
-      userLocation: userLocation ? {
-        latitude: userLocation.latitude,
-        longitude: userLocation.longitude
-      } : null
-    };
-  }
-
-  // Format single place response
-  formatPlaceResponse(place, userLocation = null, includeReviews = true) {
-    const formatted = formatPlace(place, userLocation);
-
-    // Add additional details
-    if (place.reviews && includeReviews) {
-      formatted.reviews = place.reviews.map(review => ({
-        id: review.id,
-        rating: review.rating,
-        comment: review.comment,
-        createdAt: review.createdAt,
-        user: review.user ? {
-          id: review.user.id,
-          username: review.user.username,
-          displayName: review.user.firstName && review.user.lastName 
-            ? `${review.user.firstName} ${review.user.lastName}`
-            : review.user.username
-        } : null
-      }));
-    }
-
-    // Add photo URLs
-    if (place.photos && Array.isArray(place.photos)) {
-      formatted.photoUrls = {
-        thumbnail: place.photos.map(photo => 
-          getPhotoUrl(photo.photoReference, 
-            SERVICE_CONFIG.photoSizes.thumbnail.width,
-            SERVICE_CONFIG.photoSizes.thumbnail.height)
-        ).filter(url => url),
-        medium: place.photos.map(photo => 
-          getPhotoUrl(photo.photoReference,
-            SERVICE_CONFIG.photoSizes.medium.width,
-            SERVICE_CONFIG.photoSizes.medium.height)
-        ).filter(url => url)
-      };
-    }
-
-    return formatted;
-  }
-
   // Get popular places by type
   async getPopularPlaces(type = 'cafe', options = {}) {
     try {
@@ -457,7 +507,7 @@ class GooglePlacesService {
         },
         orderBy: [
           { rating: 'desc' },
-          { createdAt: 'desc' } // Use createdAt instead of userRatingsTotal
+          { createdAt: 'desc' }
         ],
         take: limit
       });
