@@ -1,4 +1,4 @@
-// components/FullPageMap.js - WWDC DESIGN VERSION with Live Location
+// components/FullPageMap.js - FIXED VERSION - Corrected Maps Styles & Location
 // Location: /map-service/frontend/src/components/FullPageMap.js
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
@@ -346,7 +346,6 @@ const FullPageMap = ({
   const userMarkerRef = useRef(null);
   const radiusCircleRef = useRef(null);
   const userLocationButtonRef = useRef(null);
-  const watchIdRef = useRef(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState(null);
   const [mapInitialized, setMapInitialized] = useState(false);
@@ -495,85 +494,6 @@ const FullPageMap = ({
       }
     }, delay);
   }, [onCenterChange, shouldTriggerNewSearch]);
-
-  // ENHANCED: Live Location Tracking with WWDC styling
-  // FIXED: Live Location Tracking with proper parent communication
-  const startLiveLocationTracking = useCallback(() => {
-    if (!navigator.geolocation || watchIdRef.current) return;
-
-    console.log('🎯 Starting live location tracking...');
-
-    const options = {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 30000 // 30 seconds
-    };
-
-    const onLocationUpdate = (position) => {
-      const newLocation = {
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-        accuracy: position.coords.accuracy,
-        timestamp: new Date().toISOString(),
-        source: 'gps_live',
-        heading: position.coords.heading,
-        speed: position.coords.speed
-      };
-
-      console.log('📍 Live location update:', {
-        lat: newLocation.latitude.toFixed(6),
-        lng: newLocation.longitude.toFixed(6),
-        accuracy: Math.round(newLocation.accuracy)
-      });
-
-      // FIXED: Update location state directly
-      setLocation(newLocation);
-      setLoading(false);
-      setError(null);
-      setPermissionGranted(true);
-
-      // Cache the live location
-      try {
-        const locationWithExpiry = {
-          ...newLocation,
-          expiresAt: Date.now() + (30 * 60 * 1000) // 30 minutes expiry
-        };
-        localStorage.setItem('lastKnownLocation', JSON.stringify(locationWithExpiry));
-        localStorage.setItem('locationPermissionGranted', 'true');
-        localStorage.setItem('lastLocationUpdate', Date.now().toString());
-      } catch (e) {
-        console.warn('Failed to cache live location:', e);
-      }
-    };
-
-    const onLocationError = (error) => {
-      console.warn('⚠️ Live location error:', error.message);
-      // Don't stop tracking on individual errors, just log them
-    };
-
-    try {
-      const watchId = navigator.geolocation.watchPosition(
-        onLocationUpdate,
-        onLocationError,
-        options
-      );
-      
-      setWatchId(watchId);
-      watchIdRef.current = watchId;
-      console.log('✅ Live location tracking started');
-    } catch (error) {
-      console.error('❌ Failed to start live tracking:', error);
-    }
-  }, [setLocation, setLoading, setError, setPermissionGranted]);
-
-  // Stop live location tracking
-  const stopLiveLocationTracking = useCallback(() => {
-    if (watchIdRef.current) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
-      console.log('⏹️ Live location tracking stopped');
-    }
-  }, []);
 
   // ENHANCED: Create WWDC-style User Location Button
   const createWWDCLocationButton = useCallback(() => {
@@ -758,18 +678,8 @@ const FullPageMap = ({
 
     // Add click handler
     locationButton.addEventListener('click', () => {
-      if (userLocationButtonRef.current?.classList.contains('has-location')) {
-        // If we have location, toggle live tracking
-        if (watchIdRef.current) {
-          stopLiveLocationTracking();
-        } else {
-          startLiveLocationTracking();
-        }
-      } else {
-        // If no location, request location
-        if (onLocationRequest) {
-          onLocationRequest();
-        }
+      if (onLocationRequest) {
+        onLocationRequest();
       }
     });
 
@@ -781,10 +691,6 @@ const FullPageMap = ({
       } else if (userLocation) {
         locationButton.classList.remove('loading');
         locationButton.classList.add('has-location');
-        // Auto-start live tracking when we get location
-        if (!watchIdRef.current) {
-          setTimeout(() => startLiveLocationTracking(), 1000);
-        }
       } else {
         locationButton.classList.remove('loading', 'has-location');
       }
@@ -797,9 +703,9 @@ const FullPageMap = ({
     userLocationButtonRef.current = locationButton;
 
     console.log('🎯 WWDC-style location button created');
-  }, [onLocationRequest, locationLoading, userLocation, startLiveLocationTracking, stopLiveLocationTracking]);
+  }, [onLocationRequest, locationLoading, userLocation]);
 
-  // ENHANCED: Initialize Google Map with WWDC-style design
+  // ENHANCED: Initialize Google Map with FIXED WWDC-style design
   useEffect(() => {
     if (mapInitialized || !mapRef.current) return;
 
@@ -837,7 +743,7 @@ const FullPageMap = ({
           rotateControl: false,
           fullscreenControl: !isEmbedMode,
           
-          // WWDC: Dark elegant map style with all features visible
+          // FIXED: Dark elegant map style - REMOVED INVALID poi.tourist_attraction
           styles: [
             {
               "featureType": "all",
@@ -871,6 +777,11 @@ const FullPageMap = ({
               "featureType": "poi",
               "elementType": "geometry",
               "stylers": [{ "color": "#2a2a2a" }]
+            },
+            {
+              "featureType": "poi",
+              "elementType": "labels.text.fill",
+              "stylers": [{ "color": "#8a8a8a" }]
             },
             {
               "featureType": "poi.park",
@@ -947,6 +858,7 @@ const FullPageMap = ({
         // Event listeners with proper drag detection
         googleMapRef.current.addListener('dragstart', () => {
           isUserDraggingRef.current = true;
+          console.log('🗺️ User started dragging map');
           
           if (debounceTimeoutRef.current) {
             clearTimeout(debounceTimeoutRef.current);
@@ -955,13 +867,22 @@ const FullPageMap = ({
 
         googleMapRef.current.addListener('dragend', () => {
           isUserDraggingRef.current = false;
+          console.log('🗺️ User finished dragging map');
           
           immediateSearchTimeoutRef.current = setTimeout(() => {
             const newCenter = googleMapRef.current.getCenter();
-            debouncedCenterChange({
+            const newCenterObj = {
               lat: newCenter.lat(),
               lng: newCenter.lng()
+            };
+            
+            console.log('🗺️ Movement check:', {
+              from: lastSearchLocationRef.current,
+              to: newCenterObj,
+              shouldSearch: shouldTriggerNewSearch(newCenterObj)
             });
+            
+            debouncedCenterChange(newCenterObj);
           }, 500);
         });
 
@@ -1014,7 +935,7 @@ const FullPageMap = ({
     };
 
     initMap();
-  }, [mapInitialized, center.lat, center.lng, zoom, isEmbedMode, checkGoogleMapsAvailability, debouncedCenterChange, selectedCafe, onClosePopup, createWWDCLocationButton]);
+  }, [mapInitialized, center.lat, center.lng, zoom, isEmbedMode, checkGoogleMapsAvailability, debouncedCenterChange, selectedCafe, onClosePopup, createWWDCLocationButton, shouldTriggerNewSearch]);
 
   // Update map center only for external changes
   useEffect(() => {
@@ -1050,7 +971,14 @@ const FullPageMap = ({
       userMarkerRef.current.setMap(null);
     }
 
-    // WWDC-style blue pulsing marker with live tracking indicator
+    console.log('🎯 Creating WWDC-style user location marker:', {
+      latitude: userLocation.latitude,
+      longitude: userLocation.longitude,
+      accuracy: userLocation.accuracy,
+      source: userLocation.source
+    });
+
+    // WWDC-style blue pulsing marker
     const userLocationSVG = `
       <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
         <defs>
@@ -1090,13 +1018,6 @@ const FullPageMap = ({
           <animate attributeName="opacity" values="0.9;0.6;0.9" dur="1s" repeatCount="indefinite"/>
         </circle>
         
-        <!-- Live tracking indicator -->
-        ${watchIdRef.current ? `
-          <circle cx="24" cy="24" r="20" fill="none" stroke="url(#wwdcInnerGradient)" stroke-width="2" stroke-dasharray="4,4" opacity="0.7">
-            <animateTransform attributeName="transform" type="rotate" values="0 24 24;360 24 24" dur="3s" repeatCount="indefinite"/>
-          </circle>
-        ` : ''}
-        
         <!-- Accuracy ring -->
         ${userLocation.accuracy < 100 ? `
           <circle cx="24" cy="24" r="19" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1" stroke-dasharray="2,2">
@@ -1106,44 +1027,23 @@ const FullPageMap = ({
       </svg>
     `;
 
-    // Use AdvancedMarkerElement if available (newer API)
-    if (window.google.maps.marker && window.google.maps.marker.AdvancedMarkerElement) {
-      // Create marker element
-      const markerElement = document.createElement('div');
-      markerElement.innerHTML = userLocationSVG;
-      
-      const userMarker = new window.google.maps.marker.AdvancedMarkerElement({
-        position: { 
-          lat: userLocation.latitude, 
-          lng: userLocation.longitude 
-        },
-        map: googleMapRef.current,
-        title: `📍 Your location (±${Math.round(userLocation.accuracy || 0)}m accuracy)`,
-        content: markerElement,
-        zIndex: 10000
-      });
-      
-      userMarkerRef.current = userMarker;
-    } else {
-      // Fallback to legacy Marker
-      const userMarker = new window.google.maps.Marker({
-        position: { 
-          lat: userLocation.latitude, 
-          lng: userLocation.longitude 
-        },
-        map: googleMapRef.current,
-        title: `📍 Your location (±${Math.round(userLocation.accuracy || 0)}m accuracy)`,
-        icon: {
-          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(userLocationSVG),
-          scaledSize: new window.google.maps.Size(48, 48),
-          anchor: new window.google.maps.Point(24, 24)
-        },
-        zIndex: 10000,
-        optimized: false
-      });
+    const userMarker = new window.google.maps.Marker({
+      position: { 
+        lat: userLocation.latitude, 
+        lng: userLocation.longitude 
+      },
+      map: googleMapRef.current,
+      title: `📍 Your location (±${Math.round(userLocation.accuracy || 0)}m accuracy) - ${userLocation.source}`,
+      icon: {
+        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(userLocationSVG),
+        scaledSize: new window.google.maps.Size(48, 48),
+        anchor: new window.google.maps.Point(24, 24)
+      },
+      zIndex: 10000,
+      optimized: false
+    });
 
-      userMarkerRef.current = userMarker;
-    }
+    userMarkerRef.current = userMarker;
     
     // Update location button state
     if (userLocationButtonRef.current) {
@@ -1157,7 +1057,7 @@ const FullPageMap = ({
     }
 
     console.log('🎯 WWDC-style blue pulsing user location marker updated');
-  }, [userLocation, mapLoaded, locationLoading, watchIdRef.current]);
+  }, [userLocation, mapLoaded, locationLoading]);
 
   // Update search radius circle with WWDC styling
   useEffect(() => {
@@ -1337,8 +1237,6 @@ const FullPageMap = ({
         clearTimeout(immediateSearchTimeoutRef.current);
       }
       
-      stopLiveLocationTracking();
-      
       if (userMarkerRef.current) {
         userMarkerRef.current.setMap(null);
       }
@@ -1350,7 +1248,7 @@ const FullPageMap = ({
       });
       markersRef.current.clear();
     };
-  }, [stopLiveLocationTracking]);
+  }, []);
 
   // Handle retry map loading
   const handleRetryMap = useCallback(() => {
@@ -1473,7 +1371,7 @@ const FullPageMap = ({
             background: 'linear-gradient(45deg, #007AFF, #5856D6)',
             border: '2px solid rgba(255,255,255,0.3)'
           }} />
-          <span>Live location {watchIdRef.current ? '(tracking)' : ''}</span>
+          <span>Your location</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
           <span>☕</span>
