@@ -30,11 +30,22 @@ ENV REACT_APP_ENABLE_ANIMATIONS=$REACT_APP_ENABLE_ANIMATIONS
 ENV REACT_APP_CACHE_DURATION=$REACT_APP_CACHE_DURATION
 ENV REACT_APP_DEBUG_MODE=$REACT_APP_DEBUG_MODE
 
+# Debug: Print environment variables during build
+RUN echo "Building with API URL: $REACT_APP_API_BASE_URL"
+RUN echo "Building with Maps API Key: ${REACT_APP_GOOGLE_MAPS_API_KEY:0:20}..."
+
 RUN npm run build
 
 FROM nginx:alpine
 COPY --from=build /app/build /usr/share/nginx/html
 COPY default.conf /etc/nginx/conf.d/default.conf
 RUN apk add --no-cache curl
+
+# Create health check endpoint
+RUN echo '#!/bin/sh\necho "healthy"' > /usr/share/nginx/html/health && chmod +x /usr/share/nginx/html/health
+
 EXPOSE 3001
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD curl -f http://localhost:3001/health || exit 1
+
 CMD ["nginx", "-g", "daemon off;"]

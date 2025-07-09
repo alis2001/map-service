@@ -88,36 +88,38 @@ services:
       retries: 3
 
   # Frontend Service
-  map-frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        REACT_APP_API_BASE_URL: "http://localhost:5001"
-        REACT_APP_API_VERSION: "v1"
-        REACT_APP_GOOGLE_MAPS_API_KEY: "AIzaSyDD3X_K3n9WM6WpZCg40QA_hZqxK3HUDsQ"
-        REACT_APP_APP_NAME: "CoffeeFinder"
-        REACT_APP_DEFAULT_LOCATION_LAT: "45.0703"
-        REACT_APP_DEFAULT_LOCATION_LNG: "7.6869"
-        REACT_APP_DEFAULT_ZOOM: "15"
-        REACT_APP_ENABLE_GEOLOCATION: "true"
-        REACT_APP_ENABLE_ANIMATIONS: "true"
-        REACT_APP_CACHE_DURATION: "300000"
-        REACT_APP_DEBUG_MODE: "true"
-    container_name: map-service-frontend
-    restart: unless-stopped
-    ports:
-      - "3001:3001"
-    networks:
-      - map-network
-    depends_on:
-      map-backend:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+  # Frontend Service
+map-frontend:
+  build:
+    context: ./frontend
+    dockerfile: Dockerfile
+    args:
+      REACT_APP_API_BASE_URL: "http://localhost:5001"
+      REACT_APP_API_VERSION: "v1"
+      REACT_APP_GOOGLE_MAPS_API_KEY: "AIzaSyDD3X_K3n9WM6WpZCg40QA_hZqxK3HUDsQ"  # Your actual key
+      REACT_APP_APP_NAME: "CoffeeFinder"
+      REACT_APP_DEFAULT_LOCATION_LAT: "45.0703"
+      REACT_APP_DEFAULT_LOCATION_LNG: "7.6869"
+      REACT_APP_DEFAULT_ZOOM: "15"
+      REACT_APP_ENABLE_GEOLOCATION: "true"
+      REACT_APP_ENABLE_ANIMATIONS: "true"
+      REACT_APP_CACHE_DURATION: "300000"
+      REACT_APP_DEBUG_MODE: "true"
+  container_name: map-service-frontend
+  restart: unless-stopped
+  ports:
+    - "3001:3001"
+  networks:
+    - map-network
+  depends_on:
+    map-backend:
+      condition: service_healthy
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 40s  # Give more time for startup
 
 networks:
   map-network:
