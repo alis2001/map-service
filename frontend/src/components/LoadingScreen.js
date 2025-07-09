@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 
 const LoadingScreen = ({ 
   message = "Preparazione esperienza...", 
-  subMessage = "Un momento per favore" 
+  subMessage = "Un momento per favore"
 }) => {
   const [progress, setProgress] = useState(0);
   const [currentMessage, setCurrentMessage] = useState(0);

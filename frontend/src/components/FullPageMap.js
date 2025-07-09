@@ -1,11 +1,11 @@
-// components/FullPageMap.js - FIXED VERSION - Corrected Maps Styles & Location
+// components/FullPageMap.js - UPDATED VERSION with Two Loading Systems
 // Location: /map-service/frontend/src/components/FullPageMap.js
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import LoadingScreen from './LoadingScreen';
+import MapUpdateLoader from './MapUpdateLoader'; // NEW IMPORT
 import CafePopup from './CafePopup';
 import MapControls from './MapControls';
-
 
 const FullPageMap = ({
   center,
@@ -34,6 +34,8 @@ const FullPageMap = ({
   const userMarkerRef = useRef(null);
   const radiusCircleRef = useRef(null);
   const userLocationButtonRef = useRef(null);
+  
+  // UPDATED: Separate loading states
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState(null);
   const [mapInitialized, setMapInitialized] = useState(false);
@@ -43,15 +45,19 @@ const FullPageMap = ({
   const [markersLoaded, setMarkersLoaded] = useState(false);
   const [markersLoading, setMarkersLoading] = useState(false);
   
+  // NEW: Map update loading state (for drag updates)
+  const [isMapUpdating, setIsMapUpdating] = useState(false);
+  const [hasInitialLoad, setHasInitialLoad] = useState(false); // Track if map loaded once
+  
   // Smart movement detection
   const lastSearchLocationRef = useRef(null);
   const isUserDraggingRef = useRef(false);
   const debounceTimeoutRef = useRef(null);
   const immediateSearchTimeoutRef = useRef(null);
 
-  // Loading progress simulation
+  // Loading progress simulation - ONLY for initial load
   useEffect(() => {
-    if (!mapLoaded && googleMapsReady) {
+    if (!mapLoaded && googleMapsReady && !hasInitialLoad) {
       const interval = setInterval(() => {
         setLoadingProgress(prev => {
           const newProgress = prev + Math.random() * 15;
@@ -65,7 +71,15 @@ const FullPageMap = ({
       
       return () => clearInterval(interval);
     }
-  }, [mapLoaded, googleMapsReady]);
+  }, [mapLoaded, googleMapsReady, hasInitialLoad]);
+
+  // UPDATED: Mark initial load as complete
+  useEffect(() => {
+    if (mapLoaded && googleMapsReady && !hasInitialLoad) {
+      setHasInitialLoad(true);
+      console.log('✅ Initial map load completed');
+    }
+  }, [mapLoaded, googleMapsReady, hasInitialLoad]);
 
   // IMPROVED: Better Google Maps availability checking
   const checkGoogleMapsAvailability = useCallback(() => {
@@ -161,7 +175,7 @@ const FullPageMap = ({
     return hasMovedSignificantly;
   }, [searchRadius]);
 
-  // Adaptive debouncing for better user experience
+  // UPDATED: Adaptive debouncing with map update loading
   const debouncedCenterChange = useCallback((newCenter) => {
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
@@ -171,7 +185,12 @@ const FullPageMap = ({
     }
 
     const shouldSearch = shouldTriggerNewSearch(newCenter);
-    const delay = shouldSearch ? 800 : 1500;
+    const delay = shouldSearch ? 600 : 1200;
+
+    if (shouldSearch && hasInitialLoad) {
+      setIsMapUpdating(true);
+      console.log('🗺️ Map update loading started for search');
+    }
 
     debounceTimeoutRef.current = setTimeout(() => {
       if (!isUserDraggingRef.current && shouldSearch) {
@@ -181,9 +200,23 @@ const FullPageMap = ({
         if (onCenterChange) {
           onCenterChange(newCenter);
         }
+      } else if (!shouldSearch) {
+        // Hide loader if no search needed
+        setIsMapUpdating(false);
       }
     }, delay);
-  }, [onCenterChange, shouldTriggerNewSearch]);
+  }, [onCenterChange, shouldTriggerNewSearch, hasInitialLoad]);
+
+  // UPDATED: Hide map update loader when search completes
+  useEffect(() => {
+    if (!loading && !markersLoading && isMapUpdating) {
+      // Small delay to show completion
+      setTimeout(() => {
+        setIsMapUpdating(false);
+        console.log('✅ Map update completed - hiding loader');
+      }, 300);
+    }
+  }, [loading, markersLoading, isMapUpdating]);
 
   // ENHANCED: Create WWDC-style User Location Button
   const createWWDCLocationButton = useCallback(() => {
@@ -433,7 +466,7 @@ const FullPageMap = ({
           rotateControl: false,
           fullscreenControl: !isEmbedMode,
           
-          // FIXED: Dark elegant map style - REMOVED INVALID poi.tourist_attraction
+          // FIXED: Dark elegant map style
           styles: [
             {
               "featureType": "all",
@@ -545,10 +578,16 @@ const FullPageMap = ({
           return;
         }
 
-        // Event listeners with proper drag detection
+        // UPDATED: Event listeners with map update loading
         googleMapRef.current.addListener('dragstart', () => {
           isUserDraggingRef.current = true;
           console.log('🗺️ User started dragging map');
+          
+          // IMMEDIATELY show map update loader when dragging starts
+          if (hasInitialLoad) {
+            setIsMapUpdating(true);
+            console.log('🔄 Map update loading started');
+          }
           
           if (debounceTimeoutRef.current) {
             clearTimeout(debounceTimeoutRef.current);
@@ -784,7 +823,6 @@ const FullPageMap = ({
     }
   }, [userLocation, searchRadius, mapLoaded]);
 
-  // ENHANCED: WWDC-style venue markers
   // ENHANCED: WWDC-style venue markers with loading tracking
   useEffect(() => {
     if (!googleMapRef.current || !mapLoaded) return;
@@ -830,7 +868,7 @@ const FullPageMap = ({
           lng: cafe.location.longitude
         };
 
-        // WWDC-style venue markers (your existing marker creation code)
+        // WWDC-style venue markers
         const markerSVG = `
           <svg width="36" height="44" viewBox="0 0 36 44" fill="none" xmlns="http://www.w3.org/2000/svg">
             <defs>
@@ -918,7 +956,7 @@ const FullPageMap = ({
     // Start processing markers
     processBatch(0);
 
-  }, [cafes, mapLoaded, onCafeSelect]);
+  }, [cafes, mapLoaded, onCafeSelect, cafeType]); // Added cafeType dependency
 
   // WWDC helper functions for venue markers
   const getWWDCVenueColor = (cafe) => {
@@ -985,6 +1023,7 @@ const FullPageMap = ({
     setMapInitialized(false);
     setGoogleMapsReady(false);
     setLoadingProgress(0);
+    setHasInitialLoad(false); // Reset initial load state
     
     window.location.reload();
   }, []);
@@ -1012,23 +1051,22 @@ const FullPageMap = ({
 
   return (
     <div className="full-page-map">
-      {/* Creative Loading Screen - Show until map AND all markers are loaded */}
-      {(!mapLoaded || !googleMapsReady || loading || markersLoading || (cafes.length > 0 && !markersLoaded)) && (
+      {/* UPDATED: Initial Loading Screen - ONLY for first map load */}
+      {(!hasInitialLoad && (!mapLoaded || !googleMapsReady || loading)) && (
         <LoadingScreen 
-          message={
-            !mapLoaded ? "Inizializzazione mappa WWDC..." : 
-            loading ? "Caricamento locali italiani..." :
-            markersLoading ? "Posizionamento marcatori..." :
-            "Finalizzazione esperienza..."
-          }
-          subMessage={
-            !mapLoaded ? "Creazione interfaccia elegante" : 
-            loading ? "Ricerca caffè e ristoranti nelle vicinanze" :
-            markersLoading ? `Caricamento ${cafes.length} locali sulla mappa` :
-            "Un momento per favore"
-          }
+          message="Inizializzazione mappa italiana..."
+          subMessage="Preparazione dell'esperienza di ricerca locali"
+          progress={loadingProgress}
         />
       )}
+
+      {/* NEW: Map Update Loader - For drag updates */}
+      <MapUpdateLoader
+        loading={isMapUpdating || (hasInitialLoad && loading)}
+        venueCount={cafes.length}
+        searchType={cafeType}
+        userLocation={userLocation}
+      />
 
       {/* Map Container */}
       <div 
