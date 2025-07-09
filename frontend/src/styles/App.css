@@ -1,49 +1,31 @@
-/* App.css - Italian Coffee & Restaurant Theme - No Pub Support */
+/* App.css - Apple WWDC Style Integration with Dashboard Design */
 /* Location: /map-service/frontend/src/styles/App.css */
 
-/* ============================================ */
-/*    ITALIAN COFFEE & RESTAURANT DESIGN      */
-/* ============================================ */
-
 :root {
-  /* Italian Coffee & Restaurant Gradients */
-  --gradient-primary: linear-gradient(135deg, #8B4513 0%, #D2691E 100%); /* Coffee brown */
-  --gradient-secondary: linear-gradient(135deg, #228B22 0%, #32CD32 100%); /* Italian green */
-  --gradient-coffee: linear-gradient(135deg, #6F4E37 0%, #DEB887 100%); /* Coffee gradient */
-  --gradient-restaurant: linear-gradient(135deg, #DC143C 0%, #FF6347 100%); /* Tomato red */
+  /* Apple WWDC Gradients */
+  --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --gradient-secondary: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
   --gradient-success: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  --gradient-coffee: linear-gradient(135deg, #d299c2 0%, #fef9d7 100%);
+  --gradient-social: linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%);
   --gradient-location: linear-gradient(135deg, #fdbb2d 0%, #22c1c3 100%);
-  --gradient-italian-flag: linear-gradient(90deg, #009246 0%, #FFFFFF 50%, #CE2B37 100%);
+  --gradient-events: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+  --gradient-profile: linear-gradient(135deg, #a8caba 0%, #5d4e75 100%);
+  --gradient-chat: linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%);
   
-  /* REMOVED: All pub/nightlife gradients */
-  
-  /* Glass morphism for elegant Italian aesthetic */
-  --gradient-glass: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
-  --gradient-warm-glass: linear-gradient(135deg, rgba(222,184,135,0.1) 0%, rgba(222,184,135,0.05) 100%);
-  
-  /* Italian Color Palette */
-  --italian-green: #009246;
-  --italian-red: #CE2B37;
-  --italian-cream: #F5F5DC;
-  --coffee-brown: #6F4E37;
-  --espresso-dark: #3C2415;
-  --cappuccino-light: #DEB887;
-  
-  /* Spacing & Borders */
-  --border-radius-small: 8px;
-  --border-radius-medium: 16px;
+  /* Apple Design System */
   --border-radius-large: 24px;
-  --border-radius-xl: 32px;
+  --shadow-medium: 0 10px 25px rgba(0, 0, 0, 0.15);
+  --shadow-large: 0 20px 40px rgba(0, 0, 0, 0.2);
   
-  /* Italian-inspired shadows */
-  --shadow-small: 0 4px 6px rgba(111, 78, 55, 0.1);
-  --shadow-medium: 0 10px 25px rgba(111, 78, 55, 0.15);
-  --shadow-large: 0 20px 40px rgba(111, 78, 55, 0.2);
-  --shadow-coffee: 0 8px 32px rgba(111, 78, 55, 0.3);
-  --shadow-italian: 0 8px 32px rgba(0, 146, 70, 0.2);
+  /* Apple Mesh Background */
+  --bg-apple-mesh: 
+    radial-gradient(circle at 20% 20%, rgba(102, 126, 234, 0.3) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(240, 147, 251, 0.3) 0%, transparent 50%),
+    radial-gradient(circle at 40% 60%, rgba(75, 172, 254, 0.2) 0%, transparent 50%);
 }
 
-/* CSS Reset and Base Styles */
+/* CSS Reset */
 * {
   margin: 0;
   padding: 0;
@@ -54,198 +36,70 @@ html, body, #root {
   height: 100%;
   width: 100%;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  overflow: hidden; /* Prevent scrolling for full-page map */
-  background: var(--italian-cream);
+  background: var(--bg-apple-mesh);
+  background-size: 100% 100%;
+  background-attachment: fixed;
 }
 
-/* Main Map App Container */
-.map-app {
-  height: 100vh;
-  width: 100vw;
-  position: relative;
-  overflow: hidden;
-  background: linear-gradient(135deg, var(--italian-cream) 0%, #FFFFFF 100%);
-}
-
-/* ============================================ */
-/*        ITALIAN BUTTON SYSTEM               */
-/* ============================================ */
-
+/* Apple Button System */
 .btn-apple-base {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 12px 24px;
   border: none;
-  border-radius: var(--border-radius-medium);
+  border-radius: var(--border-radius-large);
   font-weight: 600;
-  font-size: 16px;
   text-decoration: none;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
   backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  box-shadow: var(--shadow-medium);
-  font-family: 'Inter', sans-serif;
 }
 
 .btn-apple-base:hover {
   transform: translateY(-2px);
-  box-shadow: var(--shadow-coffee);
 }
 
-.btn-apple-base:active {
-  transform: translateY(0);
-}
+.btn-primary { background: var(--gradient-primary); color: white; }
+.btn-secondary { background: var(--gradient-secondary); color: white; }
+.btn-success { background: var(--gradient-success); color: white; }
+.btn-coffee { background: var(--gradient-coffee); color: #333; }
+.btn-social { background: var(--gradient-social); color: white; }
+.btn-location { background: var(--gradient-location); color: white; }
+.btn-events { background: var(--gradient-events); color: #333; }
+.btn-profile { background: var(--gradient-profile); color: white; }
+.btn-chat { background: var(--gradient-chat); color: #333; }
 
-/* UPDATED: Italian-themed button variants */
-.btn-primary {
-  background: var(--gradient-coffee);
-  color: white;
-  border: 1px solid var(--coffee-brown);
-}
-
-.btn-primary:hover {
-  box-shadow: 0 8px 32px rgba(111, 78, 55, 0.4);
-}
-
-.btn-secondary {
-  background: var(--gradient-secondary);
-  color: white;
-  border: 1px solid var(--italian-green);
-}
-
-.btn-secondary:hover {
-  box-shadow: var(--shadow-italian);
-}
-
-.btn-success {
-  background: var(--gradient-success);
-  color: white;
-}
-
-.btn-coffee {
-  background: var(--gradient-coffee);
-  color: white;
-  border: 1px solid var(--espresso-dark);
-}
-
-.btn-coffee:hover {
-  box-shadow: 0 8px 32px rgba(111, 78, 55, 0.5);
-}
-
-.btn-restaurant {
-  background: var(--gradient-restaurant);
-  color: white;
-  border: 1px solid var(--italian-red);
-}
-
-.btn-restaurant:hover {
-  box-shadow: 0 8px 32px rgba(220, 20, 60, 0.4);
-}
-
-.btn-location {
-  background: var(--gradient-location);
-  color: white;
-}
-
-/* REMOVED: All pub-themed button styles */
-
-/* ============================================ */
-/*           ITALIAN MODAL STYLES             */
-/* ============================================ */
-
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(60, 36, 21, 0.6); /* Espresso-tinted overlay */
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10000;
-  animation: fadeIn 0.3s ease-out;
-}
-
-.modal-card {
-  background: linear-gradient(135deg, rgba(245, 245, 220, 0.98) 0%, rgba(255, 255, 255, 0.95) 100%);
+/* Apple Card System */
+.card-apple {
+  background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 2px solid var(--cappuccino-light);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: var(--border-radius-large);
-  padding: 0;
-  max-width: 420px;
-  width: 90%;
+  padding: 24px;
+  box-shadow: var(--shadow-medium);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-apple:hover {
+  transform: translateY(-4px);
   box-shadow: var(--shadow-large);
-  animation: slideUp 0.3s ease-out;
+}
+
+/* Main Map App */
+.map-app {
+  height: 100vh;
+  width: 100vw;
   position: relative;
   overflow: hidden;
+  background: var(--bg-apple-mesh);
+  background-size: 100% 100%;
+  background-attachment: fixed;
 }
 
-/* Italian flag accent */
-.modal-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: var(--gradient-italian-flag);
-  z-index: 1;
-}
-
-.modal-header {
-  padding: 24px 24px 0 24px;
-  position: relative;
-  z-index: 2;
-}
-
-.modal-header h3 {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--espresso-dark);
-  margin: 0;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.1);
-}
-
-.modal-content {
-  padding: 16px 24px 24px 24px;
-  position: relative;
-  z-index: 2;
-}
-
-.modal-content p {
-  color: var(--coffee-brown);
-  line-height: 1.6;
-  margin: 0;
-  font-weight: 500;
-}
-
-.modal-actions {
-  padding: 0 24px 24px 24px;
-  display: flex;
-  gap: 12px;
-  flex-direction: column;
-  position: relative;
-  z-index: 2;
-}
-
-.modal-actions .btn-apple-base {
-  width: 100%;
-  justify-content: center;
-}
-
-/* ============================================ */
-/*        ITALIAN COFFEE MAP STYLES           */
-/* ============================================ */
-
+/* Full Page Map */
 .full-page-map {
   position: relative;
   width: 100%;
@@ -258,13 +112,11 @@ html, body, #root {
   width: 100%;
   height: 100%;
   border: none;
-  filter: sepia(5%) saturate(110%) hue-rotate(5deg); /* Slight warm tint for Italian feel */
+  border-radius: 12px;
+  overflow: hidden;
 }
 
-/* ============================================ */
-/*      ITALIAN MAP CONTROLS STYLES           */
-/* ============================================ */
-
+/* Map Controls with Apple Design */
 .map-controls {
   position: absolute;
   top: 16px;
@@ -273,125 +125,17 @@ html, body, #root {
   max-width: 340px;
 }
 
-.map-controls.embed-mode {
-  top: 8px;
-  right: 8px;
-  max-width: 300px;
-}
-
-.controls-toggle {
-  background: linear-gradient(135deg, rgba(245, 245, 220, 0.95) 0%, rgba(255, 255, 255, 0.9) 100%);
-  backdrop-filter: blur(20px);
-  border: 2px solid var(--cappuccino-light);
-  border-radius: var(--border-radius-medium);
-  padding: 12px;
-  cursor: pointer;
-  font-size: 18px;
-  box-shadow: var(--shadow-coffee);
-  transition: all 0.3s ease;
-  margin-bottom: 8px;
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--coffee-brown);
-}
-
-.controls-toggle:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-large);
-  background: linear-gradient(135deg, var(--cappuccino-light) 0%, rgba(255, 255, 255, 0.95) 100%);
-}
-
 .controls-panel {
-  background: linear-gradient(135deg, rgba(245, 245, 220, 0.95) 0%, rgba(255, 255, 255, 0.9) 100%);
+  background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(20px);
-  border: 2px solid var(--cappuccino-light);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: var(--border-radius-large);
   padding: 20px;
-  box-shadow: var(--shadow-coffee);
+  box-shadow: var(--shadow-medium);
   transition: all 0.3s ease;
-  overflow: hidden;
-  position: relative;
 }
 
-/* Italian-inspired decoration */
-.controls-panel::before {
-  content: '☕ 🍕';
-  position: absolute;
-  top: -10px;
-  right: -10px;
-  font-size: 24px;
-  opacity: 0.1;
-  transform: rotate(15deg);
-  pointer-events: none;
-}
-
-.controls-panel.collapsed {
-  max-height: 0;
-  padding: 0 20px;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.controls-panel.expanded {
-  max-height: 700px;
-  opacity: 1;
-  pointer-events: auto;
-}
-
-/* Italian-themed Search Stats */
-.search-stats {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 16px;
-  padding-bottom: 16px;
-  border-bottom: 2px solid var(--cappuccino-light);
-  background: linear-gradient(90deg, rgba(222, 184, 135, 0.1) 0%, rgba(245, 245, 220, 0.1) 100%);
-  padding: 12px;
-  border-radius: var(--border-radius-medium);
-}
-
-.stats-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.stats-number {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--coffee-brown);
-  text-shadow: 0 1px 2px rgba(0,0,0,0.1);
-}
-
-.stats-icon {
-  font-size: 16px;
-  filter: drop-shadow(0 1px 1px rgba(0,0,0,0.1));
-}
-
-.stats-label {
-  font-size: 12px;
-  color: var(--espresso-dark);
-  font-weight: 500;
-}
-
-/* Control Groups */
-.control-group {
-  margin-bottom: 16px;
-}
-
-.control-label {
-  display: block;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--espresso-dark);
-  margin-bottom: 8px;
-  text-shadow: 0 1px 1px rgba(255,255,255,0.5);
-}
-
-/* UPDATED: Italian Venue Type Buttons (No Pub Support) */
+/* Type Buttons - Apple Style */
 .type-buttons {
   display: flex;
   gap: 8px;
@@ -404,277 +148,40 @@ html, body, #root {
   flex-direction: column;
   align-items: center;
   padding: 12px 8px;
-  border: 2px solid var(--cappuccino-light);
-  border-radius: var(--border-radius-medium);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(245, 245, 220, 0.8) 100%);
+  border: none;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.6);
   cursor: pointer;
   transition: all 0.3s ease;
   font-size: 12px;
   font-weight: 500;
-  color: var(--coffee-brown);
-  position: relative;
-  overflow: hidden;
-}
-
-.type-button::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-  transition: left 0.5s ease;
-}
-
-.type-button:hover::before {
-  left: 100%;
+  color: #333;
 }
 
 .type-button:hover {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 1) 0%, var(--cappuccino-light) 100%);
+  background: rgba(255, 255, 255, 0.9);
   transform: translateY(-2px);
-  box-shadow: var(--shadow-coffee);
-  border-color: var(--coffee-brown);
+  box-shadow: var(--shadow-medium);
 }
 
-/* Coffee type button */
 .type-button.active[data-type="cafe"] {
   background: var(--gradient-coffee);
-  color: white;
-  border-color: var(--coffee-brown);
-  box-shadow: var(--shadow-coffee);
+  color: #333;
 }
 
-/* Restaurant type button */
 .type-button.active[data-type="restaurant"] {
-  background: var(--gradient-restaurant);
-  color: white;
-  border-color: var(--italian-red);
-  box-shadow: 0 8px 32px rgba(220, 20, 60, 0.3);
+  background: var(--gradient-events);
+  color: #333;
 }
 
-/* REMOVED: All pub-related type button styles */
-
-.type-emoji {
-  font-size: 20px;
-  margin-bottom: 4px;
-  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.1));
-}
-
-.type-text {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-/* Italian Radius Selector */
-.radius-selector {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.radius-select {
-  width: 100%;
-  padding: 12px;
-  border: 2px solid var(--cappuccino-light);
-  border-radius: var(--border-radius-medium);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(245, 245, 220, 0.8) 100%);
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  color: var(--coffee-brown);
-}
-
-.radius-select:hover,
-.radius-select:focus {
-  border-color: var(--coffee-brown);
-  box-shadow: 0 0 0 3px rgba(111, 78, 55, 0.1);
-  outline: none;
-  background: rgba(255, 255, 255, 1);
-}
-
-.radius-visual {
-  height: 6px;
-  background: linear-gradient(90deg, var(--cappuccino-light) 0%, rgba(111, 78, 55, 0.2) 100%);
-  border-radius: 3px;
-  overflow: hidden;
-  box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
-}
-
-.radius-indicator {
-  height: 100%;
-  background: var(--gradient-coffee);
-  border-radius: 3px;
-  transition: width 0.3s ease;
-  box-shadow: 0 0 8px rgba(111, 78, 55, 0.3);
-}
-
-/* Italian Action Buttons */
-.action-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.action-button {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border: 2px solid var(--cappuccino-light);
-  border-radius: var(--border-radius-medium);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(245, 245, 220, 0.8) 100%);
-  cursor: pointer;
-  transition: all 0.3s ease;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--coffee-brown);
-}
-
-.action-button:hover {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 1) 0%, var(--cappuccino-light) 100%);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-coffee);
-  border-color: var(--coffee-brown);
-}
-
-.action-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.action-button.location-button.has-location {
-  background: var(--gradient-success);
-  color: white;
-  border-color: transparent;
-}
-
-.action-button.refresh-button:hover {
-  background: var(--gradient-secondary);
-  color: white;
-  border-color: var(--italian-green);
-}
-
-.button-icon {
-  font-size: 16px;
-  filter: drop-shadow(0 1px 1px rgba(0,0,0,0.1));
-}
-
-.button-text {
-  flex: 1;
-  text-align: left;
-  font-weight: 600;
-}
-
-/* UPDATED: Italian Quick Filters (No Pub Support) */
-.quick-filters {
-  border-top: 2px solid var(--cappuccino-light);
-  padding-top: 12px;
-  background: linear-gradient(135deg, rgba(245, 245, 220, 0.1) 0%, rgba(255, 255, 255, 0.1) 100%);
-  padding: 12px;
-  border-radius: var(--border-radius-medium);
-  margin-top: 8px;
-}
-
-.filter-label {
-  font-size: 12px;
-  color: var(--espresso-dark);
-  margin-bottom: 8px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.filter-buttons {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-}
-
-.filter-button {
-  padding: 8px 10px;
-  border: 1px solid var(--cappuccino-light);
-  border-radius: var(--border-radius-small);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(245, 245, 220, 0.6) 100%);
-  cursor: pointer;
-  font-size: 11px;
-  font-weight: 600;
-  transition: all 0.3s ease;
-  color: var(--coffee-brown);
-  text-align: center;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
-
-.filter-button:hover {
-  background: var(--gradient-coffee);
-  color: white;
-  border-color: var(--coffee-brown);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-small);
-}
-
-.filter-button.active {
-  background: var(--gradient-coffee);
-  color: white;
-  border-color: var(--coffee-brown);
-  box-shadow: var(--shadow-coffee);
-}
-
-/* REMOVED: All pub-related filter styles */
-
-/* Status Indicator */
-.status-indicator {
-  position: absolute;
-  bottom: -45px;
-  right: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: linear-gradient(135deg, rgba(245, 245, 220, 0.9) 0%, rgba(255, 255, 255, 0.8) 100%);
-  backdrop-filter: blur(10px);
-  padding: 8px 12px;
-  border-radius: var(--border-radius-large);
-  font-size: 12px;
-  box-shadow: var(--shadow-coffee);
-  border: 1px solid var(--cappuccino-light);
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #EF4444;
-  box-shadow: 0 0 4px rgba(0,0,0,0.2);
-}
-
-.status-dot.connected {
-  background: #10B981;
-  box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
-}
-
-.status-text {
-  color: var(--coffee-brown);
-  font-weight: 600;
-}
-
-/* ============================================ */
-/*      ITALIAN CAFE POPUP STYLES             */
-/* ============================================ */
-
+/* Apple Popup System */
 .popup-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(60, 36, 21, 0.6); /* Espresso overlay */
+  background: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(12px);
   display: flex;
   align-items: center;
@@ -690,9 +197,9 @@ html, body, #root {
 }
 
 .cafe-popup {
-  background: linear-gradient(135deg, rgba(245, 245, 220, 0.98) 0%, rgba(255, 255, 255, 0.95) 100%);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(20px);
-  border: 2px solid var(--cappuccino-light);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: var(--border-radius-large);
   max-width: 500px;
   width: 100%;
@@ -701,35 +208,20 @@ html, body, #root {
   box-shadow: var(--shadow-large);
   transform: translateY(20px) scale(0.95);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-}
-
-/* Italian flag accent on popup */
-.cafe-popup::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: var(--gradient-italian-flag);
-  z-index: 1;
 }
 
 .cafe-popup.visible {
   transform: translateY(0) scale(1);
 }
 
-/* Italian Popup Header */
+/* Popup Header */
 .popup-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 20px;
-  border-bottom: 2px solid var(--cappuccino-light);
-  background: linear-gradient(135deg, rgba(245, 245, 220, 0.5) 0%, rgba(255, 255, 255, 0.3) 100%);
-  position: relative;
-  z-index: 2;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.7) 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .header-content {
@@ -741,24 +233,18 @@ html, body, #root {
 
 .cafe-emoji {
   font-size: 32px;
-  background: linear-gradient(135deg, var(--cappuccino-light) 0%, rgba(255, 255, 255, 0.8) 100%);
+  background: rgba(255, 255, 255, 0.8);
   padding: 8px;
-  border-radius: var(--border-radius-medium);
-  border: 2px solid var(--coffee-brown);
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
-}
-
-.header-text {
-  flex: 1;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .cafe-name {
   font-size: 20px;
   font-weight: 700;
-  color: var(--espresso-dark);
+  color: #1F2937;
   margin: 0 0 4px 0;
   line-height: 1.2;
-  text-shadow: 0 1px 2px rgba(255,255,255,0.5);
 }
 
 .cafe-meta {
@@ -766,586 +252,41 @@ html, body, #root {
   align-items: center;
   gap: 8px;
   font-size: 14px;
-  color: var(--coffee-brown);
+  color: #6B7280;
 }
 
-.cafe-type {
-  font-weight: 600;
-  background: linear-gradient(90deg, var(--coffee-brown) 0%, var(--italian-red) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.meta-separator {
-  color: var(--cappuccino-light);
-  font-weight: bold;
-}
-
-.cafe-distance {
-  color: var(--italian-green);
-  font-weight: 700;
-  text-shadow: 0 1px 1px rgba(255,255,255,0.5);
-}
-
-.close-button {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(255, 255, 255, 0.1) 100%);
-  border: 1px solid var(--cappuccino-light);
-  border-radius: var(--border-radius-small);
-  padding: 8px;
-  cursor: pointer;
-  font-size: 16px;
-  color: var(--coffee-brown);
-  transition: all 0.3s ease;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.close-button:hover {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(255, 255, 255, 0.3) 100%);
-  color: #EF4444;
-  transform: scale(1.1);
-}
-
-/* Italian Quick Stats */
-.quick-stats {
-  display: flex;
-  gap: 16px;
-  padding: 16px 20px;
-  background: linear-gradient(135deg, var(--cappuccino-light) 0%, rgba(245, 245, 220, 0.3) 100%);
-  border-bottom: 1px solid var(--cappuccino-light);
-}
-
-.stat-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-}
-
-.stat-icon {
-  font-size: 16px;
-  filter: drop-shadow(0 1px 1px rgba(0,0,0,0.1));
-}
-
-.stat-value {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--espresso-dark);
-  text-shadow: 0 1px 1px rgba(255,255,255,0.5);
-}
-
-.stat-label {
-  font-size: 12px;
-  color: var(--coffee-brown);
-  font-weight: 500;
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  box-shadow: 0 0 4px rgba(0,0,0,0.2);
-}
-
-/* Italian Tabs */
-.popup-tabs {
-  display: flex;
-  background: linear-gradient(135deg, rgba(111, 78, 55, 0.05) 0%, rgba(245, 245, 220, 0.1) 100%);
-  border-bottom: 1px solid var(--cappuccino-light);
-}
-
-.tab-button {
-  flex: 1;
+/* Action Buttons */
+.action-btn {
   padding: 12px 16px;
   border: none;
-  background: transparent;
-  cursor: pointer;
+  border-radius: 16px;
   font-size: 14px;
   font-weight: 600;
-  color: var(--coffee-brown);
-  transition: all 0.3s ease;
-  position: relative;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.tab-button:hover {
-  background: linear-gradient(135deg, var(--cappuccino-light) 0%, rgba(255, 255, 255, 0.3) 100%);
-  color: var(--espresso-dark);
-}
-
-.tab-button.active {
-  color: var(--espresso-dark);
-  background: linear-gradient(135deg, var(--cappuccino-light) 0%, rgba(255, 255, 255, 0.5) 100%);
-  font-weight: 700;
-}
-
-.tab-button.active::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: var(--gradient-coffee);
-  border-radius: 2px 2px 0 0;
-}
-
-/* Popup Content */
-.popup-content {
-  padding: 20px;
-  max-height: 300px;
-  overflow-y: auto;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.5) 0%, rgba(245, 245, 220, 0.3) 100%);
-}
-
-/* Custom scrollbar for Italian theme */
-.popup-content::-webkit-scrollbar {
-  width: 8px;
-}
-
-.popup-content::-webkit-scrollbar-track {
-  background: var(--cappuccino-light);
-  border-radius: 4px;
-}
-
-.popup-content::-webkit-scrollbar-thumb {
-  background: var(--gradient-coffee);
-  border-radius: 4px;
-}
-
-.popup-content::-webkit-scrollbar-thumb:hover {
-  background: var(--coffee-brown);
-}
-
-/* Info Content */
-.info-content {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.info-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 12px;
-  border-radius: var(--border-radius-medium);
-  transition: all 0.3s ease;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.6) 0%, rgba(245, 245, 220, 0.4) 100%);
-  border: 1px solid var(--cappuccino-light);
-}
-
-.info-item.clickable {
-  cursor: pointer;
-}
-
-.info-item.clickable:hover {
-  background: linear-gradient(135deg, var(--cappuccino-light) 0%, rgba(255, 255, 255, 0.8) 100%);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-coffee);
-  border-color: var(--coffee-brown);
-}
-
-.info-icon {
-  font-size: 18px;
-  width: 24px;
-  text-align: center;
-  flex-shrink: 0;
-  margin-top: 2px;
-  filter: drop-shadow(0 1px 1px rgba(0,0,0,0.1));
-}
-
-.info-text {
-  flex: 1;
-}
-
-.info-label {
-  font-size: 12px;
-  color: var(--coffee-brown);
-  font-weight: 600;
-  margin-bottom: 2px;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
-
-.info-value {
-  font-size: 14px;
-  color: var(--espresso-dark);
-  font-weight: 600;
-  line-height: 1.4;
-}
-
-.phone-number,
-.website-link {
-  color: var(--italian-green);
-  font-weight: 700;
-}
-
-/* Hours Content */
-.hours-content {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.loading-hours,
-.loading-photos {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 40px;
-  color: var(--coffee-brown);
-  background: linear-gradient(135deg, rgba(245, 245, 220, 0.3) 0%, rgba(255, 255, 255, 0.1) 100%);
-  border-radius: var(--border-radius-medium);
-}
-
-.loading-spinner-small {
-  width: 24px;
-  height: 24px;
-  border: 3px solid var(--cappuccino-light);
-  border-top: 3px solid var(--coffee-brown);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-.hours-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.hours-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 12px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.6) 0%, rgba(245, 245, 220, 0.4) 100%);
-  border-radius: var(--border-radius-small);
-  border: 1px solid var(--cappuccino-light);
-}
-
-.day-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--espresso-dark);
-}
-
-.day-hours {
-  font-size: 14px;
-  color: var(--coffee-brown);
-  font-weight: 500;
-}
-
-.open-status {
-  padding: 12px;
-  border-radius: var(--border-radius-medium);
-  text-align: center;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.open-status.open {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.1) 100%);
-  color: #059669;
-  border: 2px solid rgba(16, 185, 129, 0.3);
-}
-
-.open-status.closed {
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(239, 68, 68, 0.1) 100%);
-  color: #DC2626;
-  border: 2px solid rgba(239, 68, 68, 0.3);
-}
-
-.status-indicator {
-  font-size: 14px;
-  font-weight: 700;
-}
-
-/* Photos Content */
-.photos-content {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.photos-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-}
-
-.photo-item {
-  aspect-ratio: 1;
-  border-radius: var(--border-radius-medium);
-  overflow: hidden;
-  background: var(--cappuccino-light);
-  border: 2px solid var(--cappuccino-light);
-  box-shadow: var(--shadow-small);
-}
-
-.photo-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 0.3s ease;
-  filter: sepia(10%) saturate(110%) brightness(105%);
-}
-
-.photo-image:hover {
-  transform: scale(1.05);
-  filter: sepia(5%) saturate(120%) brightness(110%);
-}
-
-.no-photos {
-  text-align: center;
-  padding: 40px;
-  color: var(--coffee-brown);
-  background: linear-gradient(135deg, rgba(245, 245, 220, 0.3) 0%, rgba(255, 255, 255, 0.1) 100%);
-  border-radius: var(--border-radius-medium);
-  border: 2px dashed var(--cappuccino-light);
-}
-
-/* Italian Action Buttons */
-.popup-actions {
-  display: flex;
-  gap: 12px;
-  padding: 16px 20px;
-  background: linear-gradient(135deg, var(--cappuccino-light) 0%, rgba(245, 245, 220, 0.5) 100%);
-  border-top: 2px solid var(--cappuccino-light);
-}
-
-.action-btn {
-  flex: 1;
-  padding: 12px 16px;
-  border: 2px solid transparent;
-  border-radius: var(--border-radius-medium);
-  font-size: 14px;
-  font-weight: 700;
   cursor: pointer;
   transition: all 0.3s ease;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
 }
 
 .action-btn.primary {
-  background: var(--gradient-coffee);
+  background: var(--gradient-primary);
   color: white;
-  border-color: var(--coffee-brown);
-}
-
-.action-btn.primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 32px rgba(111, 78, 55, 0.4);
-  background: linear-gradient(135deg, var(--coffee-brown) 0%, var(--espresso-dark) 100%);
 }
 
 .action-btn.secondary {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, var(--cappuccino-light) 100%);
-  color: var(--coffee-brown);
-  border-color: var(--cappuccino-light);
-}
-
-.action-btn.secondary:hover {
-  background: linear-gradient(135deg, var(--cappuccino-light) 0%, rgba(255, 255, 255, 1) 100%);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-coffee);
-  border-color: var(--coffee-brown);
-}
-
-/* ============================================ */
-/*      ITALIAN MAP ERROR & LOADING           */
-/* ============================================ */
-
-.map-error-container {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, var(--italian-cream) 0%, #FFFFFF 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.map-error-content {
-  text-align: center;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(245, 245, 220, 0.8) 100%);
-  padding: 40px;
-  border-radius: var(--border-radius-large);
-  box-shadow: var(--shadow-large);
-  max-width: 420px;
-  margin: 20px;
-  border: 2px solid var(--cappuccino-light);
-}
-
-.error-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
-}
-
-.map-error-content h3 {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--espresso-dark);
-  margin-bottom: 12px;
-  text-shadow: 0 1px 2px rgba(255,255,255,0.5);
-}
-
-.map-error-content p {
-  color: var(--coffee-brown);
-  margin-bottom: 24px;
-  line-height: 1.6;
-  font-weight: 500;
-}
-
-.map-error-toast {
-  position: absolute;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.95) 0%, rgba(220, 20, 60, 0.9) 100%);
-  color: white;
-  padding: 12px 20px;
-  border-radius: var(--border-radius-large);
-  box-shadow: var(--shadow-large);
-  z-index: 1001;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  backdrop-filter: blur(10px);
-  border: 2px solid rgba(255, 255, 255, 0.2);
-}
-
-.map-error-toast button {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.8);
+  color: #374151;
   border: 1px solid rgba(255, 255, 255, 0.3);
-  color: white;
-  padding: 6px 12px;
-  border-radius: var(--border-radius-small);
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
-  transition: all 0.3s ease;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
 }
 
-.map-error-toast button:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: translateY(-1px);
+.action-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-medium);
 }
 
-/* Animations */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px) scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.8;
-  }
-}
-
-/* Italian Loading State */
-.map-loading {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, rgba(245, 245, 220, 0.9) 0%, rgba(255, 255, 255, 0.8) 100%);
-  backdrop-filter: blur(12px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.loading-content {
-  text-align: center;
-  color: var(--coffee-brown);
-}
-
-.loading-spinner {
-  width: 48px;
-  height: 48px;
-  border: 4px solid var(--cappuccino-light);
-  border-top: 4px solid var(--coffee-brown);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin: 0 auto 16px;
-  box-shadow: 0 0 20px rgba(111, 78, 55, 0.2);
-}
-
-.loading-text {
-  font-size: 18px;
-  font-weight: 700;
-  margin-bottom: 8px;
-  color: var(--espresso-dark);
-  text-shadow: 0 1px 2px rgba(255,255,255,0.5);
-}
-
-.loading-subtext {
-  font-size: 14px;
-  opacity: 0.8;
-  color: var(--coffee-brown);
-  font-weight: 500;
-}
-
-/* Embed Mode Adjustments */
-.map-app.embed-mode {
-  border-radius: var(--border-radius-medium);
-  overflow: hidden;
-  border: 2px solid var(--cappuccino-light);
-}
-
-/* ============================================ */
-/*           RESPONSIVE DESIGN                */
-/* ============================================ */
-
+/* Mobile Responsive */
 @media (max-width: 768px) {
   .map-controls {
     top: 8px;
@@ -1354,156 +295,8 @@ html, body, #root {
     max-width: none;
   }
   
-  .controls-panel {
-    padding: 16px;
-  }
-  
-  .type-buttons {
-    flex-direction: column;
-    gap: 6px;
-  }
-  
-  .type-button {
-    flex-direction: row;
-    padding: 10px 12px;
-    justify-content: flex-start;
-  }
-  
-  .type-text {
-    font-size: 14px;
-    margin-left: 8px;
-  }
-  
   .cafe-popup {
     margin: 8px;
     max-height: 90vh;
-  }
-  
-  .popup-header {
-    padding: 16px;
-  }
-  
-  .cafe-name {
-    font-size: 18px;
-  }
-  
-  .quick-stats {
-    padding: 12px 16px;
-    flex-direction: column;
-    gap: 8px;
-  }
-  
-  .popup-content {
-    padding: 16px;
-    max-height: 250px;
-  }
-  
-  .photos-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .popup-actions {
-    flex-direction: column;
-    padding: 12px 16px;
-  }
-  
-  .filter-buttons {
-    grid-template-columns: 1fr;
-    gap: 4px;
-  }
-}
-
-@media (max-width: 480px) {
-  .modal-card {
-    margin: 12px;
-    width: calc(100% - 24px);
-  }
-  
-  .cafe-popup {
-    margin: 4px;
-    max-height: 95vh;
-  }
-  
-  .controls-panel {
-    padding: 12px;
-  }
-  
-  .quick-stats {
-    gap: 6px;
-  }
-  
-  .type-buttons {
-    gap: 4px;
-  }
-}
-
-/* Dark Mode Support (Italian Theme) */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --italian-cream: #2C1810;
-    --coffee-brown: #D2B48C;
-    --espresso-dark: #F5DEB3;
-    --cappuccino-light: #8B4513;
-  }
-  
-  .modal-card,
-  .cafe-popup,
-  .controls-panel {
-    background: linear-gradient(135deg, rgba(44, 24, 16, 0.95) 0%, rgba(60, 36, 21, 0.9) 100%);
-    border-color: var(--cappuccino-light);
-  }
-  
-  .modal-header h3,
-  .cafe-name {
-    color: var(--espresso-dark);
-  }
-  
-  .modal-content p,
-  .cafe-meta,
-  .stats-label {
-    color: var(--coffee-brown);
-  }
-}
-
-/* Ensure smooth animations and performance */
-* {
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-/* Hardware acceleration for smooth animations */
-.btn-apple-base,
-.type-button,
-.action-button,
-.filter-button,
-.cafe-popup,
-.modal-card {
-  -webkit-transform: translateZ(0);
-  transform: translateZ(0);
-  -webkit-backface-visibility: hidden;
-  backface-visibility: hidden;
-}
-
-/* Focus styles for accessibility */
-.btn-apple-base:focus,
-.type-button:focus,
-.action-button:focus,
-.filter-button:focus {
-  outline: 2px solid var(--coffee-brown);
-  outline-offset: 2px;
-}
-
-/* High contrast mode support */
-@media (prefers-contrast: high) {
-  .btn-apple-base,
-  .type-button,
-  .action-button {
-    border-width: 2px;
-  }
-  
-  .modal-card,
-  .cafe-popup,
-  .controls-panel {
-    border-width: 3px;
   }
 }

@@ -497,6 +497,7 @@ const FullPageMap = ({
   }, [onCenterChange, shouldTriggerNewSearch]);
 
   // ENHANCED: Live Location Tracking with WWDC styling
+  // FIXED: Live Location Tracking with proper parent communication
   const startLiveLocationTracking = useCallback(() => {
     if (!navigator.geolocation || watchIdRef.current) return;
 
@@ -525,15 +526,29 @@ const FullPageMap = ({
         accuracy: Math.round(newLocation.accuracy)
       });
 
-      // Update user location in parent component
-      if (onLocationRequest) {
-        // Trigger location update without request
-        // This would need to be handled in the parent component
+      // FIXED: Update location state directly
+      setLocation(newLocation);
+      setLoading(false);
+      setError(null);
+      setPermissionGranted(true);
+
+      // Cache the live location
+      try {
+        const locationWithExpiry = {
+          ...newLocation,
+          expiresAt: Date.now() + (30 * 60 * 1000) // 30 minutes expiry
+        };
+        localStorage.setItem('lastKnownLocation', JSON.stringify(locationWithExpiry));
+        localStorage.setItem('locationPermissionGranted', 'true');
+        localStorage.setItem('lastLocationUpdate', Date.now().toString());
+      } catch (e) {
+        console.warn('Failed to cache live location:', e);
       }
     };
 
     const onLocationError = (error) => {
       console.warn('⚠️ Live location error:', error.message);
+      // Don't stop tracking on individual errors, just log them
     };
 
     try {
@@ -543,12 +558,13 @@ const FullPageMap = ({
         options
       );
       
+      setWatchId(watchId);
       watchIdRef.current = watchId;
       console.log('✅ Live location tracking started');
     } catch (error) {
       console.error('❌ Failed to start live tracking:', error);
     }
-  }, [onLocationRequest]);
+  }, [setLocation, setLoading, setError, setPermissionGranted]);
 
   // Stop live location tracking
   const stopLiveLocationTracking = useCallback(() => {

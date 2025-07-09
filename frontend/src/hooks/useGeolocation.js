@@ -1,4 +1,4 @@
-// hooks/useGeolocation.js - FIXED VERSION - Actually Track User's Real Location
+// hooks/useGeolocation.js - FIXED VERSION - Complete with Live Location Tracking
 // Location: /frontend/src/hooks/useGeolocation.js
 
 import { useState, useEffect, useCallback } from 'react';
@@ -309,6 +309,76 @@ export const useGeolocation = () => {
     );
   }, [onSuccess, onError, options, tryIPGeolocation]);
 
+  // FIXED: Live Location Tracking with proper parent communication
+  const startLiveLocationTracking = useCallback(() => {
+    if (!navigator.geolocation || watchId) return;
+
+    console.log('🎯 Starting live location tracking...');
+
+    const liveOptions = {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 30000 // 30 seconds
+    };
+
+    const onLocationUpdate = (position) => {
+      const newLocation = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+        timestamp: new Date().toISOString(),
+        source: 'gps_live',
+        heading: position.coords.heading,
+        speed: position.coords.speed,
+        isAccurate: position.coords.accuracy < 100,
+        note: `Live GPS tracking with ${Math.round(position.coords.accuracy)}m accuracy`
+      };
+
+      console.log('📍 Live location update:', {
+        lat: newLocation.latitude.toFixed(6),
+        lng: newLocation.longitude.toFixed(6),
+        accuracy: Math.round(newLocation.accuracy)
+      });
+
+      // FIXED: Update location state directly
+      setLocation(newLocation);
+      setLoading(false);
+      setError(null);
+      setPermissionGranted(true);
+
+      // Cache the live location
+      try {
+        const locationWithExpiry = {
+          ...newLocation,
+          expiresAt: Date.now() + (30 * 60 * 1000) // 30 minutes expiry
+        };
+        localStorage.setItem('lastKnownLocation', JSON.stringify(locationWithExpiry));
+        localStorage.setItem('locationPermissionGranted', 'true');
+        localStorage.setItem('lastLocationUpdate', Date.now().toString());
+      } catch (e) {
+        console.warn('Failed to cache live location:', e);
+      }
+    };
+
+    const onLocationError = (error) => {
+      console.warn('⚠️ Live location error:', error.message);
+      // Don't stop tracking on individual errors, just log them
+    };
+
+    try {
+      const id = navigator.geolocation.watchPosition(
+        onLocationUpdate,
+        onLocationError,
+        liveOptions
+      );
+      
+      setWatchId(id);
+      console.log('✅ Live location tracking started');
+    } catch (error) {
+      console.error('❌ Failed to start live tracking:', error);
+    }
+  }, [watchId]);
+
   // INITIALIZATION: Try to get user's actual location on mount
   useEffect(() => {
     console.log('🔍 Initializing geolocation...');
@@ -362,19 +432,11 @@ export const useGeolocation = () => {
     requestLocation();
   }, [requestLocation]);
 
-  // Start watching position (for continuous tracking)
+  // Start watching position (for continuous tracking) - UPDATED
   const startWatching = useCallback(() => {
-    if (!navigator.geolocation || watchId || !permissionGranted) return;
-
-    console.log('📍 Starting GPS position watching...');
-    const id = navigator.geolocation.watchPosition(onSuccess, onError, {
-      ...options,
-      timeout: 30000,
-      maximumAge: 60 * 1000 // 1 minute cache for watching
-    });
-
-    setWatchId(id);
-  }, [watchId, onSuccess, onError, options, permissionGranted]);
+    // Use the new live tracking function
+    startLiveLocationTracking();
+  }, [startLiveLocationTracking]);
 
   const stopWatching = useCallback(() => {
     if (watchId) {
@@ -412,11 +474,12 @@ export const useGeolocation = () => {
                    location.accuracy < 1000 ? 'Medium precision' : 'Low precision',
       sourceText: {
         gps: 'GPS',
+        gps_live: 'Live GPS',
         ip: 'IP Address',
         cache: 'Cached',
         fallback: 'Default Location'
       }[location.source] || 'Unknown',
-      isReliable: location.source === 'gps' && location.accuracy < 100
+      isReliable: (location.source === 'gps' || location.source === 'gps_live') && location.accuracy < 100
     };
   }, [location]);
 
@@ -432,14 +495,16 @@ export const useGeolocation = () => {
     getDistanceTo,
     formatLocation,
     clearPermissionDenied,
+    startLiveLocationTracking, // NEW: Added live tracking function
     
     // Helper methods
-    hasReliableLocation: location?.source === 'gps' && location?.accuracy < 100,
+    hasReliableLocation: (location?.source === 'gps' || location?.source === 'gps_live') && location?.accuracy < 100,
     hasAnyLocation: !!location,
     isHighAccuracy: location?.accuracy && location.accuracy < 50,
     isUsingFallback: location?.source === 'fallback',
-    isUsingGPS: location?.source === 'gps',
+    isUsingGPS: location?.source === 'gps' || location?.source === 'gps_live',
     isUsingIP: location?.source === 'ip',
+    isLiveTracking: !!watchId && location?.source === 'gps_live',
     
     // Show modal only for explicit permission denial
     shouldShowLocationModal: error?.code === 'PERMISSION_DENIED' && 
