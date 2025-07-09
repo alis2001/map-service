@@ -139,7 +139,7 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
       <div className={`cafe-popup ${isVisible ? 'visible' : ''}`}>
         
         {/* Header */}
-        <div className="popup-header">
+        <div className="popup-header" data-venue-type={placeData.type || placeData.placeType}>
           <div className="header-content">
             <div className="cafe-emoji">{getItalianVenueEmoji(placeData)}</div>
             <div className="header-text">
@@ -335,7 +335,7 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
         </div>
 
         {/* Action Buttons */}
-        <div className="popup-actions">
+        <div className="popup-actions" data-venue-type={placeData.type || placeData.placeType}>
           <button 
             className="action-btn primary"
             onClick={handleDirections}

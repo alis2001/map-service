@@ -27,8 +27,8 @@ html, body, #root {
   --wwdc-blue: #007AFF;
   --wwdc-purple: #5856D6;
   --wwdc-pink: #AF52DE;
-  --wwdc-red: #FF2D92;
-  --wwdc-orange: #FF6B35;
+  --wwdc-red: #EF4444;      /* Updated for restaurants */
+  --wwdc-orange: #F97316;   /* Updated for cafes/bars */
   --wwdc-yellow: #FFD60A;
   --wwdc-green: #00FF88;
   --wwdc-gray: #8E8E93;
@@ -37,10 +37,10 @@ html, body, #root {
   --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   --gradient-secondary: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
   --gradient-success: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-  --gradient-coffee: linear-gradient(135deg, #d299c2 0%, #fef9d7 100%);
+  --gradient-coffee: linear-gradient(135deg, #F97316 0%, #EA580C 100%);    /* WWDC Orange for cafes */
   --gradient-social: linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%);
   --gradient-location: linear-gradient(135deg, #fdbb2d 0%, #22c1c3 100%);
-  --gradient-events: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+  --gradient-events: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);    /* WWDC Red for restaurants */
   --gradient-profile: linear-gradient(135deg, #a8caba 0%, #5d4e75 100%);
   --gradient-chat: linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%);
   --gradient-wwdc: linear-gradient(45deg, var(--wwdc-blue), var(--wwdc-purple), var(--wwdc-pink), var(--wwdc-red), var(--wwdc-orange));
@@ -463,13 +463,15 @@ html, body, #root {
 }
 
 .type-button.active[data-type="cafe"] {
-  background: var(--gradient-coffee);
-  color: #333;
+  background: linear-gradient(135deg, #F97316, #EA580C); /* WWDC Orange */
+  color: white;
+  box-shadow: 0 4px 15px rgba(249, 115, 22, 0.4);
 }
 
 .type-button.active[data-type="restaurant"] {
-  background: var(--gradient-events);
-  color: #333;
+  background: linear-gradient(135deg, #EF4444, #DC2626); /* WWDC Red */
+  color: white;
+  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
 }
 
 .type-emoji {
@@ -641,6 +643,19 @@ html, body, #root {
   color: white;
 }
 
+/* WWDC-specific filter button colors */
+.filter-button.active[title*="Caffetterie"] {
+  background: linear-gradient(135deg, var(--wwdc-orange), #EA580C);
+  color: white;
+  box-shadow: 0 4px 15px rgba(249, 115, 22, 0.3);
+}
+
+.filter-button.active[title*="Ristoranti"] {
+  background: linear-gradient(135deg, var(--wwdc-red), #DC2626);
+  color: white;
+  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+}
+
 /* Venue Info */
 .venue-info {
   margin-bottom: 16px;
@@ -707,6 +722,17 @@ html, body, #root {
   background: var(--wwdc-gray);
 }
 
+/* Enhanced WWDC status indicators */
+.status-indicator[data-context="cafe"] .status-dot.connected {
+  background: var(--wwdc-orange);
+  box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.3);
+}
+
+.status-indicator[data-context="restaurant"] .status-dot.connected {
+  background: var(--wwdc-red);
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.3);
+}
+
 .status-text {
   font-weight: 500;
 }
@@ -763,6 +789,17 @@ html, body, #root {
   padding: 20px;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.7) 100%);
   border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* WWDC-themed popup headers based on venue type */
+.popup-header[data-venue-type="cafe"] {
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.1) 0%, rgba(255, 255, 255, 0.9) 100%);
+  border-bottom: 1px solid rgba(249, 115, 22, 0.2);
+}
+
+.popup-header[data-venue-type="restaurant"] {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(255, 255, 255, 0.9) 100%);
+  border-bottom: 1px solid rgba(239, 68, 68, 0.2);
 }
 
 .header-content {
@@ -1140,6 +1177,19 @@ html, body, #root {
   background: var(--gradient-wwdc);
   color: white;
   box-shadow: 0 4px 15px rgba(0, 122, 255, 0.3);
+}
+
+/* WWDC-themed action buttons based on venue type */
+.popup-actions[data-venue-type="cafe"] .action-btn.primary {
+  background: linear-gradient(135deg, var(--wwdc-orange), #EA580C);
+  color: white;
+  box-shadow: 0 4px 15px rgba(249, 115, 22, 0.4);
+}
+
+.popup-actions[data-venue-type="restaurant"] .action-btn.primary {
+  background: linear-gradient(135deg, var(--wwdc-red), #DC2626);
+  color: white;
+  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
 }
 
 .action-btn.secondary {

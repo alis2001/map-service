@@ -1022,6 +1022,7 @@ const FullPageMap = ({
   }, [cafes, mapLoaded, onCafeSelect, cafeType]); // Added cafeType dependency
 
   // FIXED: Proper color coding - Orange for cafe/bar, Red for restaurant
+  // FIXED: Proper color coding - Orange for cafe/bar, Red for restaurant
   const getWWDCVenueColor = (cafe) => {
     // FIXED: All cafes and bars get orange, restaurants get red
     if (cafe.type === 'restaurant' || cafe.placeType === 'restaurant') {
@@ -1202,10 +1203,20 @@ const FullPageMap = ({
             width: '12px', 
             height: '12px', 
             borderRadius: '50%', 
-            background: 'linear-gradient(45deg, #007AFF, #5856D6)',
+            background: 'linear-gradient(45deg, #F97316, #EA580C)',
             border: '2px solid rgba(255,255,255,0.3)'
           }} />
-          <span>Your location</span>
+          <span>Coffee shops & bars</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ 
+            width: '12px', 
+            height: '12px', 
+            borderRadius: '50%', 
+            background: 'linear-gradient(45deg, #EF4444, #DC2626)',
+            border: '2px solid rgba(255,255,255,0.3)'
+          }} />
+          <span>Restaurants</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
           <span>☕</span>

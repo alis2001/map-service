@@ -32,6 +32,8 @@ function App() {
 }
 
 function MapApp() {
+  const [backendReady, setBackendReady] = useState(false);
+  const [backendError, setBackendError] = useState(null);
   // State management
   const [selectedCafe, setSelectedCafe] = useState(null);
   const [mapCenter, setMapCenter] = useState({
