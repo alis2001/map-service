@@ -1,4 +1,4 @@
-// hooks/useGeolocation.js - MODERN GPS SYSTEM - Complete Rebuild
+// hooks/useGeolocation.js - FIXED GPS SYSTEM - Complete Rebuild
 // Location: /frontend/src/hooks/useGeolocation.js
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -22,13 +22,13 @@ export const useGeolocation = () => {
   const lastLocationRef = useRef(null);
   const isRequestingRef = useRef(false);
 
-  // 🎯 **MODERN GPS CONFIGURATION**
+  // 🎯 **FIXED GPS CONFIGURATION - More Patient Timeouts**
   const GPS_CONFIG = {
-    // Progressive accuracy approach
+    // FIXED: More patient timeout phases
     phases: [
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 },     // Phase 1: Best possible
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }, // Phase 2: Good with cache
-      { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 } // Phase 3: Network location
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },     // 20s for high accuracy
+      { enableHighAccuracy: true, timeout: 30000, maximumAge: 60000 }, // 30s with 1min cache
+      { enableHighAccuracy: false, timeout: 25000, maximumAge: 300000 } // 25s with 5min cache
     ],
     
     // Quality thresholds
@@ -46,6 +46,56 @@ export const useGeolocation = () => {
       maximumAge: 10000  // 10 seconds for live tracking
     }
   };
+
+  // 🌐 **IP GEOLOCATION FALLBACK**
+  // 🌐 **BROWSER LOCATION FALLBACK - No CORS Issues**
+  const getBrowserLocation = useCallback(async () => {
+    try {
+      console.log('🌐 Attempting browser-based location fallback...');
+      
+      // Use a simple geolocation call with very relaxed settings
+      return new Promise((resolve) => {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const coords = position.coords;
+            const browserLocationData = {
+              latitude: coords.latitude,
+              longitude: coords.longitude,
+              accuracy: coords.accuracy || 10000,
+              timestamp: new Date().toISOString(),
+              source: 'browser_fallback',
+              quality: 'acceptable',
+              isLive: false
+            };
+            
+            console.log('🌐 Browser fallback location obtained:', {
+              accuracy: Math.round(coords.accuracy || 10000) + 'm'
+            });
+            
+            setLocation(browserLocationData);
+            setAccuracy(coords.accuracy || 10000);
+            setError(null);
+            setLoading(false);
+            lastLocationRef.current = browserLocationData;
+            
+            resolve(true);
+          },
+          (error) => {
+            console.warn('⚠️ Browser fallback failed:', error);
+            resolve(false);
+          },
+          {
+            enableHighAccuracy: false,
+            timeout: 60000, // Very long timeout
+            maximumAge: 600000 // Accept 10-minute old location
+          }
+        );
+      });
+    } catch (error) {
+      console.warn('⚠️ Browser geolocation fallback failed:', error);
+      return false;
+    }
+  }, []);
 
   // 🔍 **CHECK GPS CAPABILITIES**
   const checkGPSCapabilities = useCallback(async () => {
@@ -79,7 +129,6 @@ export const useGeolocation = () => {
     // Detect device capabilities
     const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     const hasMotion = 'DeviceMotionEvent' in window;
-    const hasOrientation = 'DeviceOrientationEvent' in window;
     
     if (isMobile && hasMotion) {
       setGpsCapability('excellent');
@@ -96,20 +145,35 @@ export const useGeolocation = () => {
     }
   }, []);
 
-  // 🎯 **PROGRESSIVE GPS ATTEMPT**
+  // 🎯 **FIXED PROGRESSIVE GPS ATTEMPT**
   const attemptGPSLocation = useCallback((phaseIndex = 0) => {
     if (phaseIndex >= GPS_CONFIG.phases.length) {
-      console.error('❌ All GPS phases failed');
-      setError({ 
-        code: 'ALL_PHASES_FAILED', 
-        message: 'Unable to determine your location. Please ensure GPS is enabled and try again.' 
+      console.log('❌ All GPS phases failed, trying browser fallback...');
+      
+      // FIXED: Try browser fallback instead of IP
+      getBrowserLocation().then(fallbackSuccess => {
+        if (!fallbackSuccess) {
+          console.log('⚠️ All location methods failed, using default');
+          setError({ 
+            code: 'ALL_METHODS_FAILED', 
+            message: 'Unable to determine precise location. Using default area.' 
+          });
+          setLoading(false);
+        }
       });
-      setLoading(false);
       return;
     }
 
     const phase = GPS_CONFIG.phases[phaseIndex];
     console.log(`🎯 GPS Phase ${phaseIndex + 1}:`, phase);
+
+    // FIXED: Show progress during GPS attempts
+    setError({ 
+      code: 'GPS_SEARCHING', 
+      message: `Searching for GPS signal... (attempt ${phaseIndex + 1}/3)`,
+      phase: phaseIndex + 1,
+      isProgress: true
+    });
 
     navigator.geolocation.getCurrentPosition(
       // ✅ SUCCESS
@@ -170,10 +234,7 @@ export const useGeolocation = () => {
       (error) => {
         console.warn(`❌ GPS Phase ${phaseIndex + 1} failed:`, {
           code: error.code,
-          message: error.message,
-          PERMISSION_DENIED: error.PERMISSION_DENIED,
-          POSITION_UNAVAILABLE: error.POSITION_UNAVAILABLE,
-          TIMEOUT: error.TIMEOUT
+          message: error.message
         });
 
         if (error.code === error.PERMISSION_DENIED) {
@@ -187,16 +248,83 @@ export const useGeolocation = () => {
           return;
         }
 
-        // Try next phase
+        // FIXED: Try next phase with progressive delay
+        const delay = (phaseIndex + 1) * 2000; // 2s, 4s, 6s delays
+        console.log(`⏳ Trying next GPS method in ${delay}ms...`);
+        
         setTimeout(() => {
           attemptGPSLocation(phaseIndex + 1);
-        }, 1000);
+        }, delay);
       },
       
       phase
     );
-  }, []);
+  }, [getBrowserLocation]);
+  // 🔄 **MANUAL GPS REQUEST - More Aggressive**
+  const requestFreshGPS = useCallback(async () => {
+    console.log('🎯 Manual fresh GPS request initiated');
+    setLoading(true);
+    setError(null);
+    
+    // Clear any existing request state
+    isRequestingRef.current = false;
+    
+    // Try immediate GPS with very long timeout
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const coords = position.coords;
+        const freshLocationData = {
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          accuracy: coords.accuracy,
+          heading: coords.heading,
+          speed: coords.speed,
+          altitude: coords.altitude,
+          timestamp: new Date().toISOString(),
+          source: 'gps_manual',
+          quality: coords.accuracy < 10 ? 'excellent' : 
+                  coords.accuracy < 50 ? 'good' : 'acceptable',
+          isLive: false
+        };
 
+        console.log('✅ Manual GPS SUCCESS:', {
+          accuracy: Math.round(coords.accuracy) + 'm',
+          source: 'manual'
+        });
+
+        setLocation(freshLocationData);
+        setAccuracy(coords.accuracy);
+        setError(null);
+        setLoading(false);
+        setPermissionState('granted');
+        setLastUpdate(new Date());
+        lastLocationRef.current = freshLocationData;
+
+        // Cache the fresh location
+        try {
+          localStorage.setItem('lastGPSLocation', JSON.stringify({
+            ...freshLocationData,
+            expiresAt: Date.now() + (10 * 60 * 1000)
+          }));
+        } catch (e) {
+          console.warn('Failed to cache manual GPS location:', e);
+        }
+      },
+      (error) => {
+        console.warn('❌ Manual GPS failed:', error.message);
+        setError({ 
+          code: 'MANUAL_GPS_FAILED', 
+          message: 'GPS signal not available. Using last known position.' 
+        });
+        setLoading(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 90000, // 90 seconds
+        maximumAge: 0 // Force fresh location
+      }
+    );
+  }, []);
   // 🔄 **START LIVE TRACKING**
   const startLiveTracking = useCallback(() => {
     if (watchIdRef.current || !location) {
@@ -304,7 +432,7 @@ export const useGeolocation = () => {
     // Set requesting to false after timeout
     setTimeout(() => {
       isRequestingRef.current = false;
-    }, 30000); // 30 second timeout for all phases
+    }, 90000); // INCREASED: 90 second timeout for all phases
   }, [checkGPSCapabilities, attemptGPSLocation]);
 
   // 🔄 **RETRY LOCATION**
@@ -334,11 +462,18 @@ export const useGeolocation = () => {
     return R * c;
   }, [location]);
 
-  // 🎬 **INITIALIZATION**
+  // 🎬 **FIXED INITIALIZATION - Use Cache Immediately**
+  // 🎬 **FIXED INITIALIZATION - Stop Multiple Requests**
   useEffect(() => {
     console.log('🎬 Initializing modern GPS system...');
     
-    // Check for cached location (but don't use it - wait for real GPS)
+    // FIXED: Prevent multiple GPS requests
+    if (isRequestingRef.current) {
+      console.log('🚫 GPS already initializing, skipping...');
+      return;
+    }
+    
+    // FIXED: Check for cached location FIRST and use it immediately
     try {
       const cached = localStorage.getItem('lastGPSLocation');
       const permission = localStorage.getItem('gpsPermissionGranted');
@@ -353,20 +488,43 @@ export const useGeolocation = () => {
         return;
       }
       
-      // Don't show cached location - wait for real GPS
+      // FIXED: Use cached location immediately while fetching fresh
       if (cached) {
         const parsedCache = JSON.parse(cached);
         if (parsedCache.expiresAt > Date.now()) {
-          console.log('📦 Found cached GPS location, but waiting for fresh GPS...');
+          console.log('📦 Found cached GPS location, using immediately while fetching fresh...');
+          setLocation({
+            ...parsedCache,
+            source: 'cache',
+            isStale: true
+          });
+          setAccuracy(parsedCache.accuracy);
+          setError(null);
+          setLoading(false); // Show cached location immediately
+          setLastUpdate(new Date(parsedCache.timestamp));
+          lastLocationRef.current = parsedCache;
+          
+          // FIXED: Don't request fresh GPS immediately if cache is recent (< 5 minutes)
+          const cacheAge = Date.now() - new Date(parsedCache.timestamp).getTime();
+          if (cacheAge < 5 * 60 * 1000) { // Less than 5 minutes old
+            console.log('📦 Cache is fresh, skipping GPS request');
+            return;
+          }
         }
       }
     } catch (e) {
       console.warn('Failed to check cached location:', e);
     }
 
-    // Always request fresh GPS location
-    requestLocation();
-  }, [requestLocation]);
+    // FIXED: Only request fresh GPS if cache is old or missing
+    setTimeout(() => {
+      if (!location || (location.source === 'cache' && location.isStale)) {
+        console.log('🔄 Cache is stale, requesting fresh GPS...');
+        setLoading(true);
+        requestLocation();
+      }
+    }, 2000); // Wait 2 seconds before requesting fresh GPS
+  }, []); // FIXED: Remove requestLocation dependency to prevent loops
 
   // 🧹 **CLEANUP**
   useEffect(() => {
@@ -382,6 +540,9 @@ export const useGeolocation = () => {
     loading,
     error,
     accuracy,
+    
+    // FIXED: Add manual GPS function
+    requestFreshGPS,
     
     // Advanced data
     permissionState,
@@ -403,12 +564,21 @@ export const useGeolocation = () => {
     isAcceptableAccuracy: accuracy && accuracy < GPS_CONFIG.accuracy.acceptable,
     qualityText: location?.quality || 'unknown',
     sourceText: location?.source === 'gps_live' ? 'Live GPS' : 
-                location?.source === 'gps' ? 'GPS' : 'Unknown',
+                location?.source === 'gps' ? 'GPS' : 
+                location?.source === 'cache' ? 'Cached' :
+                location?.source === 'ip' ? 'Network' : 'Unknown',
     
     // Status helpers
     isWaitingForGPS: loading && !error,
     needsPermission: permissionState === 'denied' || (error?.code === 'PERMISSION_DENIED'),
     canRetry: !loading && error && error.code !== 'NO_SUPPORT',
+    
+    // FIXED: Clear permission denied helper
+    clearPermissionDenied: () => {
+      localStorage.removeItem('gpsPermissionGranted');
+      setPermissionState('prompt');
+      setError(null);
+    },
     
     // Debug info
     debugInfo: {

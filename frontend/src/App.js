@@ -58,6 +58,7 @@ function MapApp() {
     permissionGranted,
     shouldShowLocationModal,
     requestLocation,
+    requestFreshGPS, // FIXED: Add this
     clearPermissionDenied
   } = useGeolocation();
 
@@ -120,16 +121,19 @@ function MapApp() {
     });
 
     if (userLocation) {
-      // Check if GPS has good accuracy
-      if (userLocation.accuracy && userLocation.accuracy < 1000) {
-        console.log('✅ GPS is ready with good accuracy:', userLocation.accuracy + 'm');
+      // Accept ANY location source immediately
+      if (userLocation.source === 'cache') {
+        console.log('✅ Using cached GPS location immediately');
         setInitializationStep('ready');
         setInitializationProgress(100);
         return true;
-      } 
-      // Accept any GPS location after 15 seconds
-      else if (userLocation.source === 'gps') {
-        console.log('✅ GPS location accepted (lower accuracy):', userLocation.accuracy + 'm');
+      } else if (userLocation.source === 'ip') {
+        console.log('✅ Using IP location (network-based)');
+        setInitializationStep('ready');
+        setInitializationProgress(100);
+        return true;
+      } else if (userLocation.source === 'gps' || userLocation.source === 'gps_live') {
+        console.log('✅ GPS location ready with accuracy:', userLocation.accuracy + 'm');
         setInitializationStep('ready');
         setInitializationProgress(100);
         return true;
@@ -153,7 +157,6 @@ function MapApp() {
     return () => clearTimeout(timer);
   }, []);
 
-  // NEW: Handle GPS initialization after backend is ready
   useEffect(() => {
     if (backendReady && initializationStep === 'gps') {
       console.log('🎯 Backend ready, initiating GPS location request...');
@@ -166,37 +169,49 @@ function MapApp() {
     }
   }, [backendReady, initializationStep, locationLoading, userLocation, requestLocation]);
 
+
   // NEW: Monitor GPS progress and readiness
   useEffect(() => {
     if (backendReady && initializationStep === 'gps') {
       if (locationLoading) {
         setInitializationProgress(70);
       } else if (userLocation) {
+        // FIXED: Accept any location immediately
         setInitializationProgress(90);
-        const isGPSReady = checkGPSReadiness();
-        
-        if (isGPSReady) {
-          console.log('🎉 App fully initialized and ready!');
-        }
-      } else if (locationError) {
-        // GPS failed, but continue with default location
-        console.log('⚠️ GPS failed, continuing with default location');
+        console.log('✅ GPS location received:', userLocation.source);
         setInitializationStep('ready');
         setInitializationProgress(100);
+      } else if (locationError) {
+        // FIXED: Check if it's a progress error or real error
+        if (locationError.isProgress) {
+          console.log('🔄 GPS search in progress:', locationError.message);
+          setInitializationProgress(60 + (locationError.phase * 10));
+        } else if (locationError.code === 'PERMISSION_DENIED') {
+          // Handle permission denied but continue
+          console.log('⚠️ GPS permission denied, continuing anyway');
+          setInitializationStep('ready');
+          setInitializationProgress(100);
+        } else {
+          // Real GPS failure, but continue
+          console.log('⚠️ GPS failed, continuing anyway');
+          setInitializationStep('ready');
+          setInitializationProgress(100);
+        }
       }
     }
   }, [backendReady, userLocation, locationLoading, locationError, initializationStep]);
 
-  // NEW: Auto-proceed if GPS takes too long
+
+  // FIXED: Auto-proceed if GPS takes too long - EXTENDED TIMEOUT
   useEffect(() => {
     if (backendReady && initializationStep === 'gps') {
       const timeout = setTimeout(() => {
         if (initializationStep === 'gps') {
-          console.log('⏰ GPS timeout - proceeding with default location');
+          console.log('⏰ GPS timeout (60s) - proceeding with available location');
           setInitializationStep('ready');
           setInitializationProgress(100);
         }
-      }, 15000); // 15 second timeout
+      }, 60000); // INCREASED from 15s to 60s
 
       return () => clearTimeout(timeout);
     }
@@ -253,6 +268,7 @@ function MapApp() {
   }, []);
 
   // NEW: Comprehensive loading screen logic
+  // FIXED: Comprehensive loading screen logic with better GPS messages
   if (!backendReady || initializationStep !== 'ready') {
     let loadingMessage = "Inizializzazione servizio...";
     let subMessage = "Preparazione dell'esperienza di ricerca locali";
@@ -267,15 +283,24 @@ function MapApp() {
         subMessage = backendError || "Verifica della disponibilità del backend";
         break;
       case 'gps':
-        if (locationLoading) {
+        if (userLocation && userLocation.source === 'cache') {
+          loadingMessage = "Posizione trovata";
+          subMessage = "Usando posizione salvata mentre cerchiamo GPS fresco";
+        } else if (locationError?.isProgress) {
+          loadingMessage = locationError.message;
+          subMessage = `Tentativo ${locationError.phase}/3 - GPS può richiedere tempo`;
+        } else if (locationLoading) {
           loadingMessage = "Rilevamento posizione GPS...";
-          subMessage = "Attivazione GPS in corso, attendere...";
-        } else if (locationError) {
-          loadingMessage = "GPS non disponibile";
-          subMessage = "Continuando con posizione predefinita...";
+          subMessage = "Il GPS può richiedere 30-60 secondi, attendere...";
+        } else if (locationError?.code === 'PERMISSION_DENIED') {
+          loadingMessage = "GPS negato";
+          subMessage = "Continuando con posizione di default...";
+        } else if (userLocation) {
+          loadingMessage = "Posizione ottenuta";
+          subMessage = `Fonte: ${userLocation.source === 'ip' ? 'Network' : userLocation.source}`;
         } else {
-          loadingMessage = "Calibrazione GPS...";
-          subMessage = "Ottenimento posizione accurata...";
+          loadingMessage = "Finalizzazione GPS...";
+          subMessage = "Ultimi controlli posizione...";
         }
         break;
       default:
@@ -331,7 +356,13 @@ function MapApp() {
   const handleLocationRequest = () => {
     console.log('📍 User requested location');
     clearPermissionDenied();
-    requestLocation();
+    
+    // FIXED: Use the new manual GPS function
+    if (requestFreshGPS) {
+      requestFreshGPS();
+    } else {
+      requestLocation();
+    }
   };
 
   const handleContinueWithoutGPS = () => {
@@ -364,7 +395,7 @@ function MapApp() {
         locationError={locationError}
       />
 
-      {/* Location Permission Modal - Show only if needed and app is ready */}
+      {/* FIXED: Location Permission Modal - Show only if really needed */}
       {(locationError?.code === 'PERMISSION_DENIED' && !userLocation) && !isEmbedMode && (
         <div className="modal-overlay">
           <div className="modal-card">
@@ -389,8 +420,12 @@ function MapApp() {
                 {userLocation ? (
                   <span>✅ Posizione attuale: {userLocation.city || 'Rilevata'} 
                     ({userLocation.source === 'gps' ? 'GPS' : 
-                      userLocation.source === 'ip' ? 'IP' : 'Predefinita'})
+                      userLocation.source === 'gps_live' ? 'GPS Live' :
+                      userLocation.source === 'cache' ? 'Cache' :
+                      userLocation.source === 'ip' ? 'Network' : 'Predefinita'})
                   </span>
+                ) : locationError?.isProgress ? (
+                  <span>🔄 {locationError.message}</span>
                 ) : (
                   <span>📍 In attesa di localizzazione...</span>
                 )}
@@ -416,6 +451,7 @@ function MapApp() {
       )}
 
       {/* Enhanced Status indicator */}
+      {/* FIXED: Enhanced Status indicator */}
       {!isEmbedMode && (
         <div style={{
           position: 'fixed',
@@ -440,14 +476,15 @@ function MapApp() {
             background: backendReady ? 
               (userLocation?.source === 'gps' ? '#10B981' : 
                userLocation?.source === 'gps_live' ? '#00FF88' :
-               userLocation?.source === 'ip' ? '#F59E0B' : '#6B7280') : '#EF4444'
+               userLocation?.source === 'cache' ? '#F59E0B' :
+               userLocation?.source === 'ip' ? '#8B5CF6' : '#6B7280') : '#EF4444'
           }} />
           <span>
             {!backendReady ? '🔴 Servizio offline' :
             userLocation?.source === 'gps' ? '📍 GPS attivo' :
             userLocation?.source === 'gps_live' ? '🎯 GPS live' :
-            userLocation?.source === 'ip' ? '🌐 Posizione IP' :
             userLocation?.source === 'cache' ? '💾 Posizione salvata' :
+            userLocation?.source === 'ip' ? '🌐 Posizione IP' :
             '📍 Posizione predefinita'}
             {' • Caffè e Ristoranti'}
           </span>
@@ -459,6 +496,16 @@ function MapApp() {
           {userLocation?.source === 'gps_live' && (
             <span style={{ color: '#00FF88', fontWeight: '600', animation: 'pulse 2s infinite' }}>
               LIVE
+            </span>
+          )}
+          {userLocation?.source === 'cache' && (
+            <span style={{ color: '#F59E0B', fontWeight: '600' }}>
+              CACHE
+            </span>
+          )}
+          {userLocation?.source === 'ip' && (
+            <span style={{ color: '#8B5CF6', fontWeight: '600' }}>
+              NET
             </span>
           )}
         </div>
