@@ -1,4 +1,4 @@
-// App.js - UPDATED VERSION - No Pub Support  
+// App.js - UPDATED VERSION with Backend Health Check & GPS Initialization
 // Location: /map-service/frontend/src/App.js
 
 import React, { useState, useEffect } from 'react';
@@ -8,6 +8,7 @@ import LoadingScreen from './components/LoadingScreen';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useGeolocation } from './hooks/useGeolocation';
 import { useCafes } from './hooks/useCafes';
+import { healthAPI } from './services/apiService';
 import './styles/App.css';
 
 // Create a client for React Query
@@ -32,9 +33,13 @@ function App() {
 }
 
 function MapApp() {
+  // NEW: Initialization states
   const [backendReady, setBackendReady] = useState(false);
   const [backendError, setBackendError] = useState(null);
-  // State management
+  const [initializationStep, setInitializationStep] = useState('starting'); // 'starting', 'backend', 'gps', 'ready'
+  const [initializationProgress, setInitializationProgress] = useState(0);
+  
+  // Existing state management
   const [selectedCafe, setSelectedCafe] = useState(null);
   const [mapCenter, setMapCenter] = useState({
     lat: parseFloat(process.env.REACT_APP_DEFAULT_LOCATION_LAT) || 45.0703,
@@ -42,9 +47,7 @@ function MapApp() {
   });
   const [zoom, setZoom] = useState(parseInt(process.env.REACT_APP_DEFAULT_ZOOM) || 15);
   const [searchRadius, setSearchRadius] = useState(1500);
-  
-  // UPDATED: Default to 'cafe' instead of any pub option
-  const [cafeType, setCafeType] = useState('cafe'); // Only cafe or restaurant allowed
+  const [cafeType, setCafeType] = useState('cafe');
   const [showControls, setShowControls] = useState(true);
 
   // Custom hooks
@@ -65,7 +68,141 @@ function MapApp() {
     refetch: refetchCafes
   } = useCafes(mapCenter.lat, mapCenter.lng, searchRadius, cafeType);
 
-  // Update map center when user location is obtained
+  // NEW: Backend health check with retries and progress tracking
+  const checkBackendHealth = async (retryCount = 0) => {
+    try {
+      console.log(`🔍 Checking backend health (attempt ${retryCount + 1})`);
+      setInitializationStep('backend');
+      setInitializationProgress(20 + (retryCount * 10)); // Show progress
+      
+      const healthResult = await healthAPI.checkHealth();
+      console.log('🏥 Backend health result:', healthResult);
+      
+      if (healthResult.success && (healthResult.status === 'OK' || healthResult.status === 'healthy')) {
+        console.log('✅ Backend is healthy and ready');
+        setBackendReady(true);
+        setBackendError(null);
+        setInitializationProgress(50);
+        setInitializationStep('gps');
+        return true;
+      } else {
+        throw new Error(healthResult.error || `Backend status: ${healthResult.status || 'unknown'}`);
+      }
+    } catch (error) {
+      console.error(`❌ Backend health check failed (attempt ${retryCount + 1}):`, error.message);
+      
+      if (retryCount < 6) { // Retry up to 6 times (30 seconds total)
+        const delay = Math.min(2000 + (retryCount * 1000), 8000); // Progressive delay: 2s, 3s, 4s, 5s, 6s, 7s, 8s
+        console.log(`⏳ Retrying backend health check in ${delay}ms...`);
+        
+        setBackendError(`Tentativo ${retryCount + 1}/6 - Riconnessione in ${Math.ceil(delay/1000)}s...`);
+        
+        setTimeout(() => {
+          checkBackendHealth(retryCount + 1);
+        }, delay);
+      } else {
+        console.error('💀 Backend health check failed permanently');
+        setBackendError('Servizio non disponibile. Controlla la connessione internet e riprova.');
+        setBackendReady(false);
+        setInitializationProgress(0);
+      }
+      return false;
+    }
+  };
+
+  // NEW: Enhanced GPS readiness check
+  const checkGPSReadiness = () => {
+    console.log('🎯 Checking GPS readiness...', {
+      hasLocation: !!userLocation,
+      accuracy: userLocation?.accuracy,
+      source: userLocation?.source,
+      loading: locationLoading
+    });
+
+    if (userLocation) {
+      // Check if GPS has good accuracy
+      if (userLocation.accuracy && userLocation.accuracy < 1000) {
+        console.log('✅ GPS is ready with good accuracy:', userLocation.accuracy + 'm');
+        setInitializationStep('ready');
+        setInitializationProgress(100);
+        return true;
+      } 
+      // Accept any GPS location after 15 seconds
+      else if (userLocation.source === 'gps') {
+        console.log('✅ GPS location accepted (lower accuracy):', userLocation.accuracy + 'm');
+        setInitializationStep('ready');
+        setInitializationProgress(100);
+        return true;
+      }
+    }
+    
+    return false;
+  };
+
+  // NEW: Initialize app sequence
+  useEffect(() => {
+    console.log('🚀 Starting app initialization sequence...');
+    setInitializationStep('starting');
+    setInitializationProgress(5);
+    
+    // Small delay to show initial loading
+    const timer = setTimeout(() => {
+      checkBackendHealth();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // NEW: Handle GPS initialization after backend is ready
+  useEffect(() => {
+    if (backendReady && initializationStep === 'gps') {
+      console.log('🎯 Backend ready, initiating GPS location request...');
+      setInitializationProgress(60);
+      
+      if (!locationLoading && !userLocation) {
+        console.log('📍 Requesting GPS location...');
+        requestLocation();
+      }
+    }
+  }, [backendReady, initializationStep, locationLoading, userLocation, requestLocation]);
+
+  // NEW: Monitor GPS progress and readiness
+  useEffect(() => {
+    if (backendReady && initializationStep === 'gps') {
+      if (locationLoading) {
+        setInitializationProgress(70);
+      } else if (userLocation) {
+        setInitializationProgress(90);
+        const isGPSReady = checkGPSReadiness();
+        
+        if (isGPSReady) {
+          console.log('🎉 App fully initialized and ready!');
+        }
+      } else if (locationError) {
+        // GPS failed, but continue with default location
+        console.log('⚠️ GPS failed, continuing with default location');
+        setInitializationStep('ready');
+        setInitializationProgress(100);
+      }
+    }
+  }, [backendReady, userLocation, locationLoading, locationError, initializationStep]);
+
+  // NEW: Auto-proceed if GPS takes too long
+  useEffect(() => {
+    if (backendReady && initializationStep === 'gps') {
+      const timeout = setTimeout(() => {
+        if (initializationStep === 'gps') {
+          console.log('⏰ GPS timeout - proceeding with default location');
+          setInitializationStep('ready');
+          setInitializationProgress(100);
+        }
+      }, 15000); // 15 second timeout
+
+      return () => clearTimeout(timeout);
+    }
+  }, [backendReady, initializationStep]);
+
+  // Existing useEffects with backend ready checks
   useEffect(() => {
     if (userLocation && userLocation.source === 'gps') {
       console.log('📍 Updating map center to user location:', userLocation);
@@ -73,18 +210,17 @@ function MapApp() {
         lat: userLocation.latitude,
         lng: userLocation.longitude
       });
-      setZoom(16); // Zoom in when we have user location
+      setZoom(16);
     }
   }, [userLocation]);
 
-  // Auto-refresh cafes when location changes
   useEffect(() => {
-    if (mapCenter.lat && mapCenter.lng) {
+    if (mapCenter.lat && mapCenter.lng && backendReady && initializationStep === 'ready') {
       refetchCafes();
     }
-  }, [mapCenter, searchRadius, cafeType, refetchCafes]);
+  }, [mapCenter, searchRadius, cafeType, refetchCafes, backendReady, initializationStep]);
 
-  // Check for embed mode (when used as widget)
+  // Check for embed mode
   const isEmbedMode = new URLSearchParams(window.location.search).get('embed') === 'true';
   
   // Handle URL parameters for embedding
@@ -103,7 +239,6 @@ function MapApp() {
       });
     }
 
-    // UPDATED: Only allow cafe or restaurant types
     if (embedType && ['cafe', 'restaurant'].includes(embedType)) {
       setCafeType(embedType);
     }
@@ -117,17 +252,53 @@ function MapApp() {
     }
   }, []);
 
-  // Only show loading screen for initial app load, not location issues
-  if (locationLoading && !userLocation && !isEmbedMode && !mapCenter.lat) {
+  // NEW: Comprehensive loading screen logic
+  if (!backendReady || initializationStep !== 'ready') {
+    let loadingMessage = "Inizializzazione servizio...";
+    let subMessage = "Preparazione dell'esperienza di ricerca locali";
+    
+    switch (initializationStep) {
+      case 'starting':
+        loadingMessage = "Avvio applicazione...";
+        subMessage = "Inizializzazione componenti";
+        break;
+      case 'backend':
+        loadingMessage = "Connessione al servizio...";
+        subMessage = backendError || "Verifica della disponibilità del backend";
+        break;
+      case 'gps':
+        if (locationLoading) {
+          loadingMessage = "Rilevamento posizione GPS...";
+          subMessage = "Attivazione GPS in corso, attendere...";
+        } else if (locationError) {
+          loadingMessage = "GPS non disponibile";
+          subMessage = "Continuando con posizione predefinita...";
+        } else {
+          loadingMessage = "Calibrazione GPS...";
+          subMessage = "Ottenimento posizione accurata...";
+        }
+        break;
+      default:
+        loadingMessage = "Finalizzazione...";
+        subMessage = "Quasi pronto!";
+    }
+
     return (
       <LoadingScreen 
-        message="Inizializzazione mappa caffè e ristoranti..."
-        subMessage="Preparazione del servizio di localizzazione italiana"
+        message={loadingMessage}
+        subMessage={subMessage}
+        progress={initializationProgress}
+        showRetry={!!backendError && initializationStep === 'backend'}
+        onRetry={() => {
+          setBackendError(null);
+          setInitializationProgress(5);
+          checkBackendHealth();
+        }}
       />
     );
   }
 
-  // Handle venue selection (cafe or restaurant only)
+  // Rest of existing component logic (venue selection, etc.)
   const handleCafeSelect = (venue) => {
     setSelectedCafe(venue);
     setMapCenter({
@@ -137,18 +308,15 @@ function MapApp() {
     setZoom(17);
   };
 
-  // Handle map center change (when user drags the map)
   const handleMapCenterChange = (newCenter) => {
     setMapCenter(newCenter);
   };
 
-  // UPDATED: Handle search options change (no pub support)
   const handleSearchChange = (options) => {
     if (options.radius !== undefined) {
       setSearchRadius(options.radius);
     }
     if (options.type !== undefined) {
-      // Validate that type is only cafe or restaurant
       if (['cafe', 'restaurant'].includes(options.type)) {
         setCafeType(options.type);
         setSelectedCafe(null);
@@ -156,12 +324,10 @@ function MapApp() {
     }
   };
 
-  // Handle close popup
   const handleClosePopup = () => {
     setSelectedCafe(null);
   };
 
-  // Better location request handling
   const handleLocationRequest = () => {
     console.log('📍 User requested location');
     clearPermissionDenied();
@@ -198,7 +364,7 @@ function MapApp() {
         locationError={locationError}
       />
 
-      {/* Location Permission Modal - Show on first visit or when permission needed */}
+      {/* Location Permission Modal - Show only if needed and app is ready */}
       {(locationError?.code === 'PERMISSION_DENIED' && !userLocation) && !isEmbedMode && (
         <div className="modal-overlay">
           <div className="modal-card">
@@ -212,7 +378,6 @@ function MapApp() {
                 manualmente spostando la mappa.
               </p>
               
-              {/* Show current status */}
               <div style={{
                 marginTop: '12px',
                 padding: '8px 12px',
@@ -250,8 +415,7 @@ function MapApp() {
         </div>
       )}
 
-      {/* Status indicator for location */}
-      {/* Enhanced Status indicator for location */}
+      {/* Enhanced Status indicator */}
       {!isEmbedMode && (
         <div style={{
           position: 'fixed',
@@ -273,12 +437,14 @@ function MapApp() {
             width: '8px',
             height: '8px',
             borderRadius: '50%',
-            background: userLocation?.source === 'gps' ? '#10B981' : 
-                        userLocation?.source === 'gps_live' ? '#00FF88' :
-                        userLocation?.source === 'ip' ? '#F59E0B' : '#6B7280'
+            background: backendReady ? 
+              (userLocation?.source === 'gps' ? '#10B981' : 
+               userLocation?.source === 'gps_live' ? '#00FF88' :
+               userLocation?.source === 'ip' ? '#F59E0B' : '#6B7280') : '#EF4444'
           }} />
           <span>
-            {userLocation?.source === 'gps' ? '📍 GPS attivo' :
+            {!backendReady ? '🔴 Servizio offline' :
+            userLocation?.source === 'gps' ? '📍 GPS attivo' :
             userLocation?.source === 'gps_live' ? '🎯 GPS live' :
             userLocation?.source === 'ip' ? '🌐 Posizione IP' :
             userLocation?.source === 'cache' ? '💾 Posizione salvata' :

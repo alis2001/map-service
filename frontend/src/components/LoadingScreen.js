@@ -1,41 +1,47 @@
-// components/LoadingScreen.js - Clean Creative Loading
+// components/LoadingScreen.js - ENHANCED VERSION with Progress & Retry
+// Location: /frontend/src/components/LoadingScreen.js
+
 import React, { useState, useEffect } from 'react';
 
 const LoadingScreen = ({ 
   message = "Preparazione esperienza...", 
-  subMessage = "Un momento per favore"
+  subMessage = "Un momento per favore",
+  progress = 0,
+  showRetry = false,
+  onRetry = null
 }) => {
-  const [progress, setProgress] = useState(0);
   const [currentMessage, setCurrentMessage] = useState(0);
+  const [animatedProgress, setAnimatedProgress] = useState(0);
 
   const loadingMessages = [
     "🗺️ Caricamento mappa...",
     "📍 Rilevamento posizione...",
     "☕ Ricerca locale...",
     "🎯 Calibrazione GPS...",
+    "🔗 Connessione servizi...",
     "✨ Finalizzazione..."
   ];
 
-  // Simulate loading progress
+  // Animate progress smoothly
   useEffect(() => {
     const interval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          return 100;
+      setAnimatedProgress(prev => {
+        const diff = progress - prev;
+        if (Math.abs(diff) < 1) {
+          return progress;
         }
-        return prev + Math.random() * 20;
+        return prev + (diff * 0.1); // Smooth animation
       });
-    }, 300);
+    }, 50);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [progress]);
 
   // Cycle through loading messages
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentMessage(prev => (prev + 1) % loadingMessages.length);
-    }, 1800);
+    }, 2000);
 
     return () => clearInterval(interval);
   }, [loadingMessages.length]);
@@ -56,6 +62,7 @@ const LoadingScreen = ({
           </div>
         </div>
 
+        {/* Enhanced Progress Ring with Percentage */}
         <div className="elegant-progress-ring">
           <svg className="progress-svg" viewBox="0 0 120 120">
             <circle
@@ -71,12 +78,13 @@ const LoadingScreen = ({
               r="54"
               style={{
                 strokeDasharray: 2 * Math.PI * 54,
-                strokeDashoffset: 2 * Math.PI * 54 * (1 - progress / 100)
+                strokeDashoffset: 2 * Math.PI * 54 * (1 - animatedProgress / 100),
+                transition: 'stroke-dashoffset 0.3s ease'
               }}
             />
           </svg>
           <div className="progress-text">
-            {Math.round(progress)}%
+            {Math.round(animatedProgress)}%
           </div>
         </div>
 
@@ -87,6 +95,34 @@ const LoadingScreen = ({
             {loadingMessages[currentMessage]}
           </p>
         </div>
+
+        {/* Progress Steps Indicator */}
+        <div className="progress-steps">
+          <div className={`step ${animatedProgress >= 20 ? 'completed' : 'pending'}`}>
+            <div className="step-icon">🔗</div>
+            <div className="step-label">Backend</div>
+          </div>
+          <div className={`step ${animatedProgress >= 60 ? 'completed' : 'pending'}`}>
+            <div className="step-icon">📍</div>
+            <div className="step-label">GPS</div>
+          </div>
+          <div className={`step ${animatedProgress >= 100 ? 'completed' : 'pending'}`}>
+            <div className="step-icon">✅</div>
+            <div className="step-label">Pronto</div>
+          </div>
+        </div>
+
+        {/* Retry Button */}
+        {showRetry && onRetry && (
+          <div className="retry-section">
+            <button 
+              className="retry-button"
+              onClick={onRetry}
+            >
+              🔄 Riprova Connessione
+            </button>
+          </div>
+        )}
 
         <div className="elegant-loading-dots">
           <div className="dot"></div>
@@ -116,33 +152,33 @@ const LoadingScreen = ({
           right: 0;
           bottom: 0;
           background: linear-gradient(135deg, #f8fafc 0%, #ffffff 25%, #e2e8f0 50%, #f1f5f9 75%, #ffffff 100%);
-          background-size: 100% 100%;
-          animation: backgroundShift 12s ease-in-out infinite;
+          background-size: 400% 400%;
+          animation: backgroundShift 8s ease-in-out infinite;
         }
 
         @keyframes backgroundShift {
-          0%, 100% { transform: scale(1) rotate(0deg); }
-          50% { transform: scale(1.02) rotate(0.5deg); }
+          0%, 100% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
         }
 
         .elegant-loading-content {
           text-align: center;
           position: relative;
           z-index: 10;
-          background: rgba(255, 255, 255, 0.85);
+          background: rgba(255, 255, 255, 0.9);
           backdrop-filter: blur(20px);
           padding: 48px 36px;
           border-radius: 24px;
-          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
           border: 1px solid rgba(255, 255, 255, 0.4);
-          max-width: 380px;
+          max-width: 420px;
           width: 90%;
           animation: contentFloat 4s ease-in-out infinite;
         }
 
         @keyframes contentFloat {
           0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-6px); }
+          50% { transform: translateY(-8px); }
         }
 
         .elegant-loading-animation {
@@ -164,7 +200,7 @@ const LoadingScreen = ({
         .ring {
           position: absolute;
           border-radius: 50%;
-          border: 2px solid;
+          border: 3px solid;
           border-color: transparent;
           border-top-color: #6366f1;
         }
@@ -221,15 +257,31 @@ const LoadingScreen = ({
         .progress-bg {
           fill: none;
           stroke: rgba(99, 102, 241, 0.1);
-          stroke-width: 3;
+          stroke-width: 4;
         }
 
         .progress-fill {
           fill: none;
-          stroke: #6366f1;
-          stroke-width: 3;
+          stroke: url(#progressGradient);
+          stroke-width: 4;
           stroke-linecap: round;
-          transition: stroke-dashoffset 0.3s ease;
+        }
+
+        .progress-svg::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+        }
+
+        .progress-svg defs {
+          position: absolute;
+        }
+
+        .progress-fill {
+          stroke: #6366f1;
         }
 
         .progress-text {
@@ -237,9 +289,13 @@ const LoadingScreen = ({
           top: 50%;
           left: 50%;
           transform: translate(-50%, -50%);
-          font-size: 16px;
-          font-weight: 600;
+          font-size: 18px;
+          font-weight: 700;
           color: #374151;
+          background: linear-gradient(135deg, #6366f1, #8b5cf6);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
         }
 
         .elegant-loading-text {
@@ -247,8 +303,8 @@ const LoadingScreen = ({
         }
 
         .main-message {
-          font-size: 22px;
-          font-weight: 600;
+          font-size: 24px;
+          font-weight: 700;
           color: #1f2937;
           margin-bottom: 8px;
           background: linear-gradient(135deg, #6366f1, #8b5cf6, #ec4899);
@@ -262,6 +318,7 @@ const LoadingScreen = ({
           color: #6b7280;
           margin-bottom: 16px;
           font-weight: 400;
+          line-height: 1.4;
         }
 
         .dynamic-message {
@@ -275,6 +332,101 @@ const LoadingScreen = ({
         @keyframes messageGlow {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.6; }
+        }
+
+        /* Progress Steps */
+        .progress-steps {
+          display: flex;
+          justify-content: center;
+          gap: 24px;
+          margin-bottom: 24px;
+          padding: 16px;
+          background: rgba(255, 255, 255, 0.6);
+          border-radius: 16px;
+          border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .step {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 6px;
+          transition: all 0.3s ease;
+        }
+
+        .step-icon {
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 16px;
+          transition: all 0.3s ease;
+          border: 2px solid transparent;
+        }
+
+        .step.pending .step-icon {
+          background: rgba(107, 114, 128, 0.1);
+          color: #9CA3AF;
+          border-color: rgba(107, 114, 128, 0.2);
+        }
+
+        .step.completed .step-icon {
+          background: linear-gradient(135deg, #10B981, #059669);
+          color: white;
+          border-color: #10B981;
+          box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+          animation: stepCompleted 0.5s ease;
+        }
+
+        @keyframes stepCompleted {
+          0% { transform: scale(0.8); }
+          50% { transform: scale(1.2); }
+          100% { transform: scale(1); }
+        }
+
+        .step-label {
+          font-size: 11px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          transition: color 0.3s ease;
+        }
+
+        .step.pending .step-label {
+          color: #9CA3AF;
+        }
+
+        .step.completed .step-label {
+          color: #10B981;
+        }
+
+        /* Retry Section */
+        .retry-section {
+          margin-bottom: 20px;
+        }
+
+        .retry-button {
+          background: linear-gradient(135deg, #EF4444, #DC2626);
+          color: white;
+          border: none;
+          padding: 12px 24px;
+          border-radius: 12px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+        }
+
+        .retry-button:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+        }
+
+        .retry-button:active {
+          transform: translateY(0);
         }
 
         .elegant-loading-dots {
@@ -307,6 +459,33 @@ const LoadingScreen = ({
           40% {
             transform: scale(1.2);
             opacity: 1;
+          }
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 480px) {
+          .elegant-loading-content {
+            padding: 32px 24px;
+            margin: 16px;
+            max-width: calc(100% - 32px);
+          }
+
+          .main-message {
+            font-size: 20px;
+          }
+
+          .progress-steps {
+            gap: 16px;
+          }
+
+          .step-icon {
+            width: 28px;
+            height: 28px;
+            font-size: 14px;
+          }
+
+          .step-label {
+            font-size: 10px;
           }
         }
       `}</style>

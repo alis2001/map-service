@@ -1,4 +1,4 @@
-// services/apiService.js - UPDATED VERSION - No Pub Support
+// services/apiService.js - UPDATED VERSION with Enhanced Health Checking
 // Location: /map-service/frontend/src/services/apiService.js
 
 import axios from 'axios';
@@ -6,7 +6,7 @@ import axios from 'axios';
 // Create axios instance with base configuration
 const api = axios.create({
   baseURL: process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001',
-  timeout: 10000,
+  timeout: 15000, // Increased timeout for health checks
   headers: {
     'Content-Type': 'application/json',
   },
@@ -20,7 +20,8 @@ api.interceptors.request.use(
         method: config.method?.toUpperCase(),
         url: config.url,
         params: config.params,
-        data: config.data
+        data: config.data,
+        timeout: config.timeout
       });
     }
     return config;
@@ -38,7 +39,8 @@ api.interceptors.response.use(
       console.log('✅ API Response:', {
         status: response.status,
         data: response.data,
-        url: response.config.url
+        url: response.config.url,
+        duration: response.config.metadata?.endTime - response.config.metadata?.startTime
       });
     }
     return response;
@@ -48,10 +50,19 @@ api.interceptors.response.use(
       message: error.message,
       status: error.response?.status,
       data: error.response?.data,
-      url: error.config?.url
+      url: error.config?.url,
+      timeout: error.code === 'ECONNABORTED'
     });
 
-    // Handle specific error cases
+    // Handle specific error cases with Italian messages
+    if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+      throw new Error('Timeout di connessione. Il servizio potrebbe essere sovraccarico.');
+    }
+    
+    if (error.code === 'NETWORK_ERROR' || error.message.includes('Network Error')) {
+      throw new Error('Errore di rete. Controlla la connessione internet.');
+    }
+    
     if (error.response?.status === 503) {
       throw new Error('Il servizio mappa non è disponibile. Riprova più tardi.');
     }
@@ -64,10 +75,6 @@ api.interceptors.response.use(
       throw new Error('Errore del server. Riprova più tardi.');
     }
     
-    if (error.code === 'ECONNABORTED') {
-      throw new Error('Richiesta scaduta. Controlla la connessione internet.');
-    }
-    
     if (!error.response) {
       throw new Error('Impossibile connettersi al servizio mappa.');
     }
@@ -76,9 +83,29 @@ api.interceptors.response.use(
   }
 );
 
+// Add request timing
+api.interceptors.request.use((config) => {
+  config.metadata = { startTime: new Date().getTime() };
+  return config;
+});
+
+api.interceptors.response.use(
+  (response) => {
+    response.config.metadata.endTime = new Date().getTime();
+    return response;
+  },
+  (error) => {
+    if (error.config) {
+      error.config.metadata = error.config.metadata || {};
+      error.config.metadata.endTime = new Date().getTime();
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Places API functions
 export const placesAPI = {
-  // UPDATED: Get nearby Italian venues (cafes/restaurants only)
+  // Get nearby Italian venues (cafes/restaurants only)
   async getNearbyPlaces(latitude, longitude, options = {}) {
     try {
       const params = {
@@ -89,7 +116,7 @@ export const placesAPI = {
         limit: options.limit || 20
       };
 
-      // UPDATED: Validate type to ensure no pub requests
+      // Validate type to ensure no pub requests
       if (!['cafe', 'restaurant'].includes(params.type)) {
         console.warn(`Invalid place type "${params.type}", defaulting to cafe`);
         params.type = 'cafe';
@@ -158,10 +185,10 @@ export const placesAPI = {
     }
   },
 
-  // UPDATED: Get popular Italian venues by type (no pub support)
+  // Get popular Italian venues by type (no pub support)
   async getPopularPlaces(type = 'cafe', options = {}) {
     try {
-      // UPDATED: Validate type to ensure no pub requests
+      // Validate type to ensure no pub requests
       const validType = ['cafe', 'restaurant'].includes(type) ? type : 'cafe';
       
       const params = {
@@ -192,7 +219,7 @@ export const placesAPI = {
   // Batch search multiple locations
   async batchSearch(locations) {
     try {
-      // UPDATED: Validate all location types
+      // Validate all location types
       const validatedLocations = locations.map(location => ({
         ...location,
         type: ['cafe', 'restaurant'].includes(location.type) ? location.type : 'cafe'
@@ -216,7 +243,7 @@ export const placesAPI = {
   // Get places within geographic bounds
   async getPlacesWithinBounds(bounds, options = {}) {
     try {
-      // UPDATED: Validate type
+      // Validate type
       const validType = ['cafe', 'restaurant'].includes(options.type) ? options.type : 'cafe';
       
       const params = {
@@ -262,21 +289,89 @@ export const placesAPI = {
   }
 };
 
-// Health check function
+// Enhanced Health check functions
 export const healthAPI = {
+  // Main health check with comprehensive testing
   async checkHealth() {
     try {
-      const response = await api.get('/health');
+      console.log('🏥 Starting comprehensive health check...');
+      const startTime = Date.now();
+      
+      // Test basic connectivity first
+      const response = await api.get('/health', {
+        timeout: 10000, // 10 second timeout for health check
+        validateStatus: (status) => status < 500 // Accept any status below 500
+      });
+      
+      const duration = Date.now() - startTime;
+      console.log(`🏥 Health check completed in ${duration}ms`);
+      
+      const healthData = response.data;
+      
+      // Determine if the service is actually healthy
+      const isHealthy = response.status === 200 && 
+                       (healthData.status === 'OK' || 
+                        healthData.status === 'healthy' || 
+                        healthData.status === 'DEGRADED'); // Accept degraded as working
+      
+      return {
+        success: isHealthy,
+        status: healthData.status || 'unknown',
+        services: healthData.services || {},
+        timestamp: healthData.timestamp || new Date().toISOString(),
+        uptime: healthData.uptime || 0,
+        version: healthData.version || 'unknown',
+        responseTime: duration,
+        rawResponse: healthData
+      };
+    } catch (error) {
+      console.error('🏥 Health check failed:', error);
+      
+      // Distinguish between different types of failures
+      let errorType = 'unknown';
+      let errorMessage = error.message;
+      
+      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        errorType = 'timeout';
+        errorMessage = 'Health check timeout - service may be starting up';
+      } else if (error.code === 'ECONNREFUSED') {
+        errorType = 'connection_refused';
+        errorMessage = 'Connection refused - service may be down';
+      } else if (error.code === 'NETWORK_ERROR') {
+        errorType = 'network_error';
+        errorMessage = 'Network error - check internet connection';
+      } else if (error.response?.status >= 500) {
+        errorType = 'server_error';
+        errorMessage = `Server error: ${error.response.status}`;
+      }
+      
+      return {
+        success: false,
+        error: errorMessage,
+        errorType: errorType,
+        timestamp: new Date().toISOString(),
+        responseTime: null,
+        status: 'unhealthy'
+      };
+    }
+  },
+
+  // Places service specific health check
+  async checkPlacesService() {
+    try {
+      console.log('🏥 Checking places service health...');
+      const response = await api.get('/api/v1/places/health', {
+        timeout: 8000
+      });
       
       return {
         success: true,
-        status: response.data.status,
+        status: response.data.status || 'healthy',
         services: response.data.services || {},
-        timestamp: response.data.timestamp,
-        uptime: response.data.uptime
+        timestamp: response.data.timestamp || new Date().toISOString()
       };
     } catch (error) {
-      console.error('Health check failed:', error);
+      console.error('🏥 Places service health check failed:', error);
       return {
         success: false,
         error: error.message,
@@ -285,24 +380,58 @@ export const healthAPI = {
     }
   },
 
-  async checkPlacesService() {
+  // Quick ping test
+  async quickPing() {
     try {
-      const response = await api.get('/api/v1/places/health');
+      const startTime = Date.now();
+      const response = await api.get('/', {
+        timeout: 5000
+      });
+      const duration = Date.now() - startTime;
       
       return {
         success: true,
-        status: response.data.status,
-        services: response.data.services || {},
-        timestamp: response.data.timestamp
+        responseTime: duration,
+        status: response.status
       };
     } catch (error) {
-      console.error('Places service health check failed:', error);
       return {
         success: false,
         error: error.message,
-        timestamp: new Date().toISOString()
+        responseTime: null
       };
     }
+  },
+
+  // Wait for service to be ready
+  async waitForReady(maxAttempts = 10, delayMs = 2000) {
+    console.log(`🏥 Waiting for service to be ready (max ${maxAttempts} attempts)...`);
+    
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        console.log(`🏥 Health check attempt ${attempt}/${maxAttempts}`);
+        const health = await this.checkHealth();
+        
+        if (health.success) {
+          console.log(`✅ Service is ready after ${attempt} attempts`);
+          return health;
+        }
+        
+        if (attempt < maxAttempts) {
+          console.log(`⏳ Service not ready, waiting ${delayMs}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+          delayMs = Math.min(delayMs * 1.2, 8000); // Progressive delay with max 8s
+        }
+      } catch (error) {
+        console.error(`❌ Health check attempt ${attempt} failed:`, error.message);
+        
+        if (attempt < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+      }
+    }
+    
+    throw new Error(`Service failed to become ready after ${maxAttempts} attempts`);
   }
 };
 
@@ -360,14 +489,13 @@ export const apiUtils = {
     }
   },
 
-  // UPDATED: Get Italian venue type emoji (no pub support)
+  // Get Italian venue type emoji (no pub support)
   getTypeEmoji(type) {
     const typeEmojis = {
       cafe: '☕',        // Italian cafeterias/bars
       restaurant: '🍽️', // Restaurants
       bakery: '🥐',     // Bakeries
       default: '📍'     // Default
-      // REMOVED: pub/bar emojis
     };
     
     return typeEmojis[type] || typeEmojis.default;
@@ -386,7 +514,7 @@ export const apiUtils = {
            '☆'.repeat(emptyStars);
   },
 
-  // UPDATED: Get Italian venue display name (no pub support)
+  // Get Italian venue display name (no pub support)
   getItalianVenueDisplayName(type) {
     switch (type) {
       case 'cafe': return 'Bar/Caffetteria';
@@ -395,7 +523,7 @@ export const apiUtils = {
     }
   },
 
-  // UPDATED: Validate Italian venue type (no pub support)
+  // Validate Italian venue type (no pub support)
   isValidItalianVenueType(type) {
     return ['cafe', 'restaurant'].includes(type);
   },
