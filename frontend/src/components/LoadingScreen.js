@@ -1,20 +1,22 @@
-// components/LoadingScreen.js
+// components/LoadingScreen.js - Italian Coffee Theme
 // Location: /map-service/frontend/src/components/LoadingScreen.js
 
 import React, { useState, useEffect } from 'react';
 
 const LoadingScreen = ({ 
-  message = "Caricamento...", 
-  subMessage = "Un momento per favore" 
+  message = "Inizializzazione mappa caffè...", 
+  subMessage = "Preparazione servizio locali italiani" 
 }) => {
   const [progress, setProgress] = useState(0);
   const [currentMessage, setCurrentMessage] = useState(0);
 
   const loadingMessages = [
-    "🗺️ Inizializzazione mappa...",
-    "📍 Rilevamento posizione...",
-    "☕ Ricerca caffè nelle vicinanze...",
-    "✨ Preparazione interfaccia..."
+    "🗺️ Inizializzazione mappa italiana...",
+    "📍 Rilevamento posizione GPS...",
+    "☕ Ricerca caffè e bar nelle vicinanze...",
+    "🍽️ Caricamento ristoranti selezionati...",
+    "⚡ Attivazione localizzazione precisa...",
+    "✨ Preparazione interfaccia italiana..."
   ];
 
   // Simulate loading progress
@@ -46,19 +48,26 @@ const LoadingScreen = ({
       <div className="loading-background" />
       
       <div className="loading-content">
-        {/* Main Loading Animation */}
+        {/* Main Loading Animation - Italian Coffee Theme */}
         <div className="loading-animation">
-          <div className="coffee-cup">
-            ☕
+          <div className="coffee-steam-container">
+            <div className="coffee-cup">
+              ☕
+            </div>
+            <div className="steam">
+              <div className="steam-line"></div>
+              <div className="steam-line"></div>
+              <div className="steam-line"></div>
+            </div>
           </div>
-          <div className="steam">
-            <div className="steam-line"></div>
-            <div className="steam-line"></div>
-            <div className="steam-line"></div>
+          
+          {/* Lightning bolt for GPS */}
+          <div className="lightning-indicator">
+            ⚡
           </div>
         </div>
 
-        {/* Progress Ring */}
+        {/* Progress Ring with Italian Colors */}
         <div className="progress-ring">
           <svg className="progress-svg" viewBox="0 0 120 120">
             <circle
@@ -92,19 +101,26 @@ const LoadingScreen = ({
           </p>
         </div>
 
-        {/* Loading Dots */}
+        {/* Italian Loading Dots */}
         <div className="loading-dots">
           <div className="dot"></div>
           <div className="dot"></div>
           <div className="dot"></div>
         </div>
 
-        {/* Brand Info */}
+        {/* Brand Info with Italian Theme */}
         <div className="brand-info">
-          <div className="brand-logo">🗺️</div>
+          <div className="brand-logo">
+            <div className="logo-coffee">☕</div>
+            <div className="logo-lightning">⚡</div>
+          </div>
           <div className="brand-text">
             <strong>CoffeeFinder Map</strong>
-            <span>Trova i migliori caffè nelle vicinanze</span>
+            <span>Scopri i migliori locali italiani nelle vicinanze</span>
+            <div className="features">
+              <span>🇮🇹 Solo locali selezionati</span>
+              <span>📍 GPS preciso</span>
+            </div>
           </div>
         </div>
       </div>
@@ -130,10 +146,10 @@ const LoadingScreen = ({
           right: 0;
           bottom: 0;
           background: 
-            radial-gradient(circle at 20% 20%, rgba(102, 126, 234, 0.4) 0%, transparent 50%),
-            radial-gradient(circle at 80% 80%, rgba(240, 147, 251, 0.4) 0%, transparent 50%),
-            radial-gradient(circle at 40% 60%, rgba(75, 172, 254, 0.3) 0%, transparent 50%),
-            linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            radial-gradient(circle at 20% 20%, rgba(111, 78, 55, 0.4) 0%, transparent 50%),
+            radial-gradient(circle at 80% 80%, rgba(222, 184, 135, 0.4) 0%, transparent 50%),
+            radial-gradient(circle at 40% 60%, rgba(206, 43, 55, 0.3) 0%, transparent 50%),
+            linear-gradient(135deg, #F5F5DC 0%, #FFFFFF 100%);
           background-size: 100% 100%;
           animation: backgroundFloat 8s ease-in-out infinite;
         }
@@ -147,15 +163,31 @@ const LoadingScreen = ({
           text-align: center;
           position: relative;
           z-index: 10;
-          background: rgba(255, 255, 255, 0.95);
+          background: linear-gradient(135deg, rgba(245, 245, 220, 0.95) 0%, rgba(255, 255, 255, 0.9) 100%);
           backdrop-filter: blur(20px);
           padding: 48px 32px;
           border-radius: 32px;
-          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
-          border: 1px solid rgba(255, 255, 255, 0.3);
-          max-width: 400px;
+          box-shadow: 
+            0 20px 40px rgba(111, 78, 55, 0.15),
+            0 0 0 2px rgba(222, 184, 135, 0.3);
+          border: 2px solid rgba(222, 184, 135, 0.4);
+          max-width: 420px;
           width: 90%;
           animation: contentFloat 3s ease-in-out infinite;
+          position: relative;
+        }
+
+        /* Italian flag accent */
+        .loading-content::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 4px;
+          background: linear-gradient(90deg, #009246 0%, #FFFFFF 50%, #CE2B37 100%);
+          border-radius: 32px 32px 0 0;
+          z-index: 1;
         }
 
         @keyframes contentFloat {
@@ -169,12 +201,20 @@ const LoadingScreen = ({
           display: flex;
           align-items: center;
           justify-content: center;
+          gap: 20px;
+        }
+
+        .coffee-steam-container {
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
 
         .coffee-cup {
           font-size: 64px;
           animation: coffeeWiggle 2s ease-in-out infinite;
-          filter: drop-shadow(0 8px 16px rgba(102, 126, 234, 0.3));
+          filter: drop-shadow(0 8px 16px rgba(111, 78, 55, 0.3));
         }
 
         @keyframes coffeeWiggle {
@@ -194,7 +234,7 @@ const LoadingScreen = ({
         .steam-line {
           width: 2px;
           height: 20px;
-          background: linear-gradient(to top, rgba(102, 126, 234, 0.6), transparent);
+          background: linear-gradient(to top, rgba(111, 78, 55, 0.6), transparent);
           border-radius: 1px;
           animation: steamRise 1.5s ease-in-out infinite;
         }
@@ -222,6 +262,23 @@ const LoadingScreen = ({
           }
         }
 
+        .lightning-indicator {
+          font-size: 48px;
+          animation: lightningPulse 2s ease-in-out infinite;
+          filter: drop-shadow(0 0 16px rgba(255, 215, 0, 0.6));
+        }
+
+        @keyframes lightningPulse {
+          0%, 100% { 
+            opacity: 0.8; 
+            transform: scale(1) rotate(0deg);
+          }
+          50% { 
+            opacity: 1; 
+            transform: scale(1.2) rotate(5deg);
+          }
+        }
+
         .progress-ring {
           position: relative;
           width: 120px;
@@ -237,13 +294,13 @@ const LoadingScreen = ({
 
         .progress-bg {
           fill: none;
-          stroke: rgba(102, 126, 234, 0.1);
+          stroke: rgba(222, 184, 135, 0.2);
           stroke-width: 4;
         }
 
         .progress-fill {
           fill: none;
-          stroke: url(#progressGradient);
+          stroke: url(#italianProgressGradient);
           stroke-width: 4;
           stroke-linecap: round;
           transition: stroke-dashoffset 0.3s ease;
@@ -256,7 +313,8 @@ const LoadingScreen = ({
           transform: translate(-50%, -50%);
           font-size: 18px;
           font-weight: 700;
-          color: #4F46E5;
+          color: #6F4E37;
+          text-shadow: 0 1px 2px rgba(255,255,255,0.5);
         }
 
         .loading-text {
@@ -266,24 +324,25 @@ const LoadingScreen = ({
         .main-message {
           font-size: 24px;
           font-weight: 700;
-          color: #1F2937;
+          color: #3C2415;
           margin-bottom: 8px;
-          background: linear-gradient(135deg, #4F46E5, #7C3AED);
+          background: linear-gradient(135deg, #6F4E37, #CE2B37);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
+          text-shadow: 0 1px 2px rgba(255,255,255,0.5);
         }
 
         .sub-message {
           font-size: 16px;
-          color: #6B7280;
+          color: #8B7355;
           margin-bottom: 16px;
           font-weight: 500;
         }
 
         .dynamic-message {
           font-size: 14px;
-          color: #4F46E5;
+          color: #6F4E37;
           font-weight: 600;
           height: 20px;
           animation: messageGlow 2s ease-in-out infinite;
@@ -305,8 +364,9 @@ const LoadingScreen = ({
           width: 12px;
           height: 12px;
           border-radius: 50%;
-          background: linear-gradient(135deg, #4F46E5, #7C3AED);
+          background: linear-gradient(135deg, #6F4E37, #CE2B37);
           animation: dotBounce 1.4s ease-in-out infinite;
+          box-shadow: 0 2px 4px rgba(111, 78, 55, 0.3);
         }
 
         .dot:nth-child(2) {
@@ -332,19 +392,39 @@ const LoadingScreen = ({
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 12px;
+          gap: 16px;
           padding-top: 24px;
-          border-top: 1px solid rgba(0, 0, 0, 0.1);
+          border-top: 2px solid rgba(222, 184, 135, 0.3);
         }
 
         .brand-logo {
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .logo-coffee {
           font-size: 32px;
           animation: logoRotate 4s linear infinite;
+        }
+
+        .logo-lightning {
+          position: absolute;
+          top: -8px;
+          right: -8px;
+          font-size: 16px;
+          animation: lightningFlash 2s ease-in-out infinite;
         }
 
         @keyframes logoRotate {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
+        }
+
+        @keyframes lightningFlash {
+          0%, 80%, 100% { opacity: 0.3; }
+          10%, 70% { opacity: 1; }
         }
 
         .brand-text {
@@ -353,16 +433,31 @@ const LoadingScreen = ({
 
         .brand-text strong {
           display: block;
-          font-size: 16px;
+          font-size: 18px;
           font-weight: 700;
-          color: #1F2937;
-          margin-bottom: 2px;
+          color: #3C2415;
+          margin-bottom: 4px;
+          text-shadow: 0 1px 2px rgba(255,255,255,0.5);
         }
 
         .brand-text span {
-          font-size: 12px;
-          color: #6B7280;
+          display: block;
+          font-size: 13px;
+          color: #6F4E37;
           font-weight: 500;
+          margin-bottom: 8px;
+        }
+
+        .features {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+
+        .features span {
+          font-size: 11px;
+          color: #8B7355;
+          font-weight: 600;
         }
 
         /* Mobile Responsive */
@@ -376,6 +471,10 @@ const LoadingScreen = ({
             font-size: 48px;
           }
 
+          .lightning-indicator {
+            font-size: 36px;
+          }
+
           .main-message {
             font-size: 20px;
           }
@@ -387,22 +486,29 @@ const LoadingScreen = ({
 
           .brand-info {
             flex-direction: column;
-            gap: 8px;
+            gap: 12px;
             text-align: center;
           }
 
           .brand-text {
             text-align: center;
           }
+
+          .features {
+            flex-direction: row;
+            justify-content: center;
+            gap: 16px;
+          }
         }
       `}</style>
 
-      {/* SVG Gradient Definition */}
+      {/* SVG Gradient Definition for Italian Theme */}
       <svg style={{ position: 'absolute', width: 0, height: 0 }}>
         <defs>
-          <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#4F46E5" />
-            <stop offset="100%" stopColor="#7C3AED" />
+          <linearGradient id="italianProgressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#009246" />
+            <stop offset="50%" stopColor="#6F4E37" />
+            <stop offset="100%" stopColor="#CE2B37" />
           </linearGradient>
         </defs>
       </svg>
