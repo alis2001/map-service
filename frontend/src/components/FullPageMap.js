@@ -40,6 +40,8 @@ const FullPageMap = ({
   const [googleMapsReady, setGoogleMapsReady] = useState(false);
   const [googleMapsError, setGoogleMapsError] = useState(null);
   const [loadingProgress, setLoadingProgress] = useState(0);
+  const [markersLoaded, setMarkersLoaded] = useState(false);
+  const [markersLoading, setMarkersLoading] = useState(false);
   
   // Smart movement detection
   const lastSearchLocationRef = useRef(null);
@@ -609,21 +611,25 @@ const FullPageMap = ({
         createWWDCLocationButton();
 
         console.log('✅ WWDC-style Google Map loaded successfully');
-        setMapLoaded(true);
+        
+        // FIX: Ensure these states are set properly
+        setMapLoaded(true);           // ← This is critical
         setMapError(null);
         setMapInitialized(true);
-        setLoadingProgress(100);
+        setLoadingProgress(100);      // ← This too
         
         lastSearchLocationRef.current = { lat: center.lat, lng: center.lng };
 
       } catch (error) {
         console.error('❌ Failed to initialize WWDC-style Google Map:', error);
         setMapError('Failed to initialize map: ' + error.message);
+        setMapLoaded(false);          // ← Ensure loading stops on error
+        setLoadingProgress(100);      // ← Stop progress animation
       }
     };
 
     initMap();
-  }, [mapInitialized, center.lat, center.lng, zoom, isEmbedMode, checkGoogleMapsAvailability, debouncedCenterChange, selectedCafe, onClosePopup, createWWDCLocationButton, shouldTriggerNewSearch]);
+  }, [mapInitialized]);
 
   // Update map center only for external changes
   useEffect(() => {
@@ -779,10 +785,15 @@ const FullPageMap = ({
   }, [userLocation, searchRadius, mapLoaded]);
 
   // ENHANCED: WWDC-style venue markers
+  // ENHANCED: WWDC-style venue markers with loading tracking
   useEffect(() => {
     if (!googleMapRef.current || !mapLoaded) return;
 
     console.log('☕ Updating WWDC-style venue markers:', cafes.length);
+
+    // Start markers loading
+    setMarkersLoading(true);
+    setMarkersLoaded(false);
 
     // Clear existing markers efficiently
     markersRef.current.forEach(marker => {
@@ -790,95 +801,123 @@ const FullPageMap = ({
     });
     markersRef.current.clear();
 
+    // If no cafes, mark as loaded immediately
+    if (cafes.length === 0) {
+      setMarkersLoading(false);
+      setMarkersLoaded(true);
+      return;
+    }
+
     // Create new markers for venues
     const bounds = new window.google.maps.LatLngBounds();
     let markersAdded = 0;
     
-    cafes.forEach((cafe, index) => {
-      if (!cafe.location || !cafe.location.latitude || !cafe.location.longitude) {
-        console.warn('Skipping cafe with invalid location:', cafe.name);
-        return;
+    // Process markers in batches for better performance
+    const processBatch = (startIndex) => {
+      const batchSize = 5; // Process 5 markers at a time
+      const endIndex = Math.min(startIndex + batchSize, cafes.length);
+      
+      for (let i = startIndex; i < endIndex; i++) {
+        const cafe = cafes[i];
+        
+        if (!cafe.location || !cafe.location.latitude || !cafe.location.longitude) {
+          console.warn('Skipping cafe with invalid location:', cafe.name);
+          continue;
+        }
+
+        const position = {
+          lat: cafe.location.latitude,
+          lng: cafe.location.longitude
+        };
+
+        // WWDC-style venue markers (your existing marker creation code)
+        const markerSVG = `
+          <svg width="36" height="44" viewBox="0 0 36 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <filter id="wwdcVenueFilter${i}" x="-50%" y="-50%" width="200%" height="200%">
+                <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.3)"/>
+              </filter>
+              <linearGradient id="wwdcVenueGradient${i}" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" style="stop-color:${getWWDCVenueColor(cafe)};stop-opacity:1" />
+                <stop offset="100%" style="stop-color:${getWWDCVenueColorSecondary(cafe)};stop-opacity:1" />
+              </linearGradient>
+            </defs>
+            
+            <!-- Pin shadow -->
+            <ellipse cx="18" cy="41" rx="10" ry="3" fill="rgba(0,0,0,0.2)"/>
+            
+            <!-- Main pin shape with WWDC gradient -->
+            <path d="M18 0C8.059 0 0 8.059 0 18C0 28 18 44 18 44S36 28 36 18C36 8.059 27.941 0 18 0Z" 
+                  fill="url(#wwdcVenueGradient${i})" 
+                  filter="url(#wwdcVenueFilter${i})"/>
+            
+            <!-- Inner circle with glassmorphism -->
+            <circle cx="18" cy="18" r="12" fill="rgba(255,255,255,0.15)" 
+                    stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
+            
+            <!-- Venue icon -->
+            <text x="18" y="23" text-anchor="middle" font-size="16" fill="white" font-weight="600">
+              ${getVenueEmoji(cafe)}
+            </text>
+            
+            <!-- Distance pulse for very close venues -->
+            ${cafe.distance && cafe.distance < 200 ? `
+              <circle cx="18" cy="18" r="15" fill="none" stroke="#00FF88" stroke-width="2" opacity="0.8">
+                <animate attributeName="r" values="12;18;12" dur="2s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0.8;0.3;0.8" dur="2s" repeatCount="indefinite"/>
+              </circle>
+            ` : ''}
+            
+            <!-- WWDC-style rating badge -->
+            ${cafe.rating && cafe.rating >= 4.5 ? `
+              <circle cx="28" cy="8" r="6" fill="url(#wwdcVenueGradient${i})" stroke="white" stroke-width="2"/>
+              <text x="28" y="11" text-anchor="middle" font-size="8" fill="white" font-weight="bold">★</text>
+            ` : ''}
+          </svg>
+        `;
+
+        const marker = new window.google.maps.Marker({
+          position: position,
+          map: googleMapRef.current,
+          title: `${cafe.emoji || getVenueEmoji(cafe)} ${cafe.name}${cafe.rating ? ` (${cafe.rating}⭐)` : ''}${cafe.distance ? ` - ${cafe.formattedDistance}` : ''}`,
+          icon: {
+            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(markerSVG),
+            scaledSize: new window.google.maps.Size(36, 44),
+            anchor: new window.google.maps.Point(18, 44)
+          },
+          zIndex: cafe.distance ? Math.round(1000 - cafe.distance / 10) : 500,
+          animation: cafe.distance && cafe.distance < 200 ? 
+            window.google.maps.Animation.BOUNCE : null,
+          optimized: false
+        });
+
+        // Add click listener
+        marker.addListener('click', () => {
+          if (onCafeSelect) {
+            onCafeSelect(cafe);
+          }
+        });
+
+        bounds.extend(position);
+        markersRef.current.set(cafe.id || cafe.googlePlaceId, marker);
+        markersAdded++;
       }
 
-      const position = {
-        lat: cafe.location.latitude,
-        lng: cafe.location.longitude
-      };
+      // Process next batch or finish
+      if (endIndex < cafes.length) {
+        // Process next batch after a small delay for smooth loading
+        setTimeout(() => processBatch(endIndex), 50);
+      } else {
+        // All markers processed
+        console.log('✅ WWDC-style venue markers updated:', markersAdded);
+        setMarkersLoading(false);
+        setMarkersLoaded(true);
+      }
+    };
 
-      // WWDC-style venue markers
-      const markerSVG = `
-        <svg width="36" height="44" viewBox="0 0 36 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <filter id="wwdcVenueFilter${index}" x="-50%" y="-50%" width="200%" height="200%">
-              <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.3)"/>
-            </filter>
-            <linearGradient id="wwdcVenueGradient${index}" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" style="stop-color:${getWWDCVenueColor(cafe)};stop-opacity:1" />
-              <stop offset="100%" style="stop-color:${getWWDCVenueColorSecondary(cafe)};stop-opacity:1" />
-            </linearGradient>
-          </defs>
-          
-          <!-- Pin shadow -->
-          <ellipse cx="18" cy="41" rx="10" ry="3" fill="rgba(0,0,0,0.2)"/>
-          
-          <!-- Main pin shape with WWDC gradient -->
-          <path d="M18 0C8.059 0 0 8.059 0 18C0 28 18 44 18 44S36 28 36 18C36 8.059 27.941 0 18 0Z" 
-                fill="url(#wwdcVenueGradient${index})" 
-                filter="url(#wwdcVenueFilter${index})"/>
-          
-          <!-- Inner circle with glassmorphism -->
-          <circle cx="18" cy="18" r="12" fill="rgba(255,255,255,0.15)" 
-                  stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
-          
-          <!-- Venue icon -->
-          <text x="18" y="23" text-anchor="middle" font-size="16" fill="white" font-weight="600">
-            ${getVenueEmoji(cafe)}
-          </text>
-          
-          <!-- Distance pulse for very close venues -->
-          ${cafe.distance && cafe.distance < 200 ? `
-            <circle cx="18" cy="18" r="15" fill="none" stroke="#00FF88" stroke-width="2" opacity="0.8">
-              <animate attributeName="r" values="12;18;12" dur="2s" repeatCount="indefinite"/>
-              <animate attributeName="opacity" values="0.8;0.3;0.8" dur="2s" repeatCount="indefinite"/>
-            </circle>
-          ` : ''}
-          
-          <!-- WWDC-style rating badge -->
-          ${cafe.rating && cafe.rating >= 4.5 ? `
-            <circle cx="28" cy="8" r="6" fill="url(#wwdcVenueGradient${index})" stroke="white" stroke-width="2"/>
-            <text x="28" y="11" text-anchor="middle" font-size="8" fill="white" font-weight="bold">★</text>
-          ` : ''}
-        </svg>
-      `;
+    // Start processing markers
+    processBatch(0);
 
-      const marker = new window.google.maps.Marker({
-        position: position,
-        map: googleMapRef.current,
-        title: `${cafe.emoji || getVenueEmoji(cafe)} ${cafe.name}${cafe.rating ? ` (${cafe.rating}⭐)` : ''}${cafe.distance ? ` - ${cafe.formattedDistance}` : ''}`,
-        icon: {
-          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(markerSVG),
-          scaledSize: new window.google.maps.Size(36, 44),
-          anchor: new window.google.maps.Point(18, 44)
-        },
-        zIndex: cafe.distance ? Math.round(1000 - cafe.distance / 10) : 500,
-        animation: cafe.distance && cafe.distance < 200 ? 
-          window.google.maps.Animation.BOUNCE : null,
-        optimized: false
-      });
-
-      // Add click listener
-      marker.addListener('click', () => {
-        if (onCafeSelect) {
-          onCafeSelect(cafe);
-        }
-      });
-
-      bounds.extend(position);
-      markersRef.current.set(cafe.id || cafe.googlePlaceId, marker);
-      markersAdded++;
-    });
-
-    console.log('✅ WWDC-style venue markers updated:', markersAdded);
   }, [cafes, mapLoaded, onCafeSelect]);
 
   // WWDC helper functions for venue markers
@@ -973,11 +1012,21 @@ const FullPageMap = ({
 
   return (
     <div className="full-page-map">
-      {/* Loading Screen - Force Hide After Success */}
-      {(!mapLoaded || !googleMapsReady || loadingProgress < 100) && (
+      {/* Creative Loading Screen - Show until map AND all markers are loaded */}
+      {(!mapLoaded || !googleMapsReady || loading || markersLoading || (cafes.length > 0 && !markersLoaded)) && (
         <LoadingScreen 
-          message="Caricamento mappa..."
-          subMessage="Un momento per favore"
+          message={
+            !mapLoaded ? "Inizializzazione mappa WWDC..." : 
+            loading ? "Caricamento locali italiani..." :
+            markersLoading ? "Posizionamento marcatori..." :
+            "Finalizzazione esperienza..."
+          }
+          subMessage={
+            !mapLoaded ? "Creazione interfaccia elegante" : 
+            loading ? "Ricerca caffè e ristoranti nelle vicinanze" :
+            markersLoading ? `Caricamento ${cafes.length} locali sulla mappa` :
+            "Un momento per favore"
+          }
         />
       )}
 

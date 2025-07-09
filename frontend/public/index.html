@@ -97,16 +97,14 @@
   </head>
   <body class="loading">
     <noscript>You need to enable JavaScript to run this app.</noscript>
-    
-    <!-- Loading Screen -->
-    <div id="initial-loader">
+    <!-- Loading Screen - DISABLED -->
+    <div id="initial-loader" style="display: none;">
       <div class="loader-content">
         <div class="loader-spinner"></div>
         <div class="loader-text">🗺️ Locali Nearby</div>
         <div class="loader-subtext">Caricamento mappa interattiva...</div>
       </div>
     </div>
-    
     <!-- React Root -->
     <div id="root"></div>
     
@@ -176,6 +174,24 @@
             }, 500);
           }
         }, 1000);
+
+        // FORCE REMOVE INITIAL LOADER IMMEDIATELY
+      document.addEventListener('DOMContentLoaded', function() {
+        const loader = document.getElementById('initial-loader');
+        if (loader) {
+          loader.remove();
+          document.body.classList.remove('loading');
+        }
+      });
+
+      // ALSO REMOVE AFTER 2 SECONDS AS BACKUP
+      setTimeout(function() {
+        const loader = document.getElementById('initial-loader');
+        if (loader) {
+          loader.remove();
+          document.body.classList.remove('loading');
+        }
+      }, 2000);
       });
     </script>
   </body>

@@ -13,8 +13,8 @@ export const useGeolocation = () => {
   // Geolocation options for better accuracy
   const options = {
     enableHighAccuracy: true,
-    timeout: 15000, // 15 seconds timeout
-    maximumAge: 5 * 60 * 1000 // 5 minutes cache
+    timeout: 25000, // 25 seconds timeout - increased
+    maximumAge: 2 * 60 * 1000 // 2 minutes cache - reduced
   };
 
   // Turin fallback only as last resort

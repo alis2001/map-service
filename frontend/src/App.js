@@ -249,6 +249,7 @@ function MapApp() {
       )}
 
       {/* Status indicator for location */}
+      {/* Enhanced Status indicator for location */}
       {!isEmbedMode && (
         <div style={{
           position: 'fixed',
@@ -271,19 +272,25 @@ function MapApp() {
             height: '8px',
             borderRadius: '50%',
             background: userLocation?.source === 'gps' ? '#10B981' : 
+                        userLocation?.source === 'gps_live' ? '#00FF88' :
                         userLocation?.source === 'ip' ? '#F59E0B' : '#6B7280'
           }} />
           <span>
             {userLocation?.source === 'gps' ? '📍 GPS attivo' :
-             userLocation?.source === 'ip' ? '🌐 Posizione IP' :
-             userLocation?.source === 'cache' ? '💾 Posizione salvata' :
-             '📍 Posizione predefinita'}
-             {/* UPDATED: Show Italian venue context */}
-             {' • Caffè e Ristoranti'}
+            userLocation?.source === 'gps_live' ? '🎯 GPS live' :
+            userLocation?.source === 'ip' ? '🌐 Posizione IP' :
+            userLocation?.source === 'cache' ? '💾 Posizione salvata' :
+            '📍 Posizione predefinita'}
+            {' • Caffè e Ristoranti'}
           </span>
-          {userLocation?.accuracy && userLocation.accuracy < 100 && (
+          {userLocation?.accuracy && userLocation.accuracy < 1000 && (
             <span style={{ color: '#10B981', fontWeight: '600' }}>
               ±{Math.round(userLocation.accuracy)}m
+            </span>
+          )}
+          {userLocation?.source === 'gps_live' && (
+            <span style={{ color: '#00FF88', fontWeight: '600', animation: 'pulse 2s infinite' }}>
+              LIVE
             </span>
           )}
         </div>

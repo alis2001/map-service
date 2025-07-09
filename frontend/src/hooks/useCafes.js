@@ -133,10 +133,10 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
     },
     {
       enabled: !!(latitude && longitude && searchKey),
-      staleTime: 5 * 60 * 1000,
+      staleTime: 2 * 60 * 1000,    // Changed from 5 to 2 minutes
       cacheTime: 15 * 60 * 1000,
       refetchOnWindowFocus: false,
-      refetchOnMount: false,
+      refetchOnMount: true,    
       retry: (failureCount, error) => {
         if (error?.response?.status === 429) {
           console.log('🛑 Rate limited, not retrying');
