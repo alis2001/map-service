@@ -1,10 +1,17 @@
-FROM node:18-alpine as build
+FROM node:18-alpine
+
 WORKDIR /app
+
+# Copy package files
 COPY package*.json ./
+
+# Install dependencies
 RUN npm install
+
+# Copy source code
 COPY . .
 
-# Build arguments for ALL environment variables
+# Build arguments for environment variables
 ARG REACT_APP_API_BASE_URL="http://localhost:5001"
 ARG REACT_APP_API_VERSION="v1"
 ARG REACT_APP_GOOGLE_MAPS_API_KEY
@@ -17,7 +24,7 @@ ARG REACT_APP_ENABLE_ANIMATIONS="true"
 ARG REACT_APP_CACHE_DURATION="300000"
 ARG REACT_APP_DEBUG_MODE="true"
 
-# Set ALL environment variables
+# Set environment variables
 ENV REACT_APP_API_BASE_URL=$REACT_APP_API_BASE_URL
 ENV REACT_APP_API_VERSION=$REACT_APP_API_VERSION
 ENV REACT_APP_GOOGLE_MAPS_API_KEY=$REACT_APP_GOOGLE_MAPS_API_KEY
@@ -30,15 +37,15 @@ ENV REACT_APP_ENABLE_ANIMATIONS=$REACT_APP_ENABLE_ANIMATIONS
 ENV REACT_APP_CACHE_DURATION=$REACT_APP_CACHE_DURATION
 ENV REACT_APP_DEBUG_MODE=$REACT_APP_DEBUG_MODE
 
-RUN npm run build
+# Enable hot reload for Docker
+ENV CHOKIDAR_USEPOLLING=true
+ENV WATCHPACK_POLLING=true
 
-FROM nginx:alpine
-COPY --from=build /app/build /usr/share/nginx/html
-COPY default.conf /etc/nginx/conf.d/default.conf
-RUN apk add --no-cache curl
+# Set React dev server to run on port 3001
+ENV PORT=3001
 
+# Expose port 3001
 EXPOSE 3001
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD curl -f http://localhost:3001/health || exit 1
 
-CMD ["nginx", "-g", "daemon off;"]
+# Start development server on port 3001
+CMD ["npm", "start"]

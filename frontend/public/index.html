@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="it">
   <head>
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#6F4E37" />
+    <meta name="theme-color" content="#6366f1" />
     <meta
       name="description"
-      content="Find the best Italian coffee shops and restaurants near you with real-time location and detailed information"
+      content="Trova i migliori locali nelle vicinanze con servizio di mappa interattiva"
     />
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
@@ -17,7 +17,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
-    <title>CoffeeFinder - Discover Great Italian Coffee & Restaurants Nearby</title>
+    <title>Locali Nearby - Mappa Interattiva</title>
     
     <style>
       /* Loading screen styles */
@@ -27,12 +27,12 @@
         left: 0;
         width: 100%;
         height: 100%;
-        background: linear-gradient(135deg, #6F4E37 0%, #DEB887 100%);
+        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
         display: flex;
         justify-content: center;
         align-items: center;
         z-index: 9999;
-        color: white;
+        color: #374151;
         font-family: 'Inter', sans-serif;
       }
       
@@ -43,8 +43,8 @@
       .loader-spinner {
         width: 50px;
         height: 50px;
-        border: 3px solid rgba(255,255,255,0.3);
-        border-top: 3px solid white;
+        border: 3px solid rgba(99, 102, 241, 0.1);
+        border-top: 3px solid #6366f1;
         border-radius: 50%;
         animation: spin 1s linear infinite;
         margin: 0 auto 20px;
@@ -57,13 +57,15 @@
       
       .loader-text {
         font-size: 18px;
-        font-weight: 500;
+        font-weight: 600;
         margin-bottom: 8px;
+        color: #1f2937;
       }
       
       .loader-subtext {
         font-size: 14px;
-        opacity: 0.8;
+        opacity: 0.7;
+        color: #6b7280;
       }
       
       /* Hide scrollbars during loading */
@@ -84,7 +86,7 @@
           sans-serif;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
-        background-color: #F5F5DC;
+        background-color: #f8fafc;
       }
       
       #root {
@@ -100,16 +102,18 @@
     <div id="initial-loader">
       <div class="loader-content">
         <div class="loader-spinner"></div>
-        <div class="loader-text">CoffeeFinder</div>
-        <div class="loader-subtext">Loading Italian coffee & restaurant finder...</div>
+        <div class="loader-text">🗺️ Locali Nearby</div>
+        <div class="loader-subtext">Caricamento mappa interattiva...</div>
       </div>
     </div>
     
     <!-- React Root -->
     <div id="root"></div>
     
-    <!-- FIXED: Google Maps Script Loading -->
+    <!-- Google Maps Script Loading -->
     <script>
+      console.log('🔄 Loading Google Maps API...');
+      
       // Global configuration for Google Maps
       window.GOOGLE_MAPS_CONFIG = {
         apiKey: '%REACT_APP_GOOGLE_MAPS_API_KEY%',
@@ -119,6 +123,7 @@
 
       // Global callback for Google Maps initialization
       window.initGoogleMaps = function() {
+        console.log('✅ Google Maps API script loaded');
         console.log('🗺️ Google Maps API loaded successfully');
         window.googleMapsLoaded = true;
         
@@ -135,94 +140,42 @@
         window.dispatchEvent(new CustomEvent('googleMapsError', {
           detail: { 
             type: 'auth_failure',
-            message: 'Google Maps authentication failed. Please check your API key.' 
+            message: 'Google Maps authentication failed. Please check your API key.'
           }
         }));
       };
 
-      // Load Google Maps API script
-      function loadGoogleMapsAPI() {
-        // Check if already loaded
-        if (window.google && window.google.maps) {
-          console.log('🗺️ Google Maps already loaded');
-          window.initGoogleMaps();
-          return;
-        }
-
-        console.log('🔄 Loading Google Maps API...');
-        
+      // Load Google Maps API
+      (function() {
         const script = document.createElement('script');
-        const apiKey = window.GOOGLE_MAPS_CONFIG.apiKey;
-        
-        // Validate API key format
-        if (!apiKey || apiKey.startsWith('%') || apiKey === 'your_api_key_here') {
-          console.error('❌ Invalid Google Maps API key');
-          window.dispatchEvent(new CustomEvent('googleMapsError', {
-            detail: { 
-              type: 'invalid_key',
-              message: 'Invalid or missing Google Maps API key' 
-            }
-          }));
-          return;
-        }
-
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=${window.GOOGLE_MAPS_CONFIG.libraries.join(',')}&loading=${window.GOOGLE_MAPS_CONFIG.loading}&callback=initGoogleMaps`;
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${window.GOOGLE_MAPS_CONFIG.apiKey}&libraries=${window.GOOGLE_MAPS_CONFIG.libraries.join(',')}&callback=initGoogleMaps&loading=async`;
         script.async = true;
         script.defer = true;
-        
-        // Handle script loading errors
         script.onerror = function() {
-          console.error('❌ Failed to load Google Maps API script');
+          console.error('❌ Failed to load Google Maps API');
           window.dispatchEvent(new CustomEvent('googleMapsError', {
             detail: { 
-              type: 'script_load_error',
-              message: 'Failed to load Google Maps API script' 
+              type: 'script_load_failure',
+              message: 'Failed to load Google Maps API script'
             }
           }));
         };
-
-        script.onload = function() {
-          console.log('✅ Google Maps API script loaded');
-        };
-
         document.head.appendChild(script);
-      }
+      })();
 
-      // Start loading Google Maps when DOM is ready
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', loadGoogleMapsAPI);
-      } else {
-        loadGoogleMapsAPI();
-      }
-    </script>
-    
-    <script>
-      // Remove loading screen once React loads
-      window.addEventListener('load', function() {
+      // Remove initial loader when React app loads
+      document.addEventListener('DOMContentLoaded', function() {
         setTimeout(function() {
           const loader = document.getElementById('initial-loader');
-          const body = document.body;
-          
-          if (loader) {
+          if (loader && window.React) {
             loader.style.opacity = '0';
-            loader.style.transition = 'opacity 0.5s ease-out';
+            loader.style.transition = 'opacity 0.5s ease';
             setTimeout(() => {
-              if (loader.parentNode) {
-                loader.remove();
-              }
-              body.classList.remove('loading');
+              loader.remove();
+              document.body.classList.remove('loading');
             }, 500);
           }
-        }, 1000); // Minimum 1 second loading time for better UX
-      });
-
-      // Global error handlers
-      window.addEventListener('error', function(event) {
-        console.error('🚨 Global JavaScript error:', event.error);
-      });
-
-      window.addEventListener('unhandledrejection', function(event) {
-        console.error('🚨 Unhandled promise rejection:', event.reason);
+        }, 1000);
       });
     </script>
   </body>

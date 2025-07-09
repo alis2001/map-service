@@ -1,3 +1,6 @@
+# docker-compose.yml
+# Location: /map-service/docker-compose.yml (root directory)
+
 version: '3.8'
 
 services:
@@ -84,7 +87,8 @@ services:
       timeout: 10s
       retries: 3
 
-  # Frontend Service - DEVELOPMENT MODE WITH VOLUMES
+# Frontend Service - FIXED VERSION
+  # Frontend Service - CORRECTED VERSION
   map-frontend:
     build:
       context: ./frontend
@@ -103,23 +107,19 @@ services:
         REACT_APP_DEBUG_MODE: "true"
     container_name: map-service-frontend
     restart: unless-stopped
-    environment:
-      - CHOKIDAR_USEPOLLING=true
-      - WATCHPACK_POLLING=true
-      - PORT=3001
     ports:
       - "3001:3001"
-    volumes:
-      - ./frontend/src:/app/src                     # CRITICAL: Mount source code
-      - ./frontend/public:/app/public               # Mount public files  
-      - ./frontend/package.json:/app/package.json   # Mount package.json
-      - /app/node_modules                           # Preserve node_modules
     networks:
       - map-network
     depends_on:
-      - map-backend
-    stdin_open: true
-    tty: true
+      map-backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 networks:
   map-network:

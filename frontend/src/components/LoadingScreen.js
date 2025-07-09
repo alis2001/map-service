@@ -1,20 +1,19 @@
-// components/LoadingScreen.js - Apple WWDC Style
+// components/LoadingScreen.js - Clean Creative Loading
 import React, { useState, useEffect } from 'react';
 
 const LoadingScreen = ({ 
-  message = "Initializing Map Experience...", 
-  subMessage = "Preparing Apple-style location services" 
+  message = "Preparazione esperienza...", 
+  subMessage = "Un momento per favore" 
 }) => {
   const [progress, setProgress] = useState(0);
   const [currentMessage, setCurrentMessage] = useState(0);
 
   const loadingMessages = [
-    "🗺️ Initializing Apple Maps experience...",
-    "📍 Acquiring precise GPS location...",
-    "☕ Discovering nearby coffee shops...",
-    "🍽️ Finding amazing restaurants...",
-    "⚡ Activating live location tracking...",
-    "✨ Preparing beautiful interface..."
+    "🗺️ Caricamento mappa...",
+    "📍 Rilevamento posizione...",
+    "☕ Ricerca locale...",
+    "🎯 Calibrazione GPS...",
+    "✨ Finalizzazione..."
   ];
 
   // Simulate loading progress
@@ -25,9 +24,9 @@ const LoadingScreen = ({
           clearInterval(interval);
           return 100;
         }
-        return prev + Math.random() * 15;
+        return prev + Math.random() * 20;
       });
-    }, 200);
+    }, 300);
 
     return () => clearInterval(interval);
   }, []);
@@ -36,30 +35,28 @@ const LoadingScreen = ({
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentMessage(prev => (prev + 1) % loadingMessages.length);
-    }, 1500);
+    }, 1800);
 
     return () => clearInterval(interval);
   }, [loadingMessages.length]);
 
   return (
-    <div className="apple-loading-screen">
-      <div className="apple-loading-background" />
+    <div className="elegant-loading-screen">
+      <div className="elegant-loading-background" />
       
-      <div className="apple-loading-content">
-        {/* Apple Logo Animation */}
-        <div className="apple-loading-animation">
-          <div className="apple-logo-container">
-            <div className="apple-logo">
-              <div className="logo-ring ring-1"></div>
-              <div className="logo-ring ring-2"></div>
-              <div className="logo-ring ring-3"></div>
-              <div className="logo-center">🗺️</div>
+      <div className="elegant-loading-content">
+        <div className="elegant-loading-animation">
+          <div className="elegant-logo-container">
+            <div className="elegant-rings">
+              <div className="ring ring-1"></div>
+              <div className="ring ring-2"></div>
+              <div className="ring ring-3"></div>
+              <div className="center-icon">🗺️</div>
             </div>
           </div>
         </div>
 
-        {/* Progress Ring */}
-        <div className="apple-progress-ring">
+        <div className="elegant-progress-ring">
           <svg className="progress-svg" viewBox="0 0 120 120">
             <circle
               className="progress-bg"
@@ -73,8 +70,8 @@ const LoadingScreen = ({
               cy="60"
               r="54"
               style={{
-                strokeDasharray: `${2 * Math.PI * 54}`,
-                strokeDashoffset: `${2 * Math.PI * 54 * (1 - progress / 100)}`
+                strokeDasharray: 2 * Math.PI * 54,
+                strokeDashoffset: 2 * Math.PI * 54 * (1 - progress / 100)
               }}
             />
           </svg>
@@ -83,8 +80,7 @@ const LoadingScreen = ({
           </div>
         </div>
 
-        {/* Loading Text */}
-        <div className="apple-loading-text">
+        <div className="elegant-loading-text">
           <h2 className="main-message">{message}</h2>
           <p className="sub-message">{subMessage}</p>
           <p className="dynamic-message">
@@ -92,16 +88,15 @@ const LoadingScreen = ({
           </p>
         </div>
 
-        {/* Apple Loading Dots */}
-        <div className="apple-loading-dots">
+        <div className="elegant-loading-dots">
           <div className="dot"></div>
           <div className="dot"></div>
           <div className="dot"></div>
         </div>
       </div>
 
-      <style jsx>{`
-        .apple-loading-screen {
+      <style>{`
+        .elegant-loading-screen {
           position: fixed;
           top: 0;
           left: 0;
@@ -114,60 +109,50 @@ const LoadingScreen = ({
           overflow: hidden;
         }
 
-        .apple-loading-background {
+        .elegant-loading-background {
           position: absolute;
           top: 0;
           left: 0;
           right: 0;
           bottom: 0;
-          background: 
-            radial-gradient(circle at 20% 20%, rgba(102, 126, 234, 0.4) 0%, transparent 50%),
-            radial-gradient(circle at 80% 80%, rgba(240, 147, 251, 0.4) 0%, transparent 50%),
-            radial-gradient(circle at 40% 60%, rgba(75, 172, 254, 0.3) 0%, transparent 50%);
+          background: linear-gradient(135deg, #f8fafc 0%, #ffffff 25%, #e2e8f0 50%, #f1f5f9 75%, #ffffff 100%);
           background-size: 100% 100%;
-          animation: backgroundFloat 8s ease-in-out infinite;
+          animation: backgroundShift 12s ease-in-out infinite;
         }
 
-        @keyframes backgroundFloat {
+        @keyframes backgroundShift {
           0%, 100% { transform: scale(1) rotate(0deg); }
-          50% { transform: scale(1.1) rotate(2deg); }
+          50% { transform: scale(1.02) rotate(0.5deg); }
         }
 
-        .apple-loading-content {
+        .elegant-loading-content {
           text-align: center;
           position: relative;
           z-index: 10;
-          background: rgba(255, 255, 255, 0.9);
+          background: rgba(255, 255, 255, 0.85);
           backdrop-filter: blur(20px);
-          padding: 48px 32px;
-          border-radius: 32px;
-          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
-          border: 1px solid rgba(255, 255, 255, 0.3);
-          max-width: 420px;
+          padding: 48px 36px;
+          border-radius: 24px;
+          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+          border: 1px solid rgba(255, 255, 255, 0.4);
+          max-width: 380px;
           width: 90%;
-          animation: contentFloat 3s ease-in-out infinite;
+          animation: contentFloat 4s ease-in-out infinite;
         }
 
         @keyframes contentFloat {
           0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-10px); }
+          50% { transform: translateY(-6px); }
         }
 
-        .apple-loading-animation {
+        .elegant-loading-animation {
           margin-bottom: 32px;
           display: flex;
           align-items: center;
           justify-content: center;
         }
 
-        .apple-logo-container {
-          position: relative;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .apple-logo {
+        .elegant-rings {
           position: relative;
           width: 120px;
           height: 120px;
@@ -176,53 +161,55 @@ const LoadingScreen = ({
           justify-content: center;
         }
 
-        .logo-ring {
+        .ring {
           position: absolute;
           border-radius: 50%;
-          border: 2px solid transparent;
-          background: linear-gradient(45deg, #667eea, #764ba2, #f093fb, #f5576c) border-box;
-          mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
-          mask-composite: exclude;
+          border: 2px solid;
+          border-color: transparent;
+          border-top-color: #6366f1;
         }
 
         .ring-1 {
           width: 120px;
           height: 120px;
-          animation: appleSpin 3s linear infinite;
+          animation: elegantSpin 3s linear infinite;
         }
 
         .ring-2 {
           width: 90px;
           height: 90px;
-          animation: appleSpin 2s linear infinite reverse;
+          animation: elegantSpin 2s linear infinite reverse;
+          border-top-color: #8b5cf6;
         }
 
         .ring-3 {
           width: 60px;
           height: 60px;
-          animation: appleSpin 4s linear infinite;
+          animation: elegantSpin 4s linear infinite;
+          border-top-color: #ec4899;
         }
 
-        .logo-center {
-          font-size: 48px;
-          animation: appleFloat 2s ease-in-out infinite;
+        .center-icon {
+          font-size: 42px;
+          animation: centerPulse 2s ease-in-out infinite;
+          z-index: 10;
         }
 
-        @keyframes appleSpin {
+        @keyframes elegantSpin {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
         }
 
-        @keyframes appleFloat {
-          0%, 100% { transform: translateY(0px) scale(1); }
-          50% { transform: translateY(-8px) scale(1.05); }
+        @keyframes centerPulse {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.1); opacity: 0.8; }
         }
 
-        .apple-progress-ring {
+        .elegant-progress-ring {
           position: relative;
-          width: 120px;
-          height: 120px;
-          margin: 0 auto 24px;
+          width: 100px;
+          height: 100px;
+          margin: 0 auto 28px;
         }
 
         .progress-svg {
@@ -233,14 +220,14 @@ const LoadingScreen = ({
 
         .progress-bg {
           fill: none;
-          stroke: rgba(102, 126, 234, 0.2);
-          stroke-width: 4;
+          stroke: rgba(99, 102, 241, 0.1);
+          stroke-width: 3;
         }
 
         .progress-fill {
           fill: none;
-          stroke: url(#appleProgressGradient);
-          stroke-width: 4;
+          stroke: #6366f1;
+          stroke-width: 3;
           stroke-linecap: round;
           transition: stroke-dashoffset 0.3s ease;
         }
@@ -250,56 +237,57 @@ const LoadingScreen = ({
           top: 50%;
           left: 50%;
           transform: translate(-50%, -50%);
-          font-size: 18px;
-          font-weight: 700;
+          font-size: 16px;
+          font-weight: 600;
           color: #374151;
         }
 
-        .apple-loading-text {
-          margin-bottom: 32px;
+        .elegant-loading-text {
+          margin-bottom: 28px;
         }
 
         .main-message {
-          font-size: 24px;
-          font-weight: 700;
-          color: #1F2937;
+          font-size: 22px;
+          font-weight: 600;
+          color: #1f2937;
           margin-bottom: 8px;
-          background: linear-gradient(135deg, #667eea, #764ba2);
+          background: linear-gradient(135deg, #6366f1, #8b5cf6, #ec4899);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
+          background-clip: text;
         }
 
         .sub-message {
-          font-size: 16px;
-          color: #6B7280;
+          font-size: 15px;
+          color: #6b7280;
           margin-bottom: 16px;
-          font-weight: 500;
+          font-weight: 400;
         }
 
         .dynamic-message {
           font-size: 14px;
           color: #374151;
-          font-weight: 600;
+          font-weight: 500;
           height: 20px;
           animation: messageGlow 2s ease-in-out infinite;
         }
 
         @keyframes messageGlow {
           0%, 100% { opacity: 1; }
-          50% { opacity: 0.7; }
+          50% { opacity: 0.6; }
         }
 
-        .apple-loading-dots {
+        .elegant-loading-dots {
           display: flex;
           justify-content: center;
           gap: 8px;
         }
 
         .dot {
-          width: 12px;
-          height: 12px;
+          width: 10px;
+          height: 10px;
           border-radius: 50%;
-          background: linear-gradient(135deg, #667eea, #764ba2);
+          background: linear-gradient(135deg, #6366f1, #8b5cf6);
           animation: dotBounce 1.4s ease-in-out infinite;
         }
 
@@ -321,38 +309,7 @@ const LoadingScreen = ({
             opacity: 1;
           }
         }
-
-        @media (max-width: 480px) {
-          .apple-loading-content {
-            padding: 32px 24px;
-            margin: 16px;
-          }
-          
-          .apple-logo {
-            width: 100px;
-            height: 100px;
-          }
-          
-          .logo-center {
-            font-size: 36px;
-          }
-          
-          .main-message {
-            font-size: 20px;
-          }
-        }
       `}</style>
-
-      {/* SVG Gradient Definition */}
-      <svg style={{ position: 'absolute', width: 0, height: 0 }}>
-        <defs>
-          <linearGradient id="appleProgressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#667eea" />
-            <stop offset="50%" stopColor="#764ba2" />
-            <stop offset="100%" stopColor="#f093fb" />
-          </linearGradient>
-        </defs>
-      </svg>
     </div>
   );
 };
