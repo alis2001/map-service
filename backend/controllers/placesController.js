@@ -61,6 +61,7 @@ class PlacesController {
         limit: searchLimit
       });
 
+      // Around line 50-60, after getting the result, add this filtering:
       const result = await googlePlacesService.searchNearby(
         userLocation.latitude,
         userLocation.longitude,
@@ -71,6 +72,31 @@ class PlacesController {
           userLocation
         }
       );
+
+      // ADDED: Filter results to match exactly what user requested
+      const filteredPlaces = result.places.filter(place => {
+        const placeType = place.type || place.placeType;
+        
+        if (type === 'restaurant') {
+          // Only show restaurants when restaurant is selected
+          return placeType === 'restaurant';
+        } else if (type === 'cafe') {
+          // Only show cafes/bars when cafe is selected (exclude restaurants)
+          return placeType === 'cafe';
+        }
+        
+        return true; // Default: show all
+      });
+
+      console.log(`🎯 FILTERED: ${result.places.length} -> ${filteredPlaces.length} places for type: ${type}`);
+
+      const finalResult = {
+        ...result,
+        places: filteredPlaces,
+        count: filteredPlaces.length
+      };
+
+      return successResponse(res, finalResult, `Found ${finalResult.count} nearby ${type}s`);
 
       logger.info('Nearby places search completed', {
         latitude: userLocation.latitude,

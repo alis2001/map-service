@@ -9,6 +9,7 @@ import { placesAPI, apiUtils } from '../services/apiService';
 export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
   const lastSearchParamsRef = useRef(null);
   const isSearchingRef = useRef(false);
+  const errorCountRef = useRef(0);
 
   const createSearchKey = useCallback((lat, lng, rad, typ) => {
     if (!lat || !lng) return null;
@@ -131,28 +132,44 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
         isSearchingRef.current = false;
       }
     },
+    // Update the useQuery configuration (around line 60-90)
     {
       enabled: !!(latitude && longitude && searchKey),
-      staleTime: 2 * 60 * 1000,    // Changed from 5 to 2 minutes
-      cacheTime: 15 * 60 * 1000,
+      staleTime: 5 * 60 * 1000,    // Increased to 5 minutes
+      cacheTime: 30 * 60 * 1000,   // Increased to 30 minutes
       refetchOnWindowFocus: false,
       refetchOnMount: true,    
       retry: (failureCount, error) => {
+        console.log('🔄 Retry attempt:', failureCount, error?.message);
+        
         if (error?.response?.status === 429) {
-          console.log('🛑 Rate limited, not retrying');
-          return false;
+          console.log('🛑 Rate limited - implementing exponential backoff');
+          return failureCount < 2; // Reduce retry attempts for rate limits
         }
         if (error?.response?.status >= 400 && error?.response?.status < 500) {
           return false;
         }
-        return failureCount < 2;
+        return failureCount < 1; // Reduce overall retry attempts
       },
-      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+      retryDelay: (attemptIndex) => {
+        const baseDelay = 2000; // Start with 2 seconds
+        const delay = Math.min(baseDelay * Math.pow(2, attemptIndex), 30000); // Max 30 seconds
+        console.log(`⏳ Retry delay: ${delay}ms`);
+        return delay;
+      },
       onError: (error) => {
         console.error('❌ Failed to fetch Italian venues:', error);
         isSearchingRef.current = false;
+        
+        // Track consecutive errors for backoff
+        if (error?.response?.status === 429) {
+          errorCountRef.current = Math.min((errorCountRef.current || 0) + 1, 5);
+          console.log(`🚦 Error count increased to: ${errorCountRef.current}`);
+        }
       },
       onSuccess: (data) => {
+        // Reset error count on success
+        errorCountRef.current = 0;
         console.log('✅ Italian venues data processed:', {
           totalPlaces: data.count,
           veryClose: data.searchStats?.veryClose || 0,

@@ -21,11 +21,12 @@ const getConfig = () => ({
   
   // Rate limiting configuration
   rateLimit: {
-    maxRequestsPerMinute: 40, // Conservative limit
+    maxRequestsPerMinute: 20, // Reduced from 40 to 20
     requestsThisMinute: 0,
     lastResetTime: Date.now(),
     requestQueue: [],
-    processing: false
+    processing: false,
+    backoffTime: 0 // Add backoff time tracking
   },
   
   // OPTIMIZED: Enhanced place type mappings for Italian venues

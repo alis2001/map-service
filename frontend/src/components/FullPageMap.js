@@ -44,7 +44,8 @@ const FullPageMap = ({
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [markersLoaded, setMarkersLoaded] = useState(false);
   const [markersLoading, setMarkersLoading] = useState(false);
-  
+  const errorCountRef = useRef(0);
+  const loaderStartTimeRef = useRef(null);
   // NEW: Map update loading state (for drag updates)
   const [isMapUpdating, setIsMapUpdating] = useState(false);
   const [hasInitialLoad, setHasInitialLoad] = useState(false); // Track if map loaded once
@@ -147,7 +148,8 @@ const FullPageMap = ({
     });
   }, []);
 
-  // Smart zone-based movement detection for responsive updates
+  // UPDATED: Much smaller trigger distance for more responsive updates
+  // UPDATED: ULTRA-FAST trigger distance - almost any movement triggers update
   const shouldTriggerNewSearch = useCallback((newCenter) => {
     if (!lastSearchLocationRef.current) {
       return true; // First search
@@ -168,14 +170,18 @@ const FullPageMap = ({
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const distance = R * c;
 
-    // Dynamic threshold based on search radius for better responsiveness
-    const dynamicThreshold = Math.max(searchRadius * 0.3, 200);
-    const hasMovedSignificantly = distance > dynamicThreshold;
+    // ULTRA-FAST: Trigger on very small movements
+    const ultraFastThreshold = Math.max(searchRadius * 0.05, 30); // Just 30 meters!
+    const hasMovedSignificantly = distance > ultraFastThreshold;
+
+    if (hasMovedSignificantly) {
+      console.log(`🚀 ULTRA-FAST TRIGGER: Moved ${Math.round(distance)}m > ${Math.round(ultraFastThreshold)}m`);
+    }
 
     return hasMovedSignificantly;
   }, [searchRadius]);
 
-  // UPDATED: Adaptive debouncing with map update loading
+  // UPDATED: LIGHTNING-FAST response - almost instant
   const debouncedCenterChange = useCallback((newCenter) => {
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
@@ -185,36 +191,68 @@ const FullPageMap = ({
     }
 
     const shouldSearch = shouldTriggerNewSearch(newCenter);
-    const delay = shouldSearch ? 600 : 1200;
+    
+    // LIGHTNING-FAST delays
+    const delay = shouldSearch ? 200 : 400; // Super fast! Down from 800/1500
 
-    if (shouldSearch && hasInitialLoad) {
-      setIsMapUpdating(true);
-      console.log('🗺️ Map update loading started for search');
-    }
+    console.log(`⚡ LIGHTNING search scheduled in ${delay}ms, shouldSearch: ${shouldSearch}`);
 
     debounceTimeoutRef.current = setTimeout(() => {
       if (!isUserDraggingRef.current && shouldSearch) {
-        console.log('🗺️ Triggering optimized search');
+        console.log('⚡ LIGHTNING-FAST search triggered!');
         lastSearchLocationRef.current = newCenter;
         
         if (onCenterChange) {
           onCenterChange(newCenter);
         }
       } else if (!shouldSearch) {
-        // Hide loader if no search needed
-        setIsMapUpdating(false);
+        // Quick hide if no search needed
+        setTimeout(() => {
+          setIsMapUpdating(false);
+        }, 200);
       }
     }, delay);
   }, [onCenterChange, shouldTriggerNewSearch, hasInitialLoad]);
+  // NEW: Real-time updates during drag for ultra-responsive feel
+  const handleRealTimeDrag = useCallback((newCenter) => {
+    // Update search immediately on significant movement during drag
+    const shouldSearch = shouldTriggerNewSearch(newCenter);
+    
+    if (shouldSearch && isUserDraggingRef.current) {
+      console.log('🔥 REAL-TIME drag update triggered!');
+      
+      // Cancel any pending searches
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+      
+      // Trigger search with minimal delay
+      debounceTimeoutRef.current = setTimeout(() => {
+        lastSearchLocationRef.current = newCenter;
+        if (onCenterChange) {
+          onCenterChange(newCenter);
+        }
+      }, 100); // Almost instant - just 100ms!
+    }
+  }, [shouldTriggerNewSearch, onCenterChange]);
 
-  // UPDATED: Hide map update loader when search completes
+  // UPDATED: Minimum display time for loader + smoother hide
+  // UPDATED: Shorter minimum display time for faster feel
   useEffect(() => {
     if (!loading && !markersLoading && isMapUpdating) {
-      // Small delay to show completion
+      // Shorter minimum display time - just 800ms
+      const minDisplayTime = 800; // Reduced from 1500ms
+      const loaderStartTime = loaderStartTimeRef.current || Date.now();
+      
       setTimeout(() => {
-        setIsMapUpdating(false);
-        console.log('✅ Map update completed - hiding loader');
-      }, 300);
+        const elapsedTime = Date.now() - loaderStartTime;
+        const remainingTime = Math.max(0, minDisplayTime - elapsedTime);
+        
+        setTimeout(() => {
+          setIsMapUpdating(false);
+          console.log('⚡ Map update completed - FAST hide');
+        }, remainingTime);
+      }, 100); // Quicker completion check
     }
   }, [loading, markersLoading, isMapUpdating]);
 
@@ -578,15 +616,14 @@ const FullPageMap = ({
           return;
         }
 
-        // UPDATED: Event listeners with map update loading
         googleMapRef.current.addListener('dragstart', () => {
           isUserDraggingRef.current = true;
           console.log('🗺️ User started dragging map');
           
-          // IMMEDIATELY show map update loader when dragging starts
+          // IMMEDIATELY show loader when user starts dragging
           if (hasInitialLoad) {
             setIsMapUpdating(true);
-            console.log('🔄 Map update loading started');
+            console.log('🔄 Map update loading started IMMEDIATELY on drag');
           }
           
           if (debounceTimeoutRef.current) {
@@ -594,10 +631,41 @@ const FullPageMap = ({
           }
         });
 
+        // UPDATED: Enhanced drag events with real-time updates
+        googleMapRef.current.addListener('dragstart', () => {
+          isUserDraggingRef.current = true;
+          console.log('🗺️ User started dragging map');
+          
+          // IMMEDIATELY show loader
+          if (hasInitialLoad) {
+            setIsMapUpdating(true);
+            console.log('🔄 Map update loading started IMMEDIATELY on drag');
+          }
+          
+          if (debounceTimeoutRef.current) {
+            clearTimeout(debounceTimeoutRef.current);
+          }
+        });
+
+        // NEW: Add real-time drag listener
+        googleMapRef.current.addListener('drag', () => {
+          if (isUserDraggingRef.current) {
+            const currentCenter = googleMapRef.current.getCenter();
+            const newCenterObj = {
+              lat: currentCenter.lat(),
+              lng: currentCenter.lng()
+            };
+            
+            // Real-time updates during drag
+            handleRealTimeDrag(newCenterObj);
+          }
+        });
+
         googleMapRef.current.addListener('dragend', () => {
           isUserDraggingRef.current = false;
           console.log('🗺️ User finished dragging map');
           
+          // Final update after drag ends
           immediateSearchTimeoutRef.current = setTimeout(() => {
             const newCenter = googleMapRef.current.getCenter();
             const newCenterObj = {
@@ -605,14 +673,9 @@ const FullPageMap = ({
               lng: newCenter.lng()
             };
             
-            console.log('🗺️ Movement check:', {
-              from: lastSearchLocationRef.current,
-              to: newCenterObj,
-              shouldSearch: shouldTriggerNewSearch(newCenterObj)
-            });
-            
+            console.log('🎯 Final drag position check');
             debouncedCenterChange(newCenterObj);
-          }, 500);
+          }, 50); // Very quick final check
         });
 
         googleMapRef.current.addListener('idle', () => {
@@ -958,38 +1021,35 @@ const FullPageMap = ({
 
   }, [cafes, mapLoaded, onCafeSelect, cafeType]); // Added cafeType dependency
 
-  // WWDC helper functions for venue markers
+  // FIXED: Proper color coding - Orange for cafe/bar, Red for restaurant
   const getWWDCVenueColor = (cafe) => {
-    if (cafe.distance && cafe.distance < 200) return '#00FF88'; // Very close - WWDC green
-    if (cafe.distance && cafe.distance < 500) return '#FFD60A'; // Close - WWDC yellow
-    if (cafe.rating && cafe.rating >= 4.5) return '#BF5AF2';     // High rated - WWDC purple
-    if (cafe.type === 'restaurant') return '#FF453A';           // Restaurants - WWDC red
+    // FIXED: All cafes and bars get orange, restaurants get red
+    if (cafe.type === 'restaurant' || cafe.placeType === 'restaurant') {
+      return '#EF4444'; // Red for restaurants
+    }
     
-    return '#007AFF'; // Default - WWDC blue
+    // Everything else (cafe, bar, etc.) gets orange
+    return '#F97316'; // Orange for cafes/bars
   };
 
   const getWWDCVenueColorSecondary = (cafe) => {
-    if (cafe.distance && cafe.distance < 200) return '#00D787'; // Darker WWDC green
-    if (cafe.distance && cafe.distance < 500) return '#FFB000'; // Darker WWDC yellow
-    if (cafe.rating && cafe.rating >= 4.5) return '#A040D1';     // Darker WWDC purple
-    if (cafe.type === 'restaurant') return '#D70015';           // Darker WWDC red
+    // FIXED: Matching secondary colors
+    if (cafe.type === 'restaurant' || cafe.placeType === 'restaurant') {
+      return '#DC2626'; // Darker red
+    }
     
-    return '#0056CC'; // Darker WWDC blue
+    return '#EA580C'; // Darker orange
   };
 
+  // FIXED: Consistent emoji mapping regardless of Google's classification
   const getVenueEmoji = (cafe) => {
-    const nameLower = (cafe.name || '').toLowerCase();
-    
-    if (nameLower.includes('gelateria') || nameLower.includes('gelato')) return '🍦';
-    if (nameLower.includes('pizzeria') || nameLower.includes('pizza')) return '🍕';
-    if (nameLower.includes('pasticceria') || nameLower.includes('dolc')) return '🧁';
-    if (nameLower.includes('panetteria') || nameLower.includes('pane')) return '🥖';
-    
-    switch (cafe.type || cafe.placeType) {
-      case 'restaurant': return '🍽️';
-      case 'cafe':
-      default: return '☕';
+    // FIXED: Base it on OUR type classification, not name analysis
+    if (cafe.type === 'restaurant' || cafe.placeType === 'restaurant') {
+      return '🍽️'; // All restaurants get this
     }
+    
+    // All cafes/bars get coffee emoji (includes bars from Google)
+    return '☕';
   };
 
   // Comprehensive cleanup
@@ -1060,13 +1120,12 @@ const FullPageMap = ({
         />
       )}
 
-      {/* NEW: Map Update Loader - For drag updates */}
-      <MapUpdateLoader
-        loading={isMapUpdating || (hasInitialLoad && loading)}
-        venueCount={cafes.length}
-        searchType={cafeType}
-        userLocation={userLocation}
-      />
+      {(isMapUpdating || (hasInitialLoad && loading)) && (
+        <MapUpdateLoader
+          loading={isMapUpdating || (hasInitialLoad && loading)}
+          searchType={cafeType}
+        />
+      )}
 
       {/* Map Container */}
       <div 

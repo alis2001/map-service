@@ -396,7 +396,7 @@ class GooglePlacesService {
     }
   }
 
-  // UPDATED: Enhanced Italian venue type detection (removed pub detection)
+  // UPDATED: Better Italian venue type detection
   detectItalianVenueType(place, fallbackType) {
     const name = (place.name || '').toLowerCase();
     const types = place.types || [];
@@ -407,22 +407,22 @@ class GooglePlacesService {
       fallback: fallbackType 
     });
     
-    // PRIORITY 1: Google Place types (most reliable)
-    if (types.includes('restaurant') || types.includes('meal_delivery') || types.includes('meal_takeaway')) {
-      console.log('🍽️ DETECTED AS RESTAURANT via Google types');
+    // PRIORITY 1: Clear restaurant indicators
+    if (types.includes('restaurant') || 
+        types.includes('meal_delivery') || 
+        types.includes('meal_takeaway') ||
+        name.includes('ristorante') || 
+        name.includes('pizzeria') || 
+        name.includes('trattoria') || 
+        name.includes('osteria')) {
+      console.log('🍽️ DETECTED AS RESTAURANT');
       return 'restaurant';
     }
     
-    // PRIORITY 2: Italian name analysis (for local context)
-    if (name.includes('ristorante') || name.includes('pizzeria') || name.includes('trattoria') || name.includes('osteria')) {
-      console.log('🍽️ DETECTED AS RESTAURANT via Italian keywords');
-      return 'restaurant';
-    }
-    
-    // PRIORITY 3: Default to cafe (covers Italian bars/caffeterias)
-    const finalType = fallbackType || 'cafe';
-    console.log('☕ USING FALLBACK TYPE:', finalType);
-    return finalType;
+    // PRIORITY 2: Everything else is cafe (including Google's "bar" type)
+    // This includes Italian bars, cafeterias, pubs, etc.
+    console.log('☕ DETECTED AS CAFE (including bars)');
+    return 'cafe';
   }
 
   async saveOrUpdatePlace(placeData, placeType = null) {
