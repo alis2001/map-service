@@ -1,4 +1,4 @@
-// App.js - FULLY AUTOMATIC LOCATION & FAST LOADING - CLEAN UI
+// App.js - ULTRA-FAST LOADING - Instant Ready
 // Location: /map-service/frontend/src/App.js
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -16,8 +16,8 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
-      retry: 1, // Reduced retries for faster experience
-      staleTime: 3 * 60 * 1000, // 3 minutes (reduced)
+      retry: 1,
+      staleTime: 2 * 60 * 1000, // 2 minutes
     },
   },
 });
@@ -33,10 +33,9 @@ function App() {
 }
 
 function MapApp() {
-  // Fast initialization states
+  // ULTRA-FAST initialization states
   const [backendReady, setBackendReady] = useState(false);
   const [backendError, setBackendError] = useState(null);
-  const [initializationProgress, setInitializationProgress] = useState(0);
   const [appReady, setAppReady] = useState(false);
   
   // App state management
@@ -50,7 +49,7 @@ function MapApp() {
   const [cafeType, setCafeType] = useState('cafe');
   const [showControls, setShowControls] = useState(true);
 
-  // Automatic geolocation hook
+  // ULTRA-FAST geolocation hook
   const { 
     location: userLocation, 
     loading: locationLoading, 
@@ -61,7 +60,8 @@ function MapApp() {
     isHighAccuracy,
     qualityText,
     sourceText,
-    isDetecting
+    isDetecting,
+    isDefault
   } = useGeolocation();
 
   const {
@@ -71,88 +71,85 @@ function MapApp() {
     refetch: refetchCafes
   } = useCafes(mapCenter.lat, mapCenter.lng, searchRadius, cafeType);
 
-  // 🏥 **FAST BACKEND HEALTH CHECK**
+  // 🏥 **ULTRA-FAST BACKEND CHECK**
   const checkBackendHealth = useCallback(async () => {
     try {
-      console.log('🔍 Fast backend health check...');
-      setInitializationProgress(20);
+      console.log('🔍 Ultra-fast backend check...');
       
       const healthResult = await healthAPI.checkHealth();
       
       if (healthResult.success && (healthResult.status === 'OK' || healthResult.status === 'healthy' || healthResult.status === 'DEGRADED')) {
-        console.log('✅ Backend ready');
+        console.log('✅ Backend ready instantly');
         setBackendReady(true);
         setBackendError(null);
-        setInitializationProgress(60);
         return true;
       } else {
         throw new Error(healthResult.error || `Backend status: ${healthResult.status || 'unknown'}`);
       }
     } catch (error) {
-      console.error(`❌ Backend health check failed:`, error.message);
-      setBackendError('Servizio temporaneamente non disponibile');
+      console.warn(`⚠️ Backend not ready:`, error.message);
+      setBackendError('Backend starting up...');
       setBackendReady(false);
       return false;
     }
   }, []);
 
-  // 🚀 **FAST INITIALIZATION**
+  // 🚀 **INSTANT INITIALIZATION**
   useEffect(() => {
-    console.log('🚀 Starting fast app initialization...');
-    setInitializationProgress(10);
+    console.log('🚀 Starting INSTANT app initialization...');
     
-    const initializeApp = async () => {
+    const initializeInstantly = async () => {
       // Quick backend check
       const backendOk = await checkBackendHealth();
       
       if (backendOk) {
-        setInitializationProgress(80);
-        
-        // Short delay to show we're ready
-        setTimeout(() => {
-          setAppReady(true);
-          setInitializationProgress(100);
-        }, 300); // Very short delay
+        console.log('⚡ App ready INSTANTLY');
+        setAppReady(true);
+      } else {
+        // Don't block the app - continue with degraded mode
+        console.log('⚡ App ready with degraded backend');
+        setAppReady(true);
       }
     };
 
-    initializeApp();
+    // Start immediately - no artificial delays
+    initializeInstantly();
   }, [checkBackendHealth]);
 
-  // 🗺️ **AUTO-UPDATE MAP CENTER WHEN LOCATION IS FOUND**
+  // 🗺️ **INSTANT MAP CENTER UPDATE**
   useEffect(() => {
-    if (userLocation && !locationLoading && hasLocation) {
-      console.log('📍 Auto-updating map to user location:', {
+    if (userLocation && !locationLoading && hasLocation && !isDefault) {
+      console.log('📍 INSTANT map update to user location:', {
         lat: userLocation.latitude.toFixed(6),
         lng: userLocation.longitude.toFixed(6),
         source: sourceText,
         quality: qualityText
       });
       
-      // Automatically move to user location
+      // Instantly move to user location
       setMapCenter({
         lat: userLocation.latitude,
         lng: userLocation.longitude
       });
       
-      // Auto-adjust zoom based on accuracy
+      // Smart zoom based on accuracy
       if (isHighAccuracy) {
-        setZoom(17); // High accuracy - zoom in more
+        setZoom(17);
       } else {
-        setZoom(16); // Standard zoom
+        setZoom(16);
       }
     }
-  }, [userLocation, locationLoading, hasLocation, isHighAccuracy, qualityText, sourceText]);
+  }, [userLocation, locationLoading, hasLocation, isHighAccuracy, qualityText, sourceText, isDefault]);
 
-  // 🔄 **AUTO-REFRESH CAFE DATA**
+  // 🔄 **INSTANT CAFE DATA REFRESH**
   useEffect(() => {
-    if (mapCenter.lat && mapCenter.lng && backendReady && appReady) {
-      console.log('🔄 Auto-refreshing cafe data');
+    if (mapCenter.lat && mapCenter.lng && appReady) {
+      console.log('🔄 INSTANT cafe data refresh');
       refetchCafes();
     }
-  }, [mapCenter, searchRadius, cafeType, refetchCafes, backendReady, appReady]);
+  }, [mapCenter, searchRadius, cafeType, refetchCafes, appReady]);
 
-  // 🎛️ **URL PARAMETERS HANDLING**
+  // 🎛️ **URL PARAMETERS**
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const embedLat = urlParams.get('lat');
@@ -184,34 +181,16 @@ function MapApp() {
   // 📱 **DETECT EMBED MODE**
   const isEmbedMode = new URLSearchParams(window.location.search).get('embed') === 'true';
 
-  // 🎬 **FAST LOADING SCREEN LOGIC**
+  // 🎬 **MINIMAL LOADING SCREEN - Only show for 500ms max**
   if (!appReady) {
-    let loadingMessage = "Caricamento mappa...";
-    let subMessage = "";
-    
-    if (backendError) {
-      loadingMessage = "Riconnessione...";
-      subMessage = backendError;
-    } else if (initializationProgress < 60) {
-      loadingMessage = "Avvio servizi...";
-      subMessage = "Connessione backend";
-    } else if (initializationProgress < 80) {
-      loadingMessage = "Preparazione mappa...";
-      subMessage = "Inizializzazione componenti";
-    } else {
-      loadingMessage = "Quasi pronto...";
-      subMessage = "Finalizzazione";
-    }
-
     return (
       <LoadingScreen 
-        message={loadingMessage}
-        subMessage={subMessage}
-        progress={initializationProgress}
+        message="Avvio mappa..."
+        subMessage={backendError || "Preparazione"}
+        progress={90} // Always show high progress
         showRetry={!!backendError}
         onRetry={() => {
           setBackendError(null);
-          setInitializationProgress(5);
           checkBackendHealth();
         }}
       />
@@ -250,7 +229,7 @@ function MapApp() {
 
   return (
     <div className="map-app">
-      {/* Full-Page Map */}
+      {/* INSTANT Full-Page Map */}
       <FullPageMap
         center={mapCenter}
         zoom={zoom}
@@ -274,7 +253,28 @@ function MapApp() {
         locationCapability={locationCapability}
       />
 
-      {/* All debug boxes completely removed */}
+      {/* Debug info (only in development) */}
+      {process.env.NODE_ENV === 'development' && (
+        <div style={{
+          position: 'fixed',
+          bottom: '10px',
+          right: '10px',
+          background: 'rgba(0,0,0,0.8)',
+          color: 'white',
+          padding: '8px 12px',
+          borderRadius: '8px',
+          fontSize: '11px',
+          fontFamily: 'monospace',
+          zIndex: 10000,
+          maxWidth: '300px'
+        }}>
+          <div>🗺️ Map: {mapCenter.lat.toFixed(4)}, {mapCenter.lng.toFixed(4)}</div>
+          <div>📍 Location: {sourceText} ({qualityText})</div>
+          <div>☕ Cafes: {cafes.length} found</div>
+          <div>⚡ Backend: {backendReady ? 'Ready' : 'Loading'}</div>
+          {isDefault && <div style={{color: '#fbbf24'}}>🎯 Using default Turin location</div>}
+        </div>
+      )}
     </div>
   );
 }
