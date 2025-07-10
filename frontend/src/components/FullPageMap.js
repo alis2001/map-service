@@ -58,6 +58,7 @@ const FullPageMap = ({
 
   // ⚡ INSTANT TRIGGER DISTANCE
   // ⚡ UPDATED: Less aggressive triggering to avoid rate limits
+  // UPDATED: More sensitive movement detection
   const shouldTriggerNewSearch = useCallback((newCenter) => {
     if (!lastSearchLocationRef.current) {
       return true;
@@ -77,25 +78,25 @@ const FullPageMap = ({
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const distance = R * c;
 
-    // UPDATED: Larger trigger distance to reduce API calls
-    const instantTrigger = Math.max(searchRadius * 0.4, 600); // Increased from 0.15 and 200
-    const hasMovedSignificantly = distance > instantTrigger;
+    // MUCH MORE SENSITIVE: Trigger search on smaller movements
+    const sensitiveRange = Math.max(searchRadius * 0.15, 150); // Reduced from 0.4 and 600
+    const hasMovedEnough = distance > sensitiveRange;
 
-    if (hasMovedSignificantly) {
-      console.log(`⚡ SEARCH TRIGGER: Moved ${Math.round(distance)}m > ${Math.round(instantTrigger)}m`);
+    if (hasMovedEnough) {
+      console.log(`⚡ SENSITIVE TRIGGER: Moved ${Math.round(distance)}m > ${Math.round(sensitiveRange)}m`);
     }
 
-    return hasMovedSignificantly;
+    return hasMovedEnough;
   }, [searchRadius]);
 
-  // 🚀 ULTRA-FAST CENTER CHANGE HANDLER
+  // UPDATED: Much faster response to dragging
   const handleMapCenterChange = useCallback((newCenter) => {
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
     }
 
     const shouldSearch = shouldTriggerNewSearch(newCenter);
-    const delay = shouldSearch ? 400 : 800;
+    const delay = shouldSearch ? 200 : 400; // REDUCED delays for instant feel
 
     console.log(`⚡ INSTANT search scheduled in ${delay}ms`);
 
@@ -110,7 +111,7 @@ const FullPageMap = ({
       } else if (!shouldSearch) {
         setTimeout(() => {
           setIsMapUpdating(false);
-        }, 200);
+        }, 100); // Faster completion
       }
     }, delay);
   }, [onCenterChange, shouldTriggerNewSearch, hasInitialLoad]);

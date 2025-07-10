@@ -22,7 +22,7 @@ const {
 class PlacesController {
   // FIXED: Get nearby coffee shops and bars with proper service integration
   getNearbyPlaces = asyncHandler(async (req, res) => {
-    const { latitude, longitude, radius = 1500, type = 'cafe', limit = 20 } = req.query;
+    const { latitude, longitude, radius = 2000, type = 'cafe', limit = 60 } = req.query; // INCREASED defaults
 
     try {
       // Validate coordinates
@@ -32,28 +32,19 @@ class PlacesController {
 
       // Validate place type
       if (!isValidPlaceType(type)) {
-        return errorResponse(res, 'Invalid place type. Must be: cafe, bar, or restaurant', 400, 'INVALID_PLACE_TYPE');
+        return errorResponse(res, 'Invalid place type. Must be: cafe or restaurant', 400, 'INVALID_PLACE_TYPE');
       }
 
-      // Validate radius
-      const searchRadius = parseInt(radius);
-      if (searchRadius < 100 || searchRadius > 50000) {
-        return errorResponse(res, 'Radius must be between 100 and 50000 meters', 400, 'INVALID_RADIUS');
-      }
-
-      // Validate limit
-      const searchLimit = parseInt(limit);
-      if (searchLimit < 1 || searchLimit > 50) {
-        return errorResponse(res, 'Limit must be between 1 and 50', 400, 'INVALID_LIMIT');
-      }
+      // INCREASED radius and limit for comprehensive coverage
+      const searchRadius = Math.min(parseInt(radius), 5000); // Allow up to 5km
+      const searchLimit = Math.min(parseInt(limit), 100);    // Allow up to 100 results
 
       const userLocation = {
         latitude: parseFloat(latitude),
         longitude: parseFloat(longitude)
       };
 
-      // FIXED: Use the Google Places service correctly
-      console.log('🔍 Searching for nearby places:', {
+      console.log('🔍 COMPREHENSIVE search for ALL venues:', {
         latitude: userLocation.latitude,
         longitude: userLocation.longitude,
         type,
@@ -61,7 +52,7 @@ class PlacesController {
         limit: searchLimit
       });
 
-      // Around line 50-60, after getting the result, add this filtering:
+      // USE COMPREHENSIVE SEARCH for maximum coverage
       const result = await googlePlacesService.searchNearby(
         userLocation.latitude,
         userLocation.longitude,
@@ -69,47 +60,17 @@ class PlacesController {
           type,
           radius: searchRadius,
           limit: searchLimit,
-          userLocation
+          userLocation,
+          comprehensive: true // Enable comprehensive search
         }
       );
 
-      // ADDED: Filter results to match exactly what user requested
-      const filteredPlaces = result.places.filter(place => {
-        const placeType = place.type || place.placeType;
-        
-        if (type === 'restaurant') {
-          // Only show restaurants when restaurant is selected
-          return placeType === 'restaurant';
-        } else if (type === 'cafe') {
-          // Only show cafes/bars when cafe is selected (exclude restaurants)
-          return placeType === 'cafe';
-        }
-        
-        return true; // Default: show all
-      });
+      console.log(`🎯 ALL VENUES FOUND: ${result.places.length} ${type}s in ${searchRadius}m radius`);
 
-      console.log(`🎯 FILTERED: ${result.places.length} -> ${filteredPlaces.length} places for type: ${type}`);
-
-      const finalResult = {
-        ...result,
-        places: filteredPlaces,
-        count: filteredPlaces.length
-      };
-
-      return successResponse(res, finalResult, `Found ${finalResult.count} nearby ${type}s`);
-
-      logger.info('Nearby places search completed', {
-        latitude: userLocation.latitude,
-        longitude: userLocation.longitude,
-        type,
-        radius: searchRadius,
-        resultCount: result.count
-      });
-
-      return successResponse(res, result, `Found ${result.count} nearby ${type}s`);
+      return successResponse(res, result, `Found ${result.count} ${type}s`);
 
     } catch (error) {
-      logger.error('Nearby places search failed', {
+      logger.error('Comprehensive nearby search failed', {
         latitude,
         longitude,
         type,
@@ -117,11 +78,7 @@ class PlacesController {
         error: error.message
       });
 
-      if (error.message.includes('Google Places API')) {
-        return errorResponse(res, 'Places service temporarily unavailable', 503, 'SERVICE_UNAVAILABLE');
-      }
-
-      return errorResponse(res, 'Failed to search nearby places', 500, 'SEARCH_ERROR');
+      return errorResponse(res, 'Failed to search all nearby places', 500, 'COMPREHENSIVE_SEARCH_ERROR');
     }
   });
 
