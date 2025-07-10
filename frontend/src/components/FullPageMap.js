@@ -3,7 +3,7 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import LoadingScreen from './LoadingScreen';
-import MapUpdateLoader from './MapUpdateLoader'; // NEW IMPORT
+import MapUpdateLoader from './MapUpdateLoader';
 import CafePopup from './CafePopup';
 import MapControls from './MapControls';
 
@@ -24,18 +24,18 @@ const FullPageMap = ({
   isEmbedMode,
   onSearchChange,
   onRefresh,
-  onLocationRequest,
   locationLoading,
-  locationError
+  locationError,
+  detectionMethod,
+  locationCapability
 }) => {
   const mapRef = useRef(null);
   const googleMapRef = useRef(null);
   const markersRef = useRef(new Map());
   const userMarkerRef = useRef(null);
   const radiusCircleRef = useRef(null);
-  const userLocationButtonRef = useRef(null);
+  // REMOVED: userLocationButtonRef
   
-  // UPDATED: Separate loading states
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState(null);
   const [mapInitialized, setMapInitialized] = useState(false);
@@ -46,9 +46,8 @@ const FullPageMap = ({
   const [markersLoading, setMarkersLoading] = useState(false);
   const errorCountRef = useRef(0);
   const loaderStartTimeRef = useRef(null);
-  // NEW: Map update loading state (for drag updates)
   const [isMapUpdating, setIsMapUpdating] = useState(false);
-  const [hasInitialLoad, setHasInitialLoad] = useState(false); // Track if map loaded once
+  const [hasInitialLoad, setHasInitialLoad] = useState(false);
   
   // Smart movement detection
   const lastSearchLocationRef = useRef(null);
@@ -56,21 +55,28 @@ const FullPageMap = ({
   const debounceTimeoutRef = useRef(null);
   const immediateSearchTimeoutRef = useRef(null);
 
-  // Loading progress simulation - ONLY for initial load
+  // Fast loading progress simulation
   useEffect(() => {
     if (!mapLoaded && googleMapsReady && !hasInitialLoad) {
       const interval = setInterval(() => {
         setLoadingProgress(prev => {
-          const newProgress = prev + Math.random() * 15;
+          const newProgress = prev + Math.random() * 20; // Faster progress
           if (newProgress >= 100) {
             clearInterval(interval);
             return 100;
           }
           return newProgress;
         });
-      }, 200);
+      }, 150); // Faster updates
       
       return () => clearInterval(interval);
+    }
+  }, [mapLoaded, googleMapsReady, hasInitialLoad]);
+
+  useEffect(() => {
+    if (mapLoaded && googleMapsReady && !hasInitialLoad) {
+      setHasInitialLoad(true);
+      console.log('✅ Initial map load completed');
     }
   }, [mapLoaded, googleMapsReady, hasInitialLoad]);
 
@@ -256,217 +262,6 @@ const FullPageMap = ({
     }
   }, [loading, markersLoading, isMapUpdating]);
 
-  // ENHANCED: Create WWDC-style User Location Button
-  const createWWDCLocationButton = useCallback(() => {
-    if (!googleMapRef.current || userLocationButtonRef.current) return;
-
-    // Create button container
-    const locationButton = document.createElement('div');
-    locationButton.className = 'wwdc-location-button';
-    
-    // Create inner content
-    locationButton.innerHTML = `
-      <div class="wwdc-location-content">
-        <div class="location-rings">
-          <div class="location-ring ring-1"></div>
-          <div class="location-ring ring-2"></div>
-        </div>
-        <div class="location-center">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="2"/>
-            <circle cx="12" cy="12" r="3" fill="currentColor"/>
-          </svg>
-        </div>
-      </div>
-    `;
-
-    // Add WWDC styles
-    const style = document.createElement('style');
-    style.textContent = `
-      .wwdc-location-button {
-        position: absolute;
-        right: 16px;
-        bottom: 120px;
-        width: 48px;
-        height: 48px;
-        background: rgba(0, 0, 0, 0.8);
-        backdrop-filter: blur(20px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 12px;
-        cursor: pointer;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        z-index: 1000;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        user-select: none;
-        overflow: hidden;
-        font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
-      }
-
-      .wwdc-location-button::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: linear-gradient(45deg, #007AFF, #5856D6, #AF52DE, #FF2D92);
-        opacity: 0;
-        transition: opacity 0.3s ease;
-        border-radius: 12px;
-      }
-
-      .wwdc-location-button:hover::before {
-        opacity: 0.1;
-      }
-
-      .wwdc-location-button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(0, 122, 255, 0.3);
-        border-color: rgba(0, 122, 255, 0.3);
-      }
-
-      .wwdc-location-button:active {
-        transform: scale(0.95);
-      }
-
-      .wwdc-location-button.has-location {
-        background: linear-gradient(45deg, #007AFF, #5856D6);
-        border-color: rgba(0, 122, 255, 0.3);
-        box-shadow: 0 0 20px rgba(0, 122, 255, 0.4);
-      }
-
-      .wwdc-location-button.has-location .location-center {
-        color: white;
-      }
-
-      .wwdc-location-button.loading .location-rings {
-        animation: wwdcLocationSpin 2s linear infinite;
-      }
-
-      .wwdc-location-content {
-        position: relative;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 2;
-      }
-
-      .location-rings {
-        position: absolute;
-        width: 40px;
-        height: 40px;
-      }
-
-      .location-ring {
-        position: absolute;
-        border-radius: 50%;
-        border: 1px solid rgba(0, 122, 255, 0.3);
-        animation: wwdcLocationPulse 2s ease-in-out infinite;
-      }
-
-      .ring-1 {
-        width: 40px;
-        height: 40px;
-        top: 0;
-        left: 0;
-        animation-delay: 0s;
-      }
-
-      .ring-2 {
-        width: 30px;
-        height: 30px;
-        top: 5px;
-        left: 5px;
-        animation-delay: 0.5s;
-      }
-
-      .location-center {
-        color: #007AFF;
-        transition: color 0.3s ease;
-        z-index: 3;
-        position: relative;
-      }
-
-      .wwdc-location-button.has-location .location-rings .location-ring {
-        border-color: rgba(255, 255, 255, 0.5);
-        animation: wwdcLocationPulseActive 1.5s ease-in-out infinite;
-      }
-
-      @keyframes wwdcLocationPulse {
-        0%, 100% { 
-          opacity: 0.3;
-          transform: scale(0.8);
-        }
-        50% { 
-          opacity: 0.8;
-          transform: scale(1.2);
-        }
-      }
-
-      @keyframes wwdcLocationPulseActive {
-        0%, 100% { 
-          opacity: 0.6;
-          transform: scale(0.9);
-        }
-        50% { 
-          opacity: 1;
-          transform: scale(1.3);
-        }
-      }
-
-      @keyframes wwdcLocationSpin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-      }
-
-      @media (max-width: 768px) {
-        .wwdc-location-button {
-          right: 12px;
-          bottom: 100px;
-          width: 44px;
-          height: 44px;
-        }
-      }
-    `;
-
-    // Add styles to head if not already added
-    if (!document.querySelector('style[data-wwdc-location]')) {
-      style.setAttribute('data-wwdc-location', 'true');
-      document.head.appendChild(style);
-    }
-
-    // Add click handler
-    locationButton.addEventListener('click', () => {
-      if (onLocationRequest) {
-        onLocationRequest();
-      }
-    });
-
-    // Update button state based on location status
-    const updateButtonState = () => {
-      if (locationLoading) {
-        locationButton.classList.add('loading');
-        locationButton.classList.remove('has-location');
-      } else if (userLocation) {
-        locationButton.classList.remove('loading');
-        locationButton.classList.add('has-location');
-      } else {
-        locationButton.classList.remove('loading', 'has-location');
-      }
-    };
-
-    updateButtonState();
-
-    // Add to map
-    googleMapRef.current.controls[window.google.maps.ControlPosition.RIGHT_BOTTOM].push(locationButton);
-    userLocationButtonRef.current = locationButton;
-
-    console.log('🎯 WWDC-style location button created');
-  }, [onLocationRequest, locationLoading, userLocation]);
-
-  // ENHANCED: Initialize Google Map with FIXED WWDC-style design
   useEffect(() => {
     if (mapInitialized || !mapRef.current) return;
 
@@ -504,7 +299,7 @@ const FullPageMap = ({
           rotateControl: false,
           fullscreenControl: !isEmbedMode,
           
-          // FIXED: Dark elegant map style
+          // Dark elegant map style
           styles: [
             {
               "featureType": "all",
@@ -602,7 +397,6 @@ const FullPageMap = ({
           draggable: true,
           scrollwheel: true,
           
-          // Disable default UI to create custom WWDC-style controls
           disableDefaultUI: false,
           clickableIcons: true
         };
@@ -616,80 +410,22 @@ const FullPageMap = ({
           return;
         }
 
+        // Add map event listeners (drag, zoom, etc.)
         googleMapRef.current.addListener('dragstart', () => {
           isUserDraggingRef.current = true;
-          console.log('🗺️ User started dragging map');
-          
-          // IMMEDIATELY show loader when user starts dragging
           if (hasInitialLoad) {
             setIsMapUpdating(true);
-            console.log('🔄 Map update loading started IMMEDIATELY on drag');
-          }
-          
-          if (debounceTimeoutRef.current) {
-            clearTimeout(debounceTimeoutRef.current);
-          }
-        });
-
-        // UPDATED: Enhanced drag events with real-time updates
-        googleMapRef.current.addListener('dragstart', () => {
-          isUserDraggingRef.current = true;
-          console.log('🗺️ User started dragging map');
-          
-          // IMMEDIATELY show loader
-          if (hasInitialLoad) {
-            setIsMapUpdating(true);
-            console.log('🔄 Map update loading started IMMEDIATELY on drag');
-          }
-          
-          if (debounceTimeoutRef.current) {
-            clearTimeout(debounceTimeoutRef.current);
-          }
-        });
-
-        // NEW: Add real-time drag listener
-        googleMapRef.current.addListener('drag', () => {
-          if (isUserDraggingRef.current) {
-            const currentCenter = googleMapRef.current.getCenter();
-            const newCenterObj = {
-              lat: currentCenter.lat(),
-              lng: currentCenter.lng()
-            };
-            
-            // Real-time updates during drag
-            handleRealTimeDrag(newCenterObj);
           }
         });
 
         googleMapRef.current.addListener('dragend', () => {
           isUserDraggingRef.current = false;
-          console.log('🗺️ User finished dragging map');
-          
-          // Final update after drag ends
-          immediateSearchTimeoutRef.current = setTimeout(() => {
-            const newCenter = googleMapRef.current.getCenter();
-            const newCenterObj = {
-              lat: newCenter.lat(),
-              lng: newCenter.lng()
-            };
-            
-            console.log('🎯 Final drag position check');
-            debouncedCenterChange(newCenterObj);
-          }, 50); // Very quick final check
-        });
-
-        googleMapRef.current.addListener('idle', () => {
-          if (!isUserDraggingRef.current) {
-            const newCenter = googleMapRef.current.getCenter();
-            const currentZoom = googleMapRef.current.getZoom();
-            
-            if (Math.abs(currentZoom - zoom) >= 2) {
-              debouncedCenterChange({
-                lat: newCenter.lat(),
-                lng: newCenter.lng()
-              });
-            }
-          }
+          const newCenter = googleMapRef.current.getCenter();
+          const newCenterObj = {
+            lat: newCenter.lat(),
+            lng: newCenter.lng()
+          };
+          handleMapCenterChange(newCenterObj);
         });
 
         googleMapRef.current.addListener('click', () => {
@@ -703,30 +439,27 @@ const FullPageMap = ({
             window.google.maps.event.removeListener(listener);
             resolve();
           });
-          
-          setTimeout(resolve, 3000);
+          setTimeout(resolve, 2000); // Faster timeout
         });
 
         await tilesLoadedPromise;
 
-        // Create WWDC-style location button
-        createWWDCLocationButton();
+        // REMOVED: createWWDCLocationButton() call
 
         console.log('✅ WWDC-style Google Map loaded successfully');
         
-        // FIX: Ensure these states are set properly
-        setMapLoaded(true);           // ← This is critical
+        setMapLoaded(true);
         setMapError(null);
         setMapInitialized(true);
-        setLoadingProgress(100);      // ← This too
+        setLoadingProgress(100);
         
         lastSearchLocationRef.current = { lat: center.lat, lng: center.lng };
 
       } catch (error) {
         console.error('❌ Failed to initialize WWDC-style Google Map:', error);
         setMapError('Failed to initialize map: ' + error.message);
-        setMapLoaded(false);          // ← Ensure loading stops on error
-        setLoadingProgress(100);      // ← Stop progress animation
+        setMapLoaded(false);
+        setLoadingProgress(100);
       }
     };
 
@@ -1112,11 +845,11 @@ const FullPageMap = ({
 
   return (
     <div className="full-page-map">
-      {/* UPDATED: Initial Loading Screen - ONLY for first map load */}
+      {/* Initial Loading Screen - Only for first map load */}
       {(!hasInitialLoad && (!mapLoaded || !googleMapsReady || loading)) && (
         <LoadingScreen 
-          message="Inizializzazione mappa italiana..."
-          subMessage="Preparazione dell'esperienza di ricerca locali"
+          message="Caricamento mappa..."
+          subMessage="Preparazione dell'esperienza"
           progress={loadingProgress}
         />
       )}
@@ -1135,23 +868,22 @@ const FullPageMap = ({
         style={{ 
           width: '100%', 
           height: '100%',
-          backgroundColor: '#000000', // WWDC dark background
+          backgroundColor: '#000000',
           borderRadius: isEmbedMode ? '12px' : '0'
         }}
       />
 
-      {/* Map Controls */}
+      {/* Map Controls - WITHOUT location controls */}
       {showControls && mapLoaded && (
         <MapControls
           cafeType={cafeType}
           searchRadius={searchRadius}
           onSearchChange={onSearchChange}
           onRefresh={onRefresh}
-          onLocationRequest={onLocationRequest}
-          locationLoading={locationLoading}
           hasUserLocation={!!userLocation}
           cafesCount={cafes.length}
           isEmbedMode={isEmbedMode}
+          userLocation={userLocation}
         />
       )}
 
@@ -1171,62 +903,6 @@ const FullPageMap = ({
           <button onClick={onRefresh}>Retry</button>
         </div>
       )}
-
-      {/* WWDC-style Map Legend */}
-      <div style={{
-        position: 'absolute',
-        bottom: '60px',
-        left: '16px',
-        background: 'rgba(0, 0, 0, 0.8)',
-        backdropFilter: 'blur(20px)',
-        padding: '12px 16px',
-        borderRadius: '12px',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
-        fontSize: '12px',
-        color: 'white',
-        fontWeight: '500',
-        zIndex: 1000,
-        fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif'
-      }}>
-        <div style={{ 
-          marginBottom: '8px', 
-          fontWeight: '600',
-          background: 'linear-gradient(45deg, #007AFF, #5856D6, #AF52DE)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          backgroundClip: 'text'
-        }}>
-          🗺️ WWDC Map
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-          <div style={{ 
-            width: '12px', 
-            height: '12px', 
-            borderRadius: '50%', 
-            background: 'linear-gradient(45deg, #F97316, #EA580C)',
-            border: '2px solid rgba(255,255,255,0.3)'
-          }} />
-          <span>Coffee shops & bars</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{ 
-            width: '12px', 
-            height: '12px', 
-            borderRadius: '50%', 
-            background: 'linear-gradient(45deg, #EF4444, #DC2626)',
-            border: '2px solid rgba(255,255,255,0.3)'
-          }} />
-          <span>Restaurants</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-          <span>☕</span>
-          <span>Coffee shops</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span>🍽️</span>
-          <span>Restaurants</span>
-        </div>
-      </div>
     </div>
   );
 };

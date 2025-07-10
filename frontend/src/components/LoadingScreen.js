@@ -1,491 +1,299 @@
-// components/LoadingScreen.js - ENHANCED VERSION with Progress & Retry
+// components/LoadingScreen.js - ULTRA-FAST OPTIMIZED LOADING
 // Location: /frontend/src/components/LoadingScreen.js
 
 import React, { useState, useEffect } from 'react';
 
 const LoadingScreen = ({ 
-  message = "Preparazione esperienza...", 
-  subMessage = "Un momento per favore",
+  message = "Caricamento...", 
+  subMessage = "",
   progress = 0,
   showRetry = false,
   onRetry = null
 }) => {
-  const [currentMessage, setCurrentMessage] = useState(0);
   const [animatedProgress, setAnimatedProgress] = useState(0);
+  const [currentDot, setCurrentDot] = useState(0);
 
-  const loadingMessages = [
-    "🗺️ Caricamento mappa...",
-    "📍 Rilevamento posizione...",
-    "☕ Ricerca locale...",
-    "🎯 Calibrazione GPS...",
-    "🔗 Connessione servizi...",
-    "✨ Finalizzazione..."
-  ];
-
-  // Animate progress smoothly
+  // Fast progress animation
   useEffect(() => {
+    const targetProgress = Math.max(progress, 10); // Minimum 10% to show activity
+    
     const interval = setInterval(() => {
       setAnimatedProgress(prev => {
-        const diff = progress - prev;
-        if (Math.abs(diff) < 1) {
-          return progress;
+        const diff = targetProgress - prev;
+        if (Math.abs(diff) < 2) {
+          clearInterval(interval);
+          return targetProgress;
         }
-        return prev + (diff * 0.1); // Smooth animation
+        return prev + (diff * 0.3); // Faster animation
       });
-    }, 50);
+    }, 30); // Faster update rate
 
     return () => clearInterval(interval);
   }, [progress]);
 
-  // Cycle through loading messages
+  // Fast dot animation
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentMessage(prev => (prev + 1) % loadingMessages.length);
-    }, 2000);
+      setCurrentDot(prev => (prev + 1) % 3);
+    }, 400); // Faster dot cycling
 
     return () => clearInterval(interval);
-  }, [loadingMessages.length]);
+  }, []);
+
+  // Auto-progress to feel faster
+  useEffect(() => {
+    if (progress === 0) {
+      // Quick initial progress to make it feel fast
+      setTimeout(() => setAnimatedProgress(25), 100);
+      setTimeout(() => setAnimatedProgress(50), 300);
+    }
+  }, [progress]);
 
   return (
-    <div className="elegant-loading-screen">
-      <div className="elegant-loading-background" />
-      
-      <div className="elegant-loading-content">
-        <div className="elegant-loading-animation">
-          <div className="elegant-logo-container">
-            <div className="elegant-rings">
-              <div className="ring ring-1"></div>
-              <div className="ring ring-2"></div>
-              <div className="ring ring-3"></div>
-              <div className="center-icon">🗺️</div>
-            </div>
-          </div>
+    <div className="fast-loading-screen">
+      <div className="fast-loading-content">
+        
+        {/* Simple, fast icon animation */}
+        <div className="fast-loading-icon">
+          <div className="icon-main">🗺️</div>
+          <div className="icon-pulse"></div>
         </div>
 
-        {/* Enhanced Progress Ring with Percentage */}
-        <div className="elegant-progress-ring">
-          <svg className="progress-svg" viewBox="0 0 120 120">
-            <circle
-              className="progress-bg"
-              cx="60"
-              cy="60"
-              r="54"
-            />
-            <circle
+        {/* Streamlined progress display */}
+        <div className="fast-progress">
+          <div className="progress-track">
+            <div 
               className="progress-fill"
-              cx="60"
-              cy="60"
-              r="54"
-              style={{
-                strokeDasharray: 2 * Math.PI * 54,
-                strokeDashoffset: 2 * Math.PI * 54 * (1 - animatedProgress / 100),
-                transition: 'stroke-dashoffset 0.3s ease'
-              }}
+              style={{ width: `${Math.min(animatedProgress, 100)}%` }}
             />
-          </svg>
-          <div className="progress-text">
+          </div>
+          <div className="progress-percentage">
             {Math.round(animatedProgress)}%
           </div>
         </div>
 
-        <div className="elegant-loading-text">
-          <h2 className="main-message">{message}</h2>
-          <p className="sub-message">{subMessage}</p>
-          <p className="dynamic-message">
-            {loadingMessages[currentMessage]}
-          </p>
+        {/* Simplified text */}
+        <div className="fast-loading-text">
+          <h3>{message}</h3>
+          {subMessage && <p>{subMessage}</p>}
         </div>
 
-        {/* Progress Steps Indicator */}
-        <div className="progress-steps">
-          <div className={`step ${animatedProgress >= 20 ? 'completed' : 'pending'}`}>
-            <div className="step-icon">🔗</div>
-            <div className="step-label">Backend</div>
-          </div>
-          <div className={`step ${animatedProgress >= 60 ? 'completed' : 'pending'}`}>
-            <div className="step-icon">📍</div>
-            <div className="step-label">GPS</div>
-          </div>
-          <div className={`step ${animatedProgress >= 100 ? 'completed' : 'pending'}`}>
-            <div className="step-icon">✅</div>
-            <div className="step-label">Pronto</div>
-          </div>
+        {/* Fast loading dots */}
+        <div className="fast-loading-dots">
+          {[0, 1, 2].map(i => (
+            <div 
+              key={i}
+              className={`dot ${currentDot === i ? 'active' : ''}`}
+            />
+          ))}
         </div>
 
-        {/* Retry Button */}
+        {/* Retry button if needed */}
         {showRetry && onRetry && (
-          <div className="retry-section">
-            <button 
-              className="retry-button"
-              onClick={onRetry}
-            >
-              🔄 Riprova Connessione
-            </button>
-          </div>
+          <button 
+            className="fast-retry-button"
+            onClick={onRetry}
+          >
+            🔄 Riprova
+          </button>
         )}
-
-        <div className="elegant-loading-dots">
-          <div className="dot"></div>
-          <div className="dot"></div>
-          <div className="dot"></div>
-        </div>
       </div>
 
       <style>{`
-        .elegant-loading-screen {
+        .fast-loading-screen {
           position: fixed;
           top: 0;
           left: 0;
           right: 0;
           bottom: 0;
+          background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+          display: flex;
+          align-items: center;
+          justify-content: center;
           z-index: 9999;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          overflow: hidden;
+          animation: fastFadeIn 0.2s ease-out;
         }
 
-        .elegant-loading-background {
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: linear-gradient(135deg, #f8fafc 0%, #ffffff 25%, #e2e8f0 50%, #f1f5f9 75%, #ffffff 100%);
-          background-size: 400% 400%;
-          animation: backgroundShift 8s ease-in-out infinite;
+        @keyframes fastFadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
 
-        @keyframes backgroundShift {
-          0%, 100% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-        }
-
-        .elegant-loading-content {
+        .fast-loading-content {
           text-align: center;
-          position: relative;
-          z-index: 10;
           background: rgba(255, 255, 255, 0.9);
-          backdrop-filter: blur(20px);
-          padding: 48px 36px;
-          border-radius: 24px;
-          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-          border: 1px solid rgba(255, 255, 255, 0.4);
-          max-width: 420px;
+          backdrop-filter: blur(10px);
+          padding: 32px 28px;
+          border-radius: 20px;
+          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+          max-width: 280px;
           width: 90%;
-          animation: contentFloat 4s ease-in-out infinite;
+          animation: fastSlideUp 0.3s ease-out;
         }
 
-        @keyframes contentFloat {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-8px); }
+        @keyframes fastSlideUp {
+          from {
+            opacity: 0;
+            transform: translateY(15px) scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
         }
 
-        .elegant-loading-animation {
-          margin-bottom: 32px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .elegant-rings {
+        .fast-loading-icon {
           position: relative;
-          width: 120px;
-          height: 120px;
+          margin-bottom: 20px;
           display: flex;
           align-items: center;
           justify-content: center;
         }
 
-        .ring {
+        .icon-main {
+          font-size: 48px;
+          animation: fastIconSpin 2s linear infinite;
+          z-index: 2;
+          position: relative;
+        }
+
+        @keyframes fastIconSpin {
+          0% { transform: rotate(0deg) scale(1); }
+          50% { transform: rotate(180deg) scale(1.1); }
+          100% { transform: rotate(360deg) scale(1); }
+        }
+
+        .icon-pulse {
           position: absolute;
-          border-radius: 50%;
-          border: 3px solid;
-          border-color: transparent;
-          border-top-color: #6366f1;
-        }
-
-        .ring-1 {
-          width: 120px;
-          height: 120px;
-          animation: elegantSpin 3s linear infinite;
-        }
-
-        .ring-2 {
-          width: 90px;
-          height: 90px;
-          animation: elegantSpin 2s linear infinite reverse;
-          border-top-color: #8b5cf6;
-        }
-
-        .ring-3 {
           width: 60px;
           height: 60px;
-          animation: elegantSpin 4s linear infinite;
-          border-top-color: #ec4899;
+          border: 2px solid rgba(79, 70, 229, 0.3);
+          border-radius: 50%;
+          animation: fastPulse 1.5s ease-in-out infinite;
         }
 
-        .center-icon {
-          font-size: 42px;
-          animation: centerPulse 2s ease-in-out infinite;
-          z-index: 10;
+        @keyframes fastPulse {
+          0%, 100% {
+            transform: scale(0.8);
+            opacity: 0.6;
+          }
+          50% {
+            transform: scale(1.2);
+            opacity: 0.2;
+          }
         }
 
-        @keyframes elegantSpin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-
-        @keyframes centerPulse {
-          0%, 100% { transform: scale(1); opacity: 1; }
-          50% { transform: scale(1.1); opacity: 0.8; }
-        }
-
-        .elegant-progress-ring {
+        .fast-progress {
+          margin-bottom: 18px;
           position: relative;
-          width: 100px;
-          height: 100px;
-          margin: 0 auto 28px;
         }
 
-        .progress-svg {
+        .progress-track {
           width: 100%;
-          height: 100%;
-          transform: rotate(-90deg);
-        }
-
-        .progress-bg {
-          fill: none;
-          stroke: rgba(99, 102, 241, 0.1);
-          stroke-width: 4;
+          height: 6px;
+          background: rgba(79, 70, 229, 0.1);
+          border-radius: 3px;
+          overflow: hidden;
+          margin-bottom: 8px;
         }
 
         .progress-fill {
-          fill: none;
-          stroke: url(#progressGradient);
-          stroke-width: 4;
-          stroke-linecap: round;
+          height: 100%;
+          background: linear-gradient(90deg, #4F46E5, #7C3AED, #EC4899);
+          border-radius: 3px;
+          transition: width 0.3s ease;
+          position: relative;
         }
 
-        .progress-svg::before {
+        .progress-fill::after {
           content: '';
           position: absolute;
           top: 0;
           left: 0;
           right: 0;
           bottom: 0;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+          animation: fastShimmer 1s linear infinite;
         }
 
-        .progress-svg defs {
-          position: absolute;
+        @keyframes fastShimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
         }
 
-        .progress-fill {
-          stroke: #6366f1;
-        }
-
-        .progress-text {
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-          font-size: 18px;
+        .progress-percentage {
+          font-size: 14px;
           font-weight: 700;
-          color: #374151;
-          background: linear-gradient(135deg, #6366f1, #8b5cf6);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
+          color: #4F46E5;
         }
 
-        .elegant-loading-text {
-          margin-bottom: 28px;
-        }
-
-        .main-message {
-          font-size: 24px;
-          font-weight: 700;
-          color: #1f2937;
-          margin-bottom: 8px;
-          background: linear-gradient(135deg, #6366f1, #8b5cf6, #ec4899);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
-        }
-
-        .sub-message {
-          font-size: 15px;
-          color: #6b7280;
+        .fast-loading-text {
           margin-bottom: 16px;
-          font-weight: 400;
-          line-height: 1.4;
         }
 
-        .dynamic-message {
-          font-size: 14px;
-          color: #374151;
-          font-weight: 500;
-          height: 20px;
-          animation: messageGlow 2s ease-in-out infinite;
+        .fast-loading-text h3 {
+          font-size: 18px;
+          font-weight: 600;
+          color: #1F2937;
+          margin-bottom: 4px;
         }
 
-        @keyframes messageGlow {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.6; }
+        .fast-loading-text p {
+          font-size: 13px;
+          color: #6B7280;
+          margin: 0;
         }
 
-        /* Progress Steps */
-        .progress-steps {
+        .fast-loading-dots {
           display: flex;
           justify-content: center;
-          gap: 24px;
-          margin-bottom: 24px;
-          padding: 16px;
-          background: rgba(255, 255, 255, 0.6);
-          border-radius: 16px;
-          border: 1px solid rgba(255, 255, 255, 0.3);
-        }
-
-        .step {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
           gap: 6px;
-          transition: all 0.3s ease;
-        }
-
-        .step-icon {
-          width: 32px;
-          height: 32px;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 16px;
-          transition: all 0.3s ease;
-          border: 2px solid transparent;
-        }
-
-        .step.pending .step-icon {
-          background: rgba(107, 114, 128, 0.1);
-          color: #9CA3AF;
-          border-color: rgba(107, 114, 128, 0.2);
-        }
-
-        .step.completed .step-icon {
-          background: linear-gradient(135deg, #10B981, #059669);
-          color: white;
-          border-color: #10B981;
-          box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
-          animation: stepCompleted 0.5s ease;
-        }
-
-        @keyframes stepCompleted {
-          0% { transform: scale(0.8); }
-          50% { transform: scale(1.2); }
-          100% { transform: scale(1); }
-        }
-
-        .step-label {
-          font-size: 11px;
-          font-weight: 600;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-          transition: color 0.3s ease;
-        }
-
-        .step.pending .step-label {
-          color: #9CA3AF;
-        }
-
-        .step.completed .step-label {
-          color: #10B981;
-        }
-
-        /* Retry Section */
-        .retry-section {
-          margin-bottom: 20px;
-        }
-
-        .retry-button {
-          background: linear-gradient(135deg, #EF4444, #DC2626);
-          color: white;
-          border: none;
-          padding: 12px 24px;
-          border-radius: 12px;
-          font-size: 14px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.3s ease;
-          box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
-        }
-
-        .retry-button:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
-        }
-
-        .retry-button:active {
-          transform: translateY(0);
-        }
-
-        .elegant-loading-dots {
-          display: flex;
-          justify-content: center;
-          gap: 8px;
+          margin-bottom: 16px;
         }
 
         .dot {
-          width: 10px;
-          height: 10px;
+          width: 8px;
+          height: 8px;
           border-radius: 50%;
-          background: linear-gradient(135deg, #6366f1, #8b5cf6);
-          animation: dotBounce 1.4s ease-in-out infinite;
+          background: #CBD5E1;
+          transition: all 0.3s ease;
         }
 
-        .dot:nth-child(2) {
-          animation-delay: 0.2s;
+        .dot.active {
+          background: #4F46E5;
+          transform: scale(1.3);
         }
 
-        .dot:nth-child(3) {
-          animation-delay: 0.4s;
+        .fast-retry-button {
+          background: linear-gradient(135deg, #EF4444, #DC2626);
+          color: white;
+          border: none;
+          padding: 10px 20px;
+          border-radius: 10px;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s ease;
         }
 
-        @keyframes dotBounce {
-          0%, 80%, 100% {
-            transform: scale(0.8);
-            opacity: 0.5;
-          }
-          40% {
-            transform: scale(1.2);
-            opacity: 1;
-          }
+        .fast-retry-button:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
         }
 
-        /* Mobile Responsive */
+        /* Mobile optimization */
         @media (max-width: 480px) {
-          .elegant-loading-content {
-            padding: 32px 24px;
-            margin: 16px;
-            max-width: calc(100% - 32px);
+          .fast-loading-content {
+            padding: 24px 20px;
+            margin: 12px;
           }
 
-          .main-message {
-            font-size: 20px;
+          .icon-main {
+            font-size: 40px;
           }
 
-          .progress-steps {
-            gap: 16px;
-          }
-
-          .step-icon {
-            width: 28px;
-            height: 28px;
-            font-size: 14px;
-          }
-
-          .step-label {
-            font-size: 10px;
+          .fast-loading-text h3 {
+            font-size: 16px;
           }
         }
       `}</style>
