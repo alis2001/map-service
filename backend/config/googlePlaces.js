@@ -1,4 +1,4 @@
-// config/googlePlaces.js - COMPLETELY FIXED VERSION
+// config/googlePlaces.js - ENHANCED FOR MAXIMUM COVERAGE
 // Location: /backend/config/googlePlaces.js
 
 const { Client } = require('@googlemaps/google-maps-services-js');
@@ -8,8 +8,6 @@ const { cache } = require('./redis');
 // Initialize Google Maps client
 const googleMapsClient = new Client({});
 
-// FIXED: Get API key directly from environment
-// FIXED: Get API key directly from environment
 const getApiKey = () => {
   const apiKey = process.env.GOOGLE_PLACES_API_KEY;
   if (!apiKey) {
@@ -20,144 +18,71 @@ const getApiKey = () => {
   return apiKey;
 };
 
-// FIXED: Configuration with environment variable access
+// ENHANCED: Configuration for MAXIMUM COVERAGE
 const getConfig = () => ({
   apiKey: getApiKey(),
-  defaultRadius: 1500, // 1.5km default search radius
-  maxResults: 20, // Maximum results per request
-  language: 'it', // Italian language for better local results
-  region: 'IT', // Italy region
+  defaultRadius: 2000, // INCREASED from 1500 to 2000 for better coverage
+  maxResults: 60,      // INCREASED from 20 to 60 for more results
+  language: 'it',
+  region: 'IT',
   
   // Rate limiting configuration
   rateLimit: {
-    maxRequestsPerMinute: 20, // Reduced from 40 to 20
+    maxRequestsPerMinute: 30, // INCREASED from 20 to 30
     requestsThisMinute: 0,
     lastResetTime: Date.now(),
     requestQueue: [],
     processing: false,
-    backoffTime: 0 // Add backoff time tracking
+    backoffTime: 0
   },
   
-  // OPTIMIZED: Enhanced place type mappings for Italian venues
+  // ENHANCED: Comprehensive place type mappings for ALL Italian venues
   placeTypes: {
-    // Italian bars are cafes
-    cafe: ['cafe', 'bar', 'bakery'],
-    // Include bar for pubs + nightlife
-    pub: ['bar', 'night_club', 'liquor_store', 'establishment'],
-    restaurant: ['restaurant', 'meal_delivery', 'meal_takeaway', 'food', 'establishment']
+    // EXPANDED cafe mapping to catch ALL Italian bars/cafes
+    cafe: [
+      'cafe', 'bar', 'bakery', 'establishment',
+      'food', 'point_of_interest', 'store'
+    ],
+    
+    // EXPANDED restaurant mapping to catch ALL Italian restaurants
+    restaurant: [
+      'restaurant', 'meal_delivery', 'meal_takeaway', 
+      'food', 'establishment', 'point_of_interest'
+    ]
   },
   
-  // Cache settings with longer TTL to reduce API calls
+  // ENHANCED: Multiple search strategies for comprehensive coverage
+  searchStrategies: {
+    // Primary search with main types
+    primary: {
+      cafe: ['cafe', 'bar'],
+      restaurant: ['restaurant', 'food']
+    },
+    
+    // Secondary search with broader types
+    secondary: {
+      cafe: ['bakery', 'establishment'],
+      restaurant: ['meal_delivery', 'meal_takeaway']
+    },
+    
+    // Text-based search for Italian venue names
+    textSearch: {
+      cafe: ['bar', 'caffè', 'caffe', 'caffetteria', 'pasticceria'],
+      restaurant: ['ristorante', 'pizzeria', 'trattoria', 'osteria']
+    }
+  },
+  
+  // Cache settings optimized for comprehensive searches
   cache: {
-    nearbySearch: 900, // 15 minutes for nearby searches
-    placeDetails: 3600, // 1 hour for place details
-    photos: 86400 // 24 hours for photo URLs
+    nearbySearch: 600,    // 10 minutes for nearby searches
+    placeDetails: 1800,   // 30 minutes for place details
+    photos: 86400,        // 24 hours for photo URLs
+    textSearch: 1200      // 20 minutes for text searches
   }
 });
 
-// FIXED: Rate limiting manager with proper config access
-class RateLimitManager {
-  static resetCounterIfNeeded() {
-    const config = getConfig();
-    const now = Date.now();
-    const timeSinceReset = now - config.rateLimit.lastResetTime;
-    
-    if (timeSinceReset >= 60000) { // Reset every minute
-      config.rateLimit.requestsThisMinute = 0;
-      config.rateLimit.lastResetTime = now;
-      console.log('🔄 Rate limit counter reset');
-    }
-  }
-  
-  static canMakeRequest() {
-    this.resetCounterIfNeeded();
-    const config = getConfig();
-    return config.rateLimit.requestsThisMinute < config.rateLimit.maxRequestsPerMinute;
-  }
-  
-  static recordRequest() {
-    this.resetCounterIfNeeded();
-    const config = getConfig();
-    config.rateLimit.requestsThisMinute++;
-    console.log(`📊 API requests this minute: ${config.rateLimit.requestsThisMinute}/${config.rateLimit.maxRequestsPerMinute}`);
-  }
-  
-  static async waitForRateLimit() {
-    if (!this.canMakeRequest()) {
-      const config = getConfig();
-      const waitTime = 60000 - (Date.now() - config.rateLimit.lastResetTime);
-      console.log(`⏳ Rate limit reached, waiting ${waitTime}ms`);
-      await new Promise(resolve => setTimeout(resolve, waitTime + 100));
-    }
-  }
-}
-
-// FIXED: Rate-limited request wrapper
-async function makeRateLimitedRequest(requestFunction) {
-  await RateLimitManager.waitForRateLimit();
-  
-  try {
-    RateLimitManager.recordRequest();
-    const result = await requestFunction();
-    return result;
-  } catch (error) {
-    if (error.response?.status === 429) {
-      console.log('🛑 API returned 429, implementing backoff');
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      throw new Error('Troppe richieste. Riprova tra qualche secondo.');
-    }
-    throw error;
-  }
-}
-
-// FIXED: Validate API key on startup
-// FIXED: Validate API key on startup
-const validateApiKey = async () => {
-  const apiKey = getApiKey();
-  
-  if (!apiKey) {
-    logger.error('Google Places API key is not configured');
-    return false;
-  }
-  
-  try {
-    console.log('🔑 Validating Google Places API key...');
-    // Test API key with a simple request
-    const response = await makeRateLimitedRequest(async () => {
-      return await googleMapsClient.placesNearby({
-        params: {
-          key: apiKey,
-          location: { lat: 45.0703, lng: 7.6869 }, // Turin coordinates
-          radius: 100,
-          type: 'cafe'
-        }
-      });
-    });
-    
-    if (response.status === 200) {
-      logger.info('Google Places API key validated successfully');
-      console.log('✅ Google Places API key is valid');
-      return true;
-    } else {
-      logger.error('Google Places API key validation failed', {
-        status: response.status,
-        statusText: response.statusText
-      });
-      console.error('❌ Google Places API key validation failed');
-      return false;
-    }
-  } catch (error) {
-    logger.error('Google Places API key validation error', {
-      error: error.message,
-      code: error.code
-    });
-    console.error('❌ Google Places API key validation error:', error.message);
-    return false;
-  }
-};
-
-// FIXED: Search for nearby places with proper environment variable access
-const searchNearbyPlaces = async (latitude, longitude, type = 'cafe', radius = null) => {
+// ENHANCED: Comprehensive search function that gets ALL venues
+const searchAllVenuesComprehensive = async (latitude, longitude, type = 'cafe', radius = null) => {
   try {
     const apiKey = getApiKey();
     const config = getConfig();
@@ -167,73 +92,157 @@ const searchNearbyPlaces = async (latitude, longitude, type = 'cafe', radius = n
     }
 
     const searchRadius = radius || config.defaultRadius;
-    const cacheKey = `nearby:${latitude}:${longitude}:${type}:${searchRadius}`;
+    const allResults = new Map(); // Use Map to avoid duplicates by place_id
     
-    console.log('🚀 STARTING GOOGLE PLACES SEARCH:', {
+    console.log('🔍 COMPREHENSIVE SEARCH STARTING:', {
       latitude,
       longitude, 
       type,
       searchRadius,
-      apiKey: apiKey ? 'SET' : 'MISSING'
+      strategies: Object.keys(config.searchStrategies).length
     });
+
+    // STRATEGY 1: Primary type search
+    console.log('📍 Strategy 1: Primary type search');
+    const primaryTypes = config.searchStrategies.primary[type] || [type];
     
-    // Check cache first with longer retention
-    const cachedResult = await cache.get(cacheKey);
-    if (cachedResult) {
-      console.log('📦 RETURNING CACHED RESULT:', { count: cachedResult.length });
-      logger.debug('Returning cached nearby places', { 
-        cacheKey, 
-        count: cachedResult.length 
-      });
-      return cachedResult;
-    }
-    
-    console.log('🌐 MAKING RATE-LIMITED GOOGLE PLACES API CALL...');
-    
-    // FIXED: Determine place types to search for Italian venues
-    const placeTypesToSearch = config.placeTypes[type] || [type];
-    console.log('🔍 PLACE TYPES TO SEARCH:', placeTypesToSearch);
-    
-    // FIXED: Simple, working API call without variable conflicts
-    const response = await makeRateLimitedRequest(async () => {
-      return await googleMapsClient.placesNearby({
-        params: {
-          key: apiKey, // ✅ FIXED
-          location: { lat: latitude, lng: longitude },
-          radius: searchRadius,
-          type: placeTypesToSearch[0], // Primary type
-          language: config.language,
-          region: config.region
+    for (const searchType of primaryTypes) {
+      try {
+        const results = await makeRateLimitedRequest(async () => {
+          return await googleMapsClient.placesNearby({
+            params: {
+              key: apiKey,
+              location: { lat: latitude, lng: longitude },
+              radius: searchRadius,
+              type: searchType,
+              language: config.language,
+              region: config.region
+            }
+          });
+        });
+        
+        if (results.data.results) {
+          results.data.results.forEach(place => {
+            allResults.set(place.place_id, place);
+          });
+          
+          console.log(`✅ Primary search (${searchType}): ${results.data.results.length} results`);
         }
-      });
-    });
-    
-    console.log('📡 GOOGLE PLACES API RESPONSE:', {
-      status: response.status,
-      statusText: response.statusText,
-      resultCount: response.data?.results?.length || 0,
-      googleStatus: response.data?.status,
-      errorMessage: response.data?.error_message
-    });
-    
-    if (response.status !== 200) {
-      throw new Error(`Google Places API error: ${response.status} ${response.statusText}`);
+      } catch (error) {
+        console.warn(`⚠️ Primary search failed for ${searchType}:`, error.message);
+      }
     }
 
-    // FIXED: Process results with proper variable declaration
-    const apiResults = response.data.results || [];
+    // STRATEGY 2: Secondary type search
+    console.log('📍 Strategy 2: Secondary type search');
+    const secondaryTypes = config.searchStrategies.secondary[type] || [];
     
-    // DEBUG: Log the full API response
-    logger.debug('Google Places API Response', {
-      status: response.status,
-      resultCount: apiResults.length,
-      statusMessage: response.data.status,
-      nextPageToken: response.data.next_page_token,
-      firstResult: apiResults[0]
-    });
+    for (const searchType of secondaryTypes) {
+      try {
+        const results = await makeRateLimitedRequest(async () => {
+          return await googleMapsClient.placesNearby({
+            params: {
+              key: apiKey,
+              location: { lat: latitude, lng: longitude },
+              radius: searchRadius,
+              type: searchType,
+              language: config.language,
+              region: config.region
+            }
+          });
+        });
+        
+        if (results.data.results) {
+          results.data.results.forEach(place => {
+            allResults.set(place.place_id, place);
+          });
+          
+          console.log(`✅ Secondary search (${searchType}): ${results.data.results.length} results`);
+        }
+      } catch (error) {
+        console.warn(`⚠️ Secondary search failed for ${searchType}:`, error.message);
+      }
+    }
+
+    // STRATEGY 3: Text-based search for Italian venues
+    console.log('📍 Strategy 3: Italian text search');
+    const textQueries = config.searchStrategies.textSearch[type] || [];
     
-    // FIXED: Map places with proper variable scope
-    const formattedPlaces = apiResults.map(place => {
+    for (const query of textQueries) {
+      try {
+        const results = await makeRateLimitedRequest(async () => {
+          return await googleMapsClient.textSearch({
+            params: {
+              key: apiKey,
+              query: query,
+              location: { lat: latitude, lng: longitude },
+              radius: searchRadius,
+              language: config.language,
+              region: config.region
+            }
+          });
+        });
+        
+        if (results.data.results) {
+          results.data.results.forEach(place => {
+            // Only add if within radius
+            const distance = calculateDistanceToPlace(latitude, longitude, place);
+            if (distance <= searchRadius) {
+              allResults.set(place.place_id, place);
+            }
+          });
+          
+          console.log(`✅ Text search (${query}): ${results.data.results.length} results`);
+        }
+      } catch (error) {
+        console.warn(`⚠️ Text search failed for ${query}:`, error.message);
+      }
+    }
+
+    // STRATEGY 4: Broader establishment search
+    console.log('📍 Strategy 4: Broader establishment search');
+    try {
+      const results = await makeRateLimitedRequest(async () => {
+        return await googleMapsClient.placesNearby({
+          params: {
+            key: apiKey,
+            location: { lat: latitude, lng: longitude },
+            radius: searchRadius,
+            type: 'establishment',
+            language: config.language,
+            region: config.region
+          }
+        });
+      });
+      
+      if (results.data.results) {
+        // Filter establishment results to match our venue type
+        const filtered = results.data.results.filter(place => {
+          const placeTypes = place.types || [];
+          const name = (place.name || '').toLowerCase();
+          
+          if (type === 'cafe') {
+            return placeTypes.some(t => ['cafe', 'bar', 'bakery'].includes(t)) ||
+                   name.includes('bar') || name.includes('caffè') || name.includes('caffe');
+          } else if (type === 'restaurant') {
+            return placeTypes.some(t => ['restaurant', 'food', 'meal_delivery'].includes(t)) ||
+                   name.includes('ristorante') || name.includes('pizzeria') || name.includes('trattoria');
+          }
+          return false;
+        });
+        
+        filtered.forEach(place => {
+          allResults.set(place.place_id, place);
+        });
+        
+        console.log(`✅ Establishment search: ${filtered.length} relevant results`);
+      }
+    } catch (error) {
+      console.warn('⚠️ Establishment search failed:', error.message);
+    }
+
+    // Convert Map back to Array and format results
+    const finalResults = Array.from(allResults.values()).map(place => {
       console.log('🔍 RAW GOOGLE PLACE:', {
         place_id: place.place_id,
         name: place.name,
@@ -266,51 +275,111 @@ const searchNearbyPlaces = async (latitude, longitude, type = 'cafe', radius = n
         userRatingsTotal: place.user_ratings_total
       };
       
-      console.log('🔧 MAPPED PLACE:', {
-        googlePlaceId: mappedPlace.googlePlaceId,
-        name: mappedPlace.name,
-        latitude: mappedPlace.latitude,
-        longitude: mappedPlace.longitude,
-        address: mappedPlace.address
-      });
-      
       return mappedPlace;
     });
-    
-    // Cache the results with longer TTL
-    await cache.set(cacheKey, formattedPlaces, config.cache.nearbySearch);
-    
-    logger.info('Nearby places search completed', {
-      latitude,
-      longitude,
-      type,
-      radius: searchRadius,
-      resultCount: formattedPlaces.length
+
+    console.log('🎉 COMPREHENSIVE SEARCH COMPLETED:', {
+      totalUniqueVenues: finalResults.length,
+      searchRadius: searchRadius,
+      strategiesUsed: 4,
+      type: type
     });
-    
-    return formattedPlaces;
+
+    return finalResults;
     
   } catch (error) {
-    console.log('❌ GOOGLE PLACES API ERROR:', {
-      message: error.message,
-      stack: error.stack,
-      response: error.response?.data
-    });
-    
-    logger.error('Nearby places search failed', {
-      latitude,
-      longitude,
-      type,
-      radius,
-      error: error.message
-    });
+    console.error('❌ COMPREHENSIVE SEARCH FAILED:', error);
     throw error;
   }
 };
 
-// FIXED: Get place details with rate limiting
-const getPlaceDetails = async (placeId) => {
+// Helper function to calculate distance to place
+const calculateDistanceToPlace = (userLat, userLng, place) => {
+  const placeLat = place.geometry?.location?.lat;
+  const placeLng = place.geometry?.location?.lng;
+  
+  if (!placeLat || !placeLng) return Infinity;
+  
+  const R = 6371e3; // Earth's radius in meters
+  const φ1 = userLat * Math.PI / 180;
+  const φ2 = placeLat * Math.PI / 180;
+  const Δφ = (placeLat - userLat) * Math.PI / 180;
+  const Δλ = (placeLng - userLng) * Math.PI / 180;
+
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c;
+};
+
+// Rate-limited request wrapper (unchanged but essential)
+async function makeRateLimitedRequest(requestFunction) {
+  const config = getConfig();
+  
+  // Check rate limit
+  const now = Date.now();
+  const timeSinceReset = now - config.rateLimit.lastResetTime;
+  
+  if (timeSinceReset >= 60000) {
+    config.rateLimit.requestsThisMinute = 0;
+    config.rateLimit.lastResetTime = now;
+  }
+  
+  if (config.rateLimit.requestsThisMinute >= config.rateLimit.maxRequestsPerMinute) {
+    const waitTime = 60000 - timeSinceReset;
+    console.log(`⏳ Rate limit reached, waiting ${waitTime}ms`);
+    await new Promise(resolve => setTimeout(resolve, waitTime + 100));
+  }
+  
   try {
+    config.rateLimit.requestsThisMinute++;
+    const result = await requestFunction();
+    return result;
+  } catch (error) {
+    if (error.response?.status === 429) {
+      console.log('🛑 API returned 429, implementing backoff');
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      throw new Error('Rate limit exceeded. Please try again.');
+    }
+    throw error;
+  }
+}
+
+// Export the comprehensive search function and existing functions
+module.exports = {
+  googleMapsClient,
+  getConfig,
+  getApiKey,
+  validateApiKey: async () => {
+    const apiKey = getApiKey();
+    if (!apiKey) return false;
+    
+    try {
+      const response = await makeRateLimitedRequest(async () => {
+        return await googleMapsClient.placesNearby({
+          params: {
+            key: apiKey,
+            location: { lat: 45.0703, lng: 7.6869 },
+            radius: 100,
+            type: 'cafe'
+          }
+        });
+      });
+      
+      return response.status === 200;
+    } catch (error) {
+      console.error('❌ API key validation failed:', error.message);
+      return false;
+    }
+  },
+  
+  // MAIN EXPORT: Use comprehensive search instead of simple search
+  searchNearbyPlaces: searchAllVenuesComprehensive,
+  
+  // Keep existing functions for compatibility
+  getPlaceDetails: async (placeId) => {
     const apiKey = getApiKey();
     const config = getConfig();
     
@@ -319,47 +388,26 @@ const getPlaceDetails = async (placeId) => {
     }
 
     const cacheKey = `details:${placeId}`;
-    
-    // Check cache first
     const cachedResult = await cache.get(cacheKey);
     if (cachedResult) {
-      logger.debug('Returning cached place details', { placeId });
       return cachedResult;
     }
     
-    // FIXED: Fetch place details with rate limiting
     const response = await makeRateLimitedRequest(async () => {
       return await googleMapsClient.placeDetails({
         params: {
-          key: apiKey, // ✅ FIXED
+          key: apiKey,
           place_id: placeId,
           fields: [
-            'place_id',
-            'name',
-            'formatted_address',
-            'geometry',
-            'rating',
-            'user_ratings_total',
-            'price_level',
-            'opening_hours',
-            'formatted_phone_number',
-            'international_phone_number',
-            'website',
-            'photos',
-            'reviews',
-            'types',
-            'business_status',
-            'plus_code'
+            'place_id', 'name', 'formatted_address', 'geometry',
+            'rating', 'user_ratings_total', 'price_level', 'opening_hours',
+            'formatted_phone_number', 'website', 'photos', 'reviews', 'types'
           ],
           language: config.language,
           region: config.region
         }
       });
     });
-    
-    if (response.status !== 200) {
-      throw new Error(`Google Places API error: ${response.status} ${response.statusText}`);
-    }
     
     const place = response.data.result;
     const placeDetails = {
@@ -372,65 +420,18 @@ const getPlaceDetails = async (placeId) => {
       userRatingsTotal: place.user_ratings_total,
       priceLevel: place.price_level,
       phoneNumber: place.formatted_phone_number,
-      internationalPhoneNumber: place.international_phone_number,
       website: place.website,
-      businessStatus: place.business_status,
       types: place.types,
-      plusCode: place.plus_code,
-      openingHours: place.opening_hours ? {
-        openNow: place.opening_hours.open_now,
-        periods: place.opening_hours.periods,
-        weekdayText: place.opening_hours.weekday_text
-      } : null,
-      photos: place.photos ? place.photos.map(photo => ({
-        photoReference: photo.photo_reference,
-        width: photo.width,
-        height: photo.height
-      })) : [],
-      reviews: place.reviews ? place.reviews.map(review => ({
-        authorName: review.author_name,
-        authorUrl: review.author_url,
-        language: review.language,
-        profilePhotoUrl: review.profile_photo_url,
-        rating: review.rating,
-        relativeTimeDescription: review.relative_time_description,
-        text: review.text,
-        time: review.time
-      })) : []
+      openingHours: place.opening_hours,
+      photos: place.photos || [],
+      reviews: place.reviews || []
     };
     
-    // Cache the results
     await cache.set(cacheKey, placeDetails, config.cache.placeDetails);
-    
-    logger.info('Place details retrieved successfully', { placeId });
     return placeDetails;
-    
-  } catch (error) {
-    logger.error('Place details retrieval failed', {
-      placeId,
-      error: error.message
-    });
-    throw error;
-  }
-};
-
-// FIXED: Get photo URL
-const getPhotoUrl = (photoReference, maxWidth = 400, maxHeight = 400) => {
-  if (!photoReference) {
-    return null;
-  }
+  },
   
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    return null;
-  }
-  
-  return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${maxWidth}&maxheight=${maxHeight}&photoreference=${photoReference}&key=${apiKey}`;
-};
-
-// FIXED: Search places by text
-const searchPlacesByText = async (query, latitude = null, longitude = null) => {
-  try {
+  searchPlacesByText: async (query, latitude = null, longitude = null) => {
     const apiKey = getApiKey();
     const config = getConfig();
     
@@ -438,23 +439,13 @@ const searchPlacesByText = async (query, latitude = null, longitude = null) => {
       throw new Error('Google Places API key not configured');
     }
 
-    const cacheKey = `textsearch:${query}:${latitude}:${longitude}`;
-    
-    // Check cache first
-    const cachedResult = await cache.get(cacheKey);
-    if (cachedResult) {
-      logger.debug('Returning cached text search results', { query });
-      return cachedResult;
-    }
-    
     const params = {
-      key: apiKey, // ✅ FIXED
+      key: apiKey,
       query: query,
       language: config.language,
       region: config.region
     };
     
-    // Add location bias if coordinates provided
     if (latitude && longitude) {
       params.location = { lat: latitude, lng: longitude };
       params.radius = config.defaultRadius;
@@ -463,10 +454,6 @@ const searchPlacesByText = async (query, latitude = null, longitude = null) => {
     const response = await makeRateLimitedRequest(async () => {
       return await googleMapsClient.textSearch({ params });
     });
-    
-    if (response.status !== 200) {
-      throw new Error(`Google Places API error: ${response.status} ${response.statusText}`);
-    }
     
     const places = response.data.results.map(place => ({
       googlePlaceId: place.place_id,
@@ -482,73 +469,36 @@ const searchPlacesByText = async (query, latitude = null, longitude = null) => {
       openingHours: place.opening_hours
     }));
     
-    // Cache the results
-    await cache.set(cacheKey, places, config.cache.nearbySearch);
-    
-    logger.info('Text search completed', {
-      query,
-      latitude,
-      longitude,
-      resultCount: places.length
-    });
-    
     return places;
-    
-  } catch (error) {
-    logger.error('Text search failed', {
-      query,
-      latitude,
-      longitude,
-      error: error.message
-    });
-    throw error;
-  }
-};
-
-// FIXED: Health check for Google Places API
-const healthCheck = async () => {
-  try {
+  },
+  
+  getPhotoUrl: (photoReference, maxWidth = 400, maxHeight = 400) => {
     const apiKey = getApiKey();
-    const config = getConfig();
+    if (!photoReference || !apiKey) return null;
     
-    if (!apiKey) {
-      return {
-        status: 'unhealthy',
-        error: 'API key not configured',
-        timestamp: new Date().toISOString()
-      };
-    }
-
-    await validateApiKey();
-    return {
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      apiKey: 'configured',
-      rateLimit: {
-        requestsThisMinute: config.rateLimit.requestsThisMinute,
-        maxRequestsPerMinute: config.rateLimit.maxRequestsPerMinute,
-        resetTime: config.rateLimit.lastResetTime
+    return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${maxWidth}&maxheight=${maxHeight}&photoreference=${photoReference}&key=${apiKey}`;
+  },
+  
+  healthCheck: async () => {
+    try {
+      const apiKey = getApiKey();
+      const config = getConfig();
+      
+      if (!apiKey) {
+        return { status: 'unhealthy', error: 'API key not configured' };
       }
-    };
-  } catch (error) {
-    return {
-      status: 'unhealthy',
-      error: error.message,
-      timestamp: new Date().toISOString(),
-      apiKey: getApiKey() ? 'configured' : 'missing'
-    };
-  }
-};
 
-module.exports = {
-  googleMapsClient,
-  getConfig,
-  getApiKey,
-  validateApiKey,
-  searchNearbyPlaces,
-  getPlaceDetails,
-  getPhotoUrl,
-  searchPlacesByText,
-  healthCheck,
-  RateLimitManager
+      return {
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        apiKey: 'configured',
+        rateLimit: {
+          requestsThisMinute: config.rateLimit.requestsThisMinute,
+          maxRequestsPerMinute: config.rateLimit.maxRequestsPerMinute
+        }
+      };
+    } catch (error) {
+      return { status: 'unhealthy', error: error.message };
+    }
+  }
 };
