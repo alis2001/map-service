@@ -205,74 +205,75 @@ class GooglePlacesService {
   }
 
   // NEW: Perform comprehensive search using multiple strategies
+  // REPLACE the existing performComprehensiveSearch method with this enhanced version:
   async performComprehensiveSearch(latitude, longitude, type, radius, limit) {
-    const allResults = new Map(); // Use Map to avoid duplicates by place_id
-    const searchPromises = [];
+      const allResults = new Map(); // Use Map to avoid duplicates by place_id
+      const searchPromises = [];
 
-    // Strategy 1: Direct type search with increased results
-    const directTypes = SERVICE_CONFIG.placeTypeMapping[type] || [type];
-    
-    for (const searchType of directTypes) {
-      searchPromises.push(
-        this.searchWithStrategy(latitude, longitude, searchType, radius, Math.ceil(limit / directTypes.length))
-          .catch(error => {
-            console.warn(`Direct search for ${searchType} failed:`, error.message);
-            return [];
-          })
-      );
-    }
+      // Strategy 1: Enhanced type search with MULTIPLE radius searches
+      const directTypes = SERVICE_CONFIG.placeTypeMapping[type] || [type];
+      const radiusSteps = [radius, Math.min(radius * 1.5, 3000), Math.min(radius * 2, 5000)];
+      
+      for (const searchType of directTypes) {
+        for (const searchRadius of radiusSteps) {
+          searchPromises.push(
+            this.searchWithStrategy(latitude, longitude, searchType, searchRadius, Math.ceil(limit / directTypes.length))
+              .catch(error => {
+                console.warn(`Search for ${searchType} at ${searchRadius}m failed:`, error.message);
+                return [];
+              })
+          );
+        }
+      }
 
-    // Strategy 2: Keyword-based search for more comprehensive coverage
-    const strategy = SERVICE_CONFIG.searchStrategies.find(s => s.type === type);
-    if (strategy) {
-      for (const keyword of strategy.keywords) {
+      // Strategy 2: COMPREHENSIVE keyword search for Italian venues
+      const enhancedKeywords = type === 'restaurant' ? 
+        ['ristorante', 'pizzeria', 'trattoria', 'osteria', 'restaurant', 'food', 'meal'] :
+        ['bar', 'caffè', 'cafe', 'coffee', 'gelateria', 'pasticceria', 'bakery'];
+
+      for (const keyword of enhancedKeywords) {
         searchPromises.push(
-          this.searchByKeyword(latitude, longitude, keyword, Math.ceil(radius * 0.8))
+          this.searchByKeyword(latitude, longitude, keyword, radius)
             .catch(error => {
               console.warn(`Keyword search for ${keyword} failed:`, error.message);
               return [];
             })
         );
       }
-    }
 
-    // Strategy 3: Broader establishment search as fallback
-    searchPromises.push(
-      this.searchWithStrategy(latitude, longitude, 'establishment', radius, limit)
-        .catch(error => {
-          console.warn(`Establishment search failed:`, error.message);
-          return [];
-        })
-    );
-
-    // Execute all search strategies in parallel
-    console.log(`🔍 EXECUTING ${searchPromises.length} SEARCH STRATEGIES...`);
-    const searchResults = await Promise.allSettled(searchPromises);
-
-    // Combine and deduplicate results
-    searchResults.forEach((result, index) => {
-      if (result.status === 'fulfilled' && Array.isArray(result.value)) {
-        result.value.forEach(place => {
-          if (place.googlePlaceId && !allResults.has(place.googlePlaceId)) {
-            allResults.set(place.googlePlaceId, place);
-          }
-        });
+      // Strategy 3: Broader establishment search with multiple types
+      const establishmentTypes = ['establishment', 'point_of_interest', 'store'];
+      for (const estType of establishmentTypes) {
+        searchPromises.push(
+          this.searchWithStrategy(latitude, longitude, estType, radius, limit)
+            .catch(error => {
+              console.warn(`Establishment search for ${estType} failed:`, error.message);
+              return [];
+            })
+        );
       }
-    });
 
-    const uniqueResults = Array.from(allResults.values());
-    
-    // Filter results by type relevance and distance
-    const filteredResults = this.filterAndRankResults(uniqueResults, type, latitude, longitude, radius);
-    
-    console.log(`📊 SEARCH STRATEGIES SUMMARY:`, {
-      strategiesExecuted: searchPromises.length,
-      rawResults: uniqueResults.length,
-      afterFiltering: filteredResults.length,
-      targetType: type
-    });
+      console.log(`🔍 EXECUTING ${searchPromises.length} COMPREHENSIVE SEARCH STRATEGIES...`);
+      const searchResults = await Promise.allSettled(searchPromises);
 
-    return filteredResults.slice(0, limit * 2); // Return more than requested for better filtering
+      // Combine and deduplicate results
+      searchResults.forEach((result, index) => {
+        if (result.status === 'fulfilled' && Array.isArray(result.value)) {
+          result.value.forEach(place => {
+            if (place.googlePlaceId && !allResults.has(place.googlePlaceId)) {
+              allResults.set(place.googlePlaceId, place);
+            }
+          });
+        }
+      });
+
+      const uniqueResults = Array.from(allResults.values());
+      console.log(`📊 COMPREHENSIVE SEARCH RESULTS: ${uniqueResults.length} unique places found`);
+
+      // Enhanced filtering with better Italian venue detection
+      const filteredResults = this.filterAndRankResults(uniqueResults, type, latitude, longitude, radius * 2);
+      
+      return filteredResults.slice(0, limit * 3); // Return more results for better coverage
   }
 
   // NEW: Search with specific type strategy

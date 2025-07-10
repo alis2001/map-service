@@ -413,6 +413,290 @@ const getPhotoUrl = (photoReference, maxWidth = 400, maxHeight = 400) => {
   
   return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${maxWidth}&maxheight=${maxHeight}&photoreference=${photoReference}&key=${apiKey}`;
 };
+// ADDED: Enhanced place details with real-time opening hours
+const getEnhancedPlaceDetails = async (placeId, userLocation = null) => {
+  try {
+    const apiKey = getApiKey();
+    if (!apiKey) {
+      throw new Error('Google Places API key not configured');
+    }
+
+    const cacheKey = `enhanced_details:${placeId}`;
+    
+    // Check cache first (shorter cache for opening hours)
+    const cachedResult = await cache.get(cacheKey);
+    if (cachedResult) {
+      // Always refresh opening hours status
+      if (cachedResult.openingHours) {
+        cachedResult.dynamicStatus = calculateRealTimeStatus(cachedResult.openingHours);
+        cachedResult.lastStatusUpdate = new Date().toISOString();
+      }
+      return cachedResult;
+    }
+    
+    const response = await makeRateLimitedRequest(async () => {
+      return await googleMapsClient.placeDetails({
+        params: {
+          key: apiKey,
+          place_id: placeId,
+          fields: [
+            'place_id', 'name', 'formatted_address', 'geometry',
+            'rating', 'user_ratings_total', 'price_level',
+            'opening_hours', 'current_opening_hours', // CRITICAL: Get both
+            'formatted_phone_number', 'international_phone_number',
+            'website', 'photos', 'reviews', 'types',
+            'business_status', 'plus_code'
+          ],
+          language: 'it',
+          region: 'IT'
+        }
+      });
+    });
+    
+    if (response.status !== 200) {
+      throw new Error(`Google Places API error: ${response.status}`);
+    }
+    
+    const place = response.data.result;
+    const enhancedDetails = {
+      googlePlaceId: place.place_id,
+      name: place.name,
+      address: place.formatted_address,
+      latitude: place.geometry.location.lat,
+      longitude: place.geometry.location.lng,
+      rating: place.rating,
+      userRatingsTotal: place.user_ratings_total,
+      priceLevel: place.price_level,
+      phoneNumber: place.formatted_phone_number,
+      website: place.website,
+      businessStatus: place.business_status,
+      types: place.types,
+      
+      // ENHANCED: Real-time opening hours
+      openingHours: formatOpeningHours(place.opening_hours || place.current_opening_hours),
+      dynamicStatus: calculateRealTimeStatus(place.opening_hours || place.current_opening_hours),
+      lastStatusUpdate: new Date().toISOString(),
+      
+      photos: place.photos ? place.photos.map(photo => ({
+        photoReference: photo.photo_reference,
+        width: photo.width,
+        height: photo.height
+      })) : [],
+      
+      reviews: place.reviews ? place.reviews.slice(0, 5).map(review => ({
+        authorName: review.author_name,
+        rating: review.rating,
+        text: review.text,
+        time: review.time,
+        relativeTime: review.relative_time_description
+      })) : []
+    };
+
+    // Add distance if user location provided
+    if (userLocation) {
+      const distance = calculateDistanceMeters(
+        userLocation.latitude, userLocation.longitude,
+        enhancedDetails.latitude, enhancedDetails.longitude
+      );
+      enhancedDetails.distance = Math.round(distance);
+      enhancedDetails.formattedDistance = formatDistance(distance);
+    }
+
+    // Cache with shorter TTL for dynamic status
+    await cache.set(cacheKey, enhancedDetails, 300); // 5 minutes cache
+    
+    return enhancedDetails;
+    
+  } catch (error) {
+    logger.error('Enhanced place details failed', { placeId, error: error.message });
+    throw error;
+  }
+};
+
+// ADDED: Real-time opening status calculation
+const calculateRealTimeStatus = (openingHours) => {
+  if (!openingHours || !openingHours.periods || openingHours.periods.length === 0) {
+    return {
+      isOpen: null,
+      status: 'Orari non disponibili',
+      statusColor: '#6B7280',
+      nextChange: null,
+      confidence: 'unknown'
+    };
+  }
+
+  const now = new Date();
+  const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
+
+  // Find today's periods
+  const todayPeriods = openingHours.periods.filter(period => {
+    return period.open && period.open.day === currentDay;
+  });
+
+  if (todayPeriods.length === 0) {
+    return {
+      isOpen: false,
+      status: 'Chiuso oggi',
+      statusColor: '#EF4444',
+      nextChange: getNextOpeningTime(openingHours.periods, currentDay),
+      confidence: 'high'
+    };
+  }
+
+  // Check if currently open
+  for (const period of todayPeriods) {
+    const openTime = period.open?.time;
+    const closeTime = period.close?.time;
+    
+    if (!openTime) continue;
+
+    const openMinutes = parseInt(openTime.substring(0, 2)) * 60 + parseInt(openTime.substring(2, 4));
+    
+    if (!closeTime) {
+      return {
+        isOpen: true,
+        status: 'Aperto 24 ore',
+        statusColor: '#10B981',
+        nextChange: null,
+        confidence: 'high'
+      };
+    }
+
+    const closeMinutes = parseInt(closeTime.substring(0, 2)) * 60 + parseInt(closeTime.substring(2, 4));
+
+    // Handle same-day hours
+    if (closeMinutes > openMinutes) {
+      if (currentTimeMinutes >= openMinutes && currentTimeMinutes < closeMinutes) {
+        const minutesUntilClose = closeMinutes - currentTimeMinutes;
+        return {
+          isOpen: true,
+          status: minutesUntilClose < 60 ? 
+            `Aperto - Chiude tra ${minutesUntilClose} min` : 
+            'Aperto ora',
+          statusColor: minutesUntilClose < 30 ? '#F59E0B' : '#10B981',
+          nextChange: {
+            action: 'closes',
+            time: formatTime(closeMinutes),
+            minutesUntil: minutesUntilClose
+          },
+          confidence: 'high'
+        };
+      }
+    }
+    // Handle overnight hours (crosses midnight)
+    else {
+      if (currentTimeMinutes >= openMinutes || currentTimeMinutes < closeMinutes) {
+        const minutesUntilClose = currentTimeMinutes < closeMinutes ? 
+          closeMinutes - currentTimeMinutes : 
+          (24 * 60) - currentTimeMinutes + closeMinutes;
+        
+        return {
+          isOpen: true,
+          status: minutesUntilClose < 60 ? 
+            `Aperto - Chiude tra ${minutesUntilClose} min` : 
+            'Aperto ora',
+          statusColor: minutesUntilClose < 30 ? '#F59E0B' : '#10B981',
+          nextChange: {
+            action: 'closes',
+            time: formatTime(closeMinutes),
+            minutesUntil: minutesUntilClose
+          },
+          confidence: 'high'
+        };
+      }
+    }
+  }
+
+  // Not currently open
+  const nextOpening = getNextOpeningTime(openingHours.periods, currentDay, currentTimeMinutes);
+  
+  return {
+    isOpen: false,
+    status: nextOpening ? 
+      `Chiuso - Apre ${nextOpening.timeText}` : 
+      'Chiuso',
+    statusColor: '#EF4444',
+    nextChange: nextOpening,
+    confidence: 'high'
+  };
+};
+
+// Helper functions for time formatting
+const formatTime = (minutes) => {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+};
+
+const getNextOpeningTime = (periods, currentDay, currentTimeMinutes = 0) => {
+  const dayNames = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
+  
+  for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+    const checkDay = (currentDay + dayOffset) % 7;
+    const dayPeriods = periods.filter(p => p.open && p.open.day === checkDay);
+    
+    for (const period of dayPeriods) {
+      if (!period.open.time) continue;
+      
+      const openMinutes = parseInt(period.open.time.substring(0, 2)) * 60 + 
+                         parseInt(period.open.time.substring(2, 4));
+      
+      // Skip if time has passed today
+      if (dayOffset === 0 && openMinutes <= currentTimeMinutes) {
+        continue;
+      }
+      
+      const timeText = dayOffset === 0 ? 
+        `alle ${formatTime(openMinutes)}` :
+        dayOffset === 1 ? 
+        `domani alle ${formatTime(openMinutes)}` :
+        `${dayNames[checkDay]} alle ${formatTime(openMinutes)}`;
+      
+      return {
+        day: checkDay,
+        time: formatTime(openMinutes),
+        timeText,
+        dayOffset
+      };
+    }
+  }
+  
+  return null;
+};
+
+const formatOpeningHours = (openingHours) => {
+  if (!openingHours) return null;
+
+  return {
+    openNow: openingHours.open_now,
+    periods: openingHours.periods || [],
+    weekdayText: openingHours.weekday_text || []
+  };
+};
+
+const calculateDistanceMeters = (lat1, lng1, lat2, lng2) => {
+  const R = 6371e3;
+  const φ1 = lat1 * Math.PI / 180;
+  const φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lng2 - lng1) * Math.PI / 180;
+
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c;
+};
+
+const formatDistance = (distanceInMeters) => {
+  if (distanceInMeters < 1000) {
+    return `${Math.round(distanceInMeters)}m`;
+  } else {
+    return `${(distanceInMeters / 1000).toFixed(1)}km`;
+  }
+};
 
 // FIXED: Search places by text
 const searchPlacesByText = async (query, latitude = null, longitude = null) => {
@@ -533,8 +817,17 @@ module.exports = {
   validateApiKey,
   searchNearbyPlaces,
   getPlaceDetails,
+  getEnhancedPlaceDetails, // ADDED: New enhanced function
   getPhotoUrl,
   searchPlacesByText,
   healthCheck,
-  RateLimitManager
+  RateLimitManager,
+  
+  // ADDED: New utility functions
+  calculateRealTimeStatus,
+  formatOpeningHours,
+  calculateDistanceMeters,
+  formatDistance,
+  formatTime,
+  getNextOpeningTime
 };

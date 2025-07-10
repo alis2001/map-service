@@ -197,6 +197,7 @@ class PlacesController {
   });
 
   // FIXED: Get detailed information about a specific place - NOW PROPERLY IMPLEMENTED
+  // ENHANCED: Get detailed information about a specific place with real-time status
   getPlaceDetails = asyncHandler(async (req, res) => {
     const { placeId } = req.params;
     const { latitude, longitude } = req.query;
@@ -219,31 +220,50 @@ class PlacesController {
         };
       }
 
-      console.log('📍 Getting place details:', {
+      console.log('📍 Getting enhanced place details with real-time status:', {
         placeId,
         userLocation: userLocation ? 'provided' : 'not provided'
       });
 
-      // FIXED: Use the proper getPlaceById method from googlePlacesService
-      const place = await googlePlacesService.getPlaceById(placeId, {
-        userLocation,
-        includeReviews: true
-      });
+      // ENHANCED: Use the new enhanced place details function
+      const { getEnhancedPlaceDetails } = require('../config/googlePlaces');
+      const place = await getEnhancedPlaceDetails(placeId, userLocation);
 
       if (!place) {
         return errorResponse(res, 'Place not found', 404, 'PLACE_NOT_FOUND');
       }
 
-      logger.info('Place details retrieved', {
+      // ENHANCED: Add Italian venue context
+      const enhancedPlace = {
+        ...place,
+        emoji: getItalianVenueEmoji(place),
+        displayType: getItalianVenueDisplayType(place.types),
+        
+        // ENHANCED: Add walking information
+        walkingTime: userLocation && place.distance ? 
+          calculateWalkingTime(place.distance) : null,
+        
+        // ENHANCED: Add contextual tips
+        italianTips: getItalianVenueTips(place),
+        
+        // ENHANCED: Format reviews for Italian context
+        reviews: place.reviews ? place.reviews.map(review => ({
+          ...review,
+          timeAgo: formatTimeAgo(review.time)
+        })) : []
+      };
+
+      logger.info('Enhanced place details retrieved', {
         placeId,
         placeName: place.name,
+        isOpen: place.dynamicStatus?.isOpen,
         userLocation: userLocation ? 'provided' : 'not provided'
       });
 
-      return successResponse(res, place, 'Place details retrieved successfully');
+      return successResponse(res, enhancedPlace, 'Place details retrieved successfully');
 
     } catch (error) {
-      logger.error('Failed to get place details', {
+      logger.error('Failed to get enhanced place details', {
         placeId,
         error: error.message
       });
@@ -649,6 +669,90 @@ class PlacesController {
     }
   });
 }
+const getItalianVenueEmoji = (place) => {
+  const name = (place.name || '').toLowerCase();
+  const types = place.types || [];
+  
+  if (name.includes('gelateria') || name.includes('gelato')) return '🍦';
+  if (name.includes('pizzeria') || name.includes('pizza')) return '🍕';
+  if (name.includes('pasticceria') || name.includes('dolci')) return '🧁';
+  if (name.includes('panetteria') || name.includes('pane')) return '🥖';
+  if (name.includes('trattoria')) return '🍝';
+  if (name.includes('osteria')) return '🍷';
+  
+  if (types.includes('restaurant') || types.includes('meal_delivery')) return '🍽️';
+  if (types.includes('bar') || types.includes('cafe')) return '☕';
+  
+  return '📍';
+};
+
+const getItalianVenueDisplayType = (types = []) => {
+  if (types.includes('restaurant') || types.includes('meal_delivery')) {
+    return 'Ristorante';
+  }
+  if (types.includes('bar') || types.includes('cafe')) {
+    return 'Bar/Caffetteria';
+  }
+  if (types.includes('bakery')) {
+    return 'Panetteria';
+  }
+  return 'Locale';
+};
+
+const calculateWalkingTime = (distanceInMeters) => {
+  if (!distanceInMeters) return null;
+  
+  const walkingSpeedKmh = 5; // Average walking speed
+  const timeMinutes = Math.round((distanceInMeters / 1000) * (60 / walkingSpeedKmh));
+  
+  if (timeMinutes < 1) return 'Meno di 1 minuto a piedi';
+  if (timeMinutes === 1) return '1 minuto a piedi';
+  if (timeMinutes < 60) return `${timeMinutes} minuti a piedi`;
+  
+  const hours = Math.floor(timeMinutes / 60);
+  const mins = timeMinutes % 60;
+  return `${hours}h ${mins}m a piedi`;
+};
+
+const getItalianVenueTips = (place) => {
+  const tips = [];
+  const name = (place.name || '').toLowerCase();
+  const types = place.types || [];
+  
+  if (types.includes('bar') || types.includes('cafe')) {
+    tips.push('I bar italiani servono caffè eccellente e aperitivi dalle 18:00');
+    if (place.dynamicStatus?.isOpen === false) {
+      tips.push('Molti bar chiudono nel pomeriggio e riaprono per l\'aperitivo');
+    }
+  }
+  
+  if (types.includes('restaurant')) {
+    tips.push('I ristoranti italiani spesso aprono alle 19:30 per cena');
+    if (place.priceLevel && place.priceLevel >= 3) {
+      tips.push('Prenotazione consigliata per questo ristorante');
+    }
+  }
+  
+  if (name.includes('gelateria')) {
+    tips.push('Le gelaterie artigianali offrono gelato fresco giornalmente');
+  }
+  
+  return tips;
+};
+
+const formatTimeAgo = (timestamp) => {
+  if (!timestamp) return null;
+  
+  const now = Date.now() / 1000;
+  const diffSeconds = now - timestamp;
+  
+  if (diffSeconds < 60) return 'Adesso';
+  if (diffSeconds < 3600) return `${Math.floor(diffSeconds / 60)} minuti fa`;
+  if (diffSeconds < 86400) return `${Math.floor(diffSeconds / 3600)} ore fa`;
+  if (diffSeconds < 2592000) return `${Math.floor(diffSeconds / 86400)} giorni fa`;
+  
+  return 'Molto tempo fa';
+};
 
 // Create and export controller instance
 const placesController = new PlacesController();
