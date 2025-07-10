@@ -1,4 +1,4 @@
-// components/FullPageMap.js - ULTRA-OPTIMIZED for Instant Interactivity
+// components/FullPageMap.js - COMPLETE DARK MAP VERSION with Enhanced Features
 // Location: /map-service/frontend/src/components/FullPageMap.js
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
@@ -49,14 +49,14 @@ const FullPageMap = ({
   const [isMapUpdating, setIsMapUpdating] = useState(false);
   const [hasInitialLoad, setHasInitialLoad] = useState(false);
   
-  // INSTANT MOVEMENT DETECTION - Much more responsive
+  // INSTANT MOVEMENT DETECTION
   const lastSearchLocationRef = useRef(null);
   const isUserDraggingRef = useRef(false);
   const debounceTimeoutRef = useRef(null);
   const currentFilterRef = useRef(cafeType);
   const activeMarkersRef = useRef(new Set());
 
-  // ⚡ INSTANT TRIGGER DISTANCE - Ultra responsive
+  // ⚡ INSTANT TRIGGER DISTANCE
   const shouldTriggerNewSearch = useCallback((newCenter) => {
     if (!lastSearchLocationRef.current) {
       return true;
@@ -76,7 +76,6 @@ const FullPageMap = ({
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const distance = R * c;
 
-    // ULTRA-FAST trigger - 200m minimum for instant response
     const instantTrigger = Math.max(searchRadius * 0.15, 200);
     const hasMovedSignificantly = distance > instantTrigger;
 
@@ -94,9 +93,7 @@ const FullPageMap = ({
     }
 
     const shouldSearch = shouldTriggerNewSearch(newCenter);
-    
-    // INSTANT response - very short delay
-    const delay = shouldSearch ? 400 : 800; // Much faster
+    const delay = shouldSearch ? 400 : 800;
 
     console.log(`⚡ INSTANT search scheduled in ${delay}ms`);
 
@@ -119,8 +116,7 @@ const FullPageMap = ({
   // ⚡ INSTANT LOADING MANAGEMENT
   useEffect(() => {
     if (!loading && isMapUpdating) {
-      // Very short minimum display time for instant feel
-      const minDisplayTime = 800; // Reduced to 0.8 seconds
+      const minDisplayTime = 800;
       
       setTimeout(() => {
         setIsMapUpdating(false);
@@ -134,14 +130,14 @@ const FullPageMap = ({
     if (!mapLoaded && googleMapsReady && !hasInitialLoad) {
       const interval = setInterval(() => {
         setLoadingProgress(prev => {
-          const newProgress = prev + Math.random() * 25; // Faster progress
+          const newProgress = prev + Math.random() * 25;
           if (newProgress >= 100) {
             clearInterval(interval);
             return 100;
           }
           return newProgress;
         });
-      }, 100); // Faster intervals
+      }, 100);
       
       return () => clearInterval(interval);
     }
@@ -188,7 +184,7 @@ const FullPageMap = ({
         setGoogleMapsReady(false);
         resolve(false);
         cleanup();
-      }, 10000); // Shorter timeout
+      }, 10000);
 
       const checkInterval = setInterval(() => {
         if (window.google && window.google.maps && window.google.maps.Map) {
@@ -199,7 +195,7 @@ const FullPageMap = ({
           cleanup();
           clearInterval(checkInterval);
         }
-      }, 200); // Faster polling
+      }, 200);
 
       setTimeout(() => {
         clearInterval(checkInterval);
@@ -207,13 +203,123 @@ const FullPageMap = ({
     });
   }, []);
 
-  // 🗺️ Map initialization
+  // 🌑 ENHANCED DARK MAP STYLES
+  const getDarkMapStyles = () => [
+    // Base dark theme
+    {
+      "elementType": "geometry",
+      "stylers": [{ "color": "#212121" }]
+    },
+    {
+      "elementType": "labels.icon",
+      "stylers": [{ "visibility": "off" }]
+    },
+    {
+      "elementType": "labels.text.fill",
+      "stylers": [{ "color": "#757575" }]
+    },
+    {
+      "elementType": "labels.text.stroke",
+      "stylers": [{ "color": "#212121" }]
+    },
+    
+    // Administrative areas
+    {
+      "featureType": "administrative",
+      "elementType": "geometry",
+      "stylers": [{ "color": "#757575" }, { "visibility": "off" }]
+    },
+    {
+      "featureType": "administrative.country",
+      "elementType": "labels.text.fill",
+      "stylers": [{ "color": "#9ca5b3" }]
+    },
+    {
+      "featureType": "administrative.locality",
+      "elementType": "labels.text.fill",
+      "stylers": [{ "color": "#bdbdbd" }]
+    },
+    
+    // Hide POI for cleaner look
+    {
+      "featureType": "poi",
+      "stylers": [{ "visibility": "off" }]
+    },
+    {
+      "featureType": "poi.business",
+      "stylers": [{ "visibility": "off" }]
+    },
+    {
+      "featureType": "poi.park",
+      "elementType": "geometry",
+      "stylers": [{ "color": "#263c3f" }]
+    },
+    
+    // Enhanced roads
+    {
+      "featureType": "road",
+      "elementType": "geometry.fill",
+      "stylers": [{ "color": "#2c2c2c" }]
+    },
+    {
+      "featureType": "road",
+      "elementType": "labels.text.fill",
+      "stylers": [{ "color": "#8a8a8a" }]
+    },
+    {
+      "featureType": "road.arterial",
+      "elementType": "geometry",
+      "stylers": [{ "color": "#373737" }]
+    },
+    {
+      "featureType": "road.highway",
+      "elementType": "geometry",
+      "stylers": [{ "color": "#3c3c3c" }]
+    },
+    {
+      "featureType": "road.local",
+      "elementType": "labels.text.fill",
+      "stylers": [{ "color": "#616161" }]
+    },
+    
+    // Hide transit
+    {
+      "featureType": "transit",
+      "stylers": [{ "visibility": "off" }]
+    },
+    
+    // Dark water
+    {
+      "featureType": "water",
+      "elementType": "geometry",
+      "stylers": [{ "color": "#000000" }]
+    },
+    {
+      "featureType": "water",
+      "elementType": "labels.text.fill",
+      "stylers": [{ "color": "#3d3d3d" }]
+    },
+    
+    // Dark landscape
+    {
+      "featureType": "landscape.man_made",
+      "elementType": "geometry.fill",
+      "stylers": [{ "color": "#1a1a1a" }]
+    },
+    {
+      "featureType": "landscape.natural",
+      "elementType": "geometry.fill",
+      "stylers": [{ "color": "#2d2d2d" }]
+    }
+  ];
+
+  // 🗺️ Enhanced Map initialization with dark theme
   useEffect(() => {
     if (mapInitialized || !mapRef.current) return;
 
     const initMap = async () => {
       try {
-        console.log('🗺️ Initializing interactive map...');
+        console.log('🗺️ Initializing dark interactive map...');
         
         const isReady = await checkGoogleMapsAvailability();
         if (!isReady) {
@@ -231,7 +337,7 @@ const FullPageMap = ({
           zoom: zoom,
           mapTypeId: window.google.maps.MapTypeId.ROADMAP,
           
-          // UI Controls - minimal for speed
+          // UI Controls - minimal for dark theme
           zoomControl: true,
           zoomControlOptions: {
             position: window.google.maps.ControlPosition.RIGHT_BOTTOM,
@@ -243,75 +349,8 @@ const FullPageMap = ({
           rotateControl: false,
           fullscreenControl: !isEmbedMode,
           
-          // Beautiful light theme for better marker visibility
-          styles: [
-            {
-              "featureType": "all",
-              "elementType": "geometry",
-              "stylers": [{ "color": "#f5f5f5" }]
-            },
-            {
-              "featureType": "all",
-              "elementType": "labels.text.fill",
-              "stylers": [{ "color": "#333333" }]
-            },
-            {
-              "featureType": "administrative",
-              "elementType": "geometry.stroke",
-              "stylers": [
-                { "color": "#c9c9c9" },
-                { "weight": 0.8 }
-              ]
-            },
-            {
-              "featureType": "landscape",
-              "elementType": "geometry",
-              "stylers": [{ "color": "#f9f9f9" }]
-            },
-            
-            // Hide POI icons for cleaner look
-            {
-              "featureType": "poi",
-              "elementType": "labels.icon",
-              "stylers": [{ "visibility": "off" }]
-            },
-            {
-              "featureType": "poi.business",
-              "elementType": "all",
-              "stylers": [{ "visibility": "off" }]
-            },
-            
-            // Parks in light green
-            {
-              "featureType": "poi.park",
-              "elementType": "geometry",
-              "stylers": [{ "color": "#e8f5e8" }]
-            },
-            
-            // Roads in light colors
-            {
-              "featureType": "road",
-              "elementType": "geometry.fill",
-              "stylers": [{ "color": "#ffffff" }]
-            },
-            {
-              "featureType": "road",
-              "elementType": "geometry.stroke",
-              "stylers": [{ "color": "#d4d4d4" }]
-            },
-            {
-              "featureType": "road.highway",
-              "elementType": "geometry",
-              "stylers": [{ "color": "#f0f0f0" }]
-            },
-            
-            // Water in light blue
-            {
-              "featureType": "water",
-              "elementType": "geometry",
-              "stylers": [{ "color": "#e6f3ff" }]
-            }
-          ],
+          // 🌑 ENHANCED DARK MAP STYLES
+          styles: getDarkMapStyles(),
           
           // Gestures for responsiveness
           gestureHandling: 'greedy',
@@ -319,17 +358,20 @@ const FullPageMap = ({
           draggable: true,
           scrollwheel: true,
           
-          // Disable default markers
+          // Clean dark theme
           disableDefaultUI: false,
-          clickableIcons: false
+          clickableIcons: false,
+          
+          // Enhanced dark background
+          backgroundColor: '#1a1a1a'
         };
 
         try {
           googleMapRef.current = new window.google.maps.Map(mapRef.current, mapOptions);
-          console.log('✅ Interactive map created successfully');
+          console.log('✅ Dark interactive map created successfully');
           
         } catch (mapCreationError) {
-          console.error('❌ Failed to create map:', mapCreationError);
+          console.error('❌ Failed to create dark map:', mapCreationError);
           setMapError('Error creating map instance');
           return;
         }
@@ -358,18 +400,18 @@ const FullPageMap = ({
           }
         });
 
-        // Quick tiles loading
+        // Quick tiles loading for dark map
         const tilesLoadedPromise = new Promise((resolve) => {
           const listener = googleMapRef.current.addListener('tilesloaded', () => {
             window.google.maps.event.removeListener(listener);
             resolve();
           });
-          setTimeout(resolve, 1000); // Faster timeout
+          setTimeout(resolve, 1000);
         });
 
         await tilesLoadedPromise;
 
-        console.log('✅ Interactive map loaded');
+        console.log('✅ Dark interactive map loaded');
         
         setMapLoaded(true);
         setMapError(null);
@@ -379,7 +421,7 @@ const FullPageMap = ({
         lastSearchLocationRef.current = { lat: center.lat, lng: center.lng };
 
       } catch (error) {
-        console.error('❌ Failed to initialize map:', error);
+        console.error('❌ Failed to initialize dark map:', error);
         setMapError('Failed to initialize map: ' + error.message);
         setMapLoaded(false);
         setLoadingProgress(100);
@@ -402,19 +444,19 @@ const FullPageMap = ({
          Math.abs(currentCenter?.lng() - newCenter.lng) > 0.001);
       
       if (isExternalChange) {
-        console.log('🗺️ Updating map center:', newCenter);
+        console.log('🗺️ Updating dark map center:', newCenter);
         googleMapRef.current.setCenter(newCenter);
         lastSearchLocationRef.current = newCenter;
         
         if (Math.abs(currentZoom - zoom) > 1) {
-          console.log('🗺️ Updating map zoom:', zoom);
+          console.log('🗺️ Updating dark map zoom:', zoom);
           googleMapRef.current.setZoom(zoom);
         }
       }
     }
   }, [center.lat, center.lng, zoom, mapLoaded, mapInitialized]);
 
-  // User location marker
+  // 🎯 Enhanced User location marker for dark map
   useEffect(() => {
     if (!googleMapRef.current || !mapLoaded || !userLocation) return;
 
@@ -422,28 +464,39 @@ const FullPageMap = ({
       userMarkerRef.current.setMap(null);
     }
 
-    console.log('🎯 Creating user location marker');
+    console.log('🎯 Creating bright user location marker for dark map');
 
     const userLocationSVG = `
-      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
         <defs>
-          <radialGradient id="userGradient" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" style="stop-color:#007AFF;stop-opacity:1" />
-            <stop offset="70%" style="stop-color:#5856D6;stop-opacity:0.8" />
-            <stop offset="100%" style="stop-color:#007AFF;stop-opacity:0" />
+          <radialGradient id="userGradientDark" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" style="stop-color:#00D4FF;stop-opacity:1" />
+            <stop offset="70%" style="stop-color:#0099CC;stop-opacity:0.8" />
+            <stop offset="100%" style="stop-color:#00D4FF;stop-opacity:0" />
           </radialGradient>
+          <filter id="userGlow">
+            <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+            <feMerge> 
+              <feMergeNode in="coloredBlur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
         </defs>
         
-        <circle cx="16" cy="16" r="14" fill="url(#userGradient)" opacity="0.4">
-          <animate attributeName="r" values="10;18;10" dur="2s" repeatCount="indefinite"/>
+        <!-- Outer pulsing ring -->
+        <circle cx="18" cy="18" r="16" fill="url(#userGradientDark)" opacity="0.4">
+          <animate attributeName="r" values="12;20;12" dur="2s" repeatCount="indefinite"/>
           <animate attributeName="opacity" values="0.4;0.1;0.4" dur="2s" repeatCount="indefinite"/>
         </circle>
         
-        <circle cx="16" cy="16" r="8" fill="#007AFF">
-          <animate attributeName="r" values="6;9;6" dur="1.5s" repeatCount="indefinite"/>
+        <!-- Middle ring -->
+        <circle cx="18" cy="18" r="10" fill="#00D4FF" opacity="0.6" filter="url(#userGlow)">
+          <animate attributeName="r" values="8;12;8" dur="1.5s" repeatCount="indefinite"/>
         </circle>
         
-        <circle cx="16" cy="16" r="3" fill="white"/>
+        <!-- Inner bright core -->
+        <circle cx="18" cy="18" r="6" fill="#FFFFFF" stroke="#00D4FF" stroke-width="2"/>
+        <circle cx="18" cy="18" r="3" fill="#00D4FF"/>
       </svg>
     `;
 
@@ -453,21 +506,21 @@ const FullPageMap = ({
         lng: userLocation.longitude 
       },
       map: googleMapRef.current,
-      title: `📍 Your location`,
+      title: `📍 Your location (${detectionMethod || 'detected'})`,
       icon: {
         url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(userLocationSVG),
-        scaledSize: new window.google.maps.Size(32, 32),
-        anchor: new window.google.maps.Point(16, 16)
+        scaledSize: new window.google.maps.Size(36, 36),
+        anchor: new window.google.maps.Point(18, 18)
       },
       zIndex: 10000,
       optimized: false
     });
 
     userMarkerRef.current = userMarker;
-    console.log('🎯 User location marker updated');
-  }, [userLocation, mapLoaded, locationLoading]);
+    console.log('🎯 Bright user location marker updated for dark map');
+  }, [userLocation, mapLoaded, locationLoading, detectionMethod]);
 
-  // Search radius circle
+  // 🔍 Enhanced Search radius circle for dark map
   useEffect(() => {
     if (!googleMapRef.current || !mapLoaded || !userLocation || !searchRadius) return;
 
@@ -476,6 +529,10 @@ const FullPageMap = ({
     }
 
     if (userLocation.accuracy && userLocation.accuracy < 1000) {
+      const circleColors = cafeType === 'restaurant' ? 
+        { fill: '#A55EEA', stroke: '#8B5CF6' } : 
+        { fill: '#FF9F43', stroke: '#F97316' };
+
       const circle = new window.google.maps.Circle({
         center: { 
           lat: userLocation.latitude, 
@@ -483,24 +540,119 @@ const FullPageMap = ({
         },
         radius: searchRadius,
         map: googleMapRef.current,
-        fillColor: cafeType === 'restaurant' ? '#EF4444' : '#F97316',
-        fillOpacity: 0.1,
-        strokeColor: cafeType === 'restaurant' ? '#DC2626' : '#EA580C',
-        strokeOpacity: 0.4,
+        fillColor: circleColors.fill,
+        fillOpacity: 0.15,
+        strokeColor: circleColors.stroke,
+        strokeOpacity: 0.6,
         strokeWeight: 2,
         clickable: false
       });
 
       radiusCircleRef.current = circle;
-      console.log('🔍 Search radius circle updated:', searchRadius);
+      console.log('🔍 Bright search radius circle updated for dark map:', searchRadius);
     }
   }, [userLocation, searchRadius, mapLoaded, cafeType]);
 
-  // 🚀 INSTANT MARKER RENDERING - Perfect filtering with cute markers
+  // 🎨 ENHANCED DARK MAP MARKER CREATION
+  const createEnhancedDarkMapMarker = (cafe, index, selectedType) => {
+    // Bright colors that pop on dark background
+    const colors = selectedType === 'restaurant' ? 
+      { 
+        primary: '#A55EEA',      // Bright purple
+        secondary: '#FD79A8',    // Bright pink
+        accent: '#FFD700',       // Gold
+        glow: '#A55EEA'
+      } :
+      { 
+        primary: '#FF9F43',      // Bright orange
+        secondary: '#FF6B6B',    // Bright coral
+        accent: '#4ECDC4',       // Bright teal
+        glow: '#FF9F43'
+      };
+    
+    const emoji = selectedType === 'restaurant' ? '🍽️' : '☕';
+    const isClose = cafe.distance && cafe.distance < 300;
+    const isVeryClose = cafe.distance && cafe.distance < 150;
+    const isHighRated = cafe.rating && cafe.rating >= 4.5;
+    
+    // Dynamic size based on distance and rating
+    const baseSize = isVeryClose ? 36 : isClose ? 32 : 28;
+    
+    return `
+      <svg width="${baseSize}" height="${baseSize}" viewBox="0 0 ${baseSize} ${baseSize}" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="darkMapGradient${index}" cx="50%" cy="30%" r="70%">
+            <stop offset="0%" style="stop-color:white;stop-opacity:1" />
+            <stop offset="40%" style="stop-color:${colors.primary};stop-opacity:1" />
+            <stop offset="100%" style="stop-color:${colors.secondary};stop-opacity:0.9" />
+          </radialGradient>
+          
+          <filter id="darkMapGlow${index}">
+            <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+            <feMerge> 
+              <feMergeNode in="coloredBlur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+          
+          <filter id="brightShadow${index}">
+            <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="${colors.glow}" flood-opacity="0.8"/>
+          </filter>
+        </defs>
+        
+        ${isVeryClose ? `
+          <!-- Very close indicator - pulsing outer ring -->
+          <circle cx="${baseSize/2}" cy="${baseSize/2}" r="${baseSize/2 - 2}" 
+                  fill="none" stroke="${colors.accent}" stroke-width="2" opacity="0.6">
+            <animate attributeName="r" values="${baseSize/2 - 6};${baseSize/2 + 2};${baseSize/2 - 6}" 
+                     dur="2s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0.6;0.2;0.6" dur="2s" repeatCount="indefinite"/>
+          </circle>
+        ` : ''}
+        
+        ${isClose ? `
+          <!-- Close indicator - gentle glow -->
+          <circle cx="${baseSize/2}" cy="${baseSize/2}" r="${baseSize/2 - 1}" 
+                  fill="${colors.glow}" opacity="0.3">
+            <animate attributeName="opacity" values="0.3;0.1;0.3" dur="3s" repeatCount="indefinite"/>
+          </circle>
+        ` : ''}
+        
+        <!-- Main marker circle with bright gradient -->
+        <circle cx="${baseSize/2}" cy="${baseSize/2}" r="${baseSize/2 - 4}" 
+                fill="url(#darkMapGradient${index})" 
+                filter="url(#brightShadow${index})"
+                stroke="white" stroke-width="2"/>
+        
+        <!-- Emoji icon -->
+        <text x="${baseSize/2}" y="${baseSize/2 + 4}" text-anchor="middle" 
+              font-size="${baseSize * 0.5}" fill="white" 
+              style="text-shadow: 0 0 6px rgba(0,0,0,0.8); font-weight: bold;">
+          ${emoji}
+        </text>
+        
+        ${isHighRated ? `
+          <!-- High rating star indicator -->
+          <circle cx="${baseSize - 6}" cy="6" r="4" fill="${colors.accent}" 
+                  stroke="white" stroke-width="1"/>
+          <text x="${baseSize - 6}" y="9" text-anchor="middle" 
+                font-size="8" fill="white" font-weight="bold">★</text>
+        ` : ''}
+        
+        ${isVeryClose ? `
+          <!-- Very close distance indicator -->
+          <circle cx="6" cy="6" r="3" fill="#26DE81" stroke="white" stroke-width="1"/>
+          <text x="6" y="8" text-anchor="middle" font-size="6" fill="white" font-weight="bold">!</text>
+        ` : ''}
+      </svg>
+    `;
+  };
+
+  // 🚀 INSTANT MARKER RENDERING with Enhanced Dark Map Markers
   useEffect(() => {
     if (!googleMapRef.current || !mapLoaded) return;
 
-    console.log('☕ INSTANT FILTERING - Starting marker update:', {
+    console.log('☕ INSTANT FILTERING - Dark map marker update:', {
       totalCafes: cafes.length,
       selectedType: cafeType,
       mapReady: mapLoaded
@@ -525,14 +677,14 @@ const FullPageMap = ({
       return cafeType_normalized === selectedType_normalized;
     });
 
-    console.log(`🎯 INSTANT FILTER: ${perfectlyFilteredCafes.length}/${cafes.length} places match "${currentFilterRef.current}"`);
+    console.log(`🎯 DARK MAP FILTER: ${perfectlyFilteredCafes.length}/${cafes.length} places match "${currentFilterRef.current}"`);
 
     if (perfectlyFilteredCafes.length === 0) {
-      console.log('📍 NO MATCHES - Empty map');
+      console.log('📍 NO MATCHES - Empty dark map');
       return;
     }
 
-    // 🎨 INSTANT MARKER CREATION - Cute circular markers
+    // 🎨 ENHANCED DARK MAP MARKER CREATION
     perfectlyFilteredCafes.forEach((cafe, index) => {
       if (!cafe.location || !cafe.location.latitude || !cafe.location.longitude) {
         return;
@@ -543,17 +695,27 @@ const FullPageMap = ({
         lng: cafe.location.longitude
       };
 
-      // 🎨 CUTE CIRCULAR MARKER
-      const markerSVG = createCuteCircularMarker(cafe, index, currentFilterRef.current);
+      // 🎨 ENHANCED DARK MAP MARKER
+      const markerSVG = createEnhancedDarkMapMarker(cafe, index, currentFilterRef.current);
 
       const marker = new window.google.maps.Marker({
         position: position,
         map: googleMapRef.current,
-        title: `${getCuteEmoji(cafe)} ${cafe.name}${cafe.rating ? ` (${cafe.rating}⭐)` : ''}${cafe.distance ? ` - ${cafe.formattedDistance}` : ''}`,
+        title: `${cafe.emoji || (currentFilterRef.current === 'restaurant' ? '🍽️' : '☕')} ${cafe.name}${cafe.rating ? ` (${cafe.rating}⭐)` : ''}${cafe.distance ? ` - ${cafe.formattedDistance}` : ''}`,
         icon: {
           url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(markerSVG),
-          scaledSize: new window.google.maps.Size(28, 28), // Small and cozy
-          anchor: new window.google.maps.Point(14, 14),
+          scaledSize: new window.google.maps.Size(
+            cafe.distance && cafe.distance < 150 ? 36 : 
+            cafe.distance && cafe.distance < 300 ? 32 : 28, 
+            cafe.distance && cafe.distance < 150 ? 36 : 
+            cafe.distance && cafe.distance < 300 ? 32 : 28
+          ),
+          anchor: new window.google.maps.Point(
+            cafe.distance && cafe.distance < 150 ? 18 : 
+            cafe.distance && cafe.distance < 300 ? 16 : 14,
+            cafe.distance && cafe.distance < 150 ? 18 : 
+            cafe.distance && cafe.distance < 300 ? 16 : 14
+          ),
           optimized: false
         },
         zIndex: cafe.distance ? Math.round(2000 - cafe.distance / 10) : 1000,
@@ -573,71 +735,15 @@ const FullPageMap = ({
       activeMarkersRef.current.add(`${markerId}:${currentFilterRef.current}`);
     });
 
-    console.log(`🎉 INSTANT MARKERS: ${perfectlyFilteredCafes.length} cute ${currentFilterRef.current} markers added instantly`);
+    console.log(`🎉 DARK MAP MARKERS: ${perfectlyFilteredCafes.length} enhanced ${currentFilterRef.current} markers added instantly`);
 
   }, [cafes, mapLoaded, onCafeSelect, cafeType]);
-
-  // 🎨 CREATE CUTE CIRCULAR MARKER
-  const createCuteCircularMarker = (cafe, index, selectedType) => {
-    const colors = selectedType === 'restaurant' ? 
-      { primary: '#EF4444', secondary: '#FEE2E2', accent: '#FECACA' } :
-      { primary: '#F97316', secondary: '#FED7AA', accent: '#FDBA74' };
-    
-    const emoji = getCuteEmoji(cafe);
-    const isClose = cafe.distance && cafe.distance < 300;
-    
-    return `
-      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <radialGradient id="cuteGradient${index}" cx="50%" cy="30%" r="70%">
-            <stop offset="0%" style="stop-color:white;stop-opacity:1" />
-            <stop offset="60%" style="stop-color:${colors.primary};stop-opacity:1" />
-            <stop offset="100%" style="stop-color:${colors.primary};stop-opacity:0.8" />
-          </radialGradient>
-          <filter id="cuteShadow${index}">
-            <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="${colors.primary}" flood-opacity="0.3"/>
-          </filter>
-        </defs>
-        
-        ${isClose ? `
-          <circle cx="14" cy="14" r="16" fill="${colors.primary}" opacity="0.2">
-            <animate attributeName="r" values="12;18;12" dur="2s" repeatCount="indefinite"/>
-            <animate attributeName="opacity" values="0.2;0.05;0.2" dur="2s" repeatCount="indefinite"/>
-          </circle>
-        ` : ''}
-        
-        <circle cx="14" cy="14" r="12" fill="url(#cuteGradient${index})" 
-                filter="url(#cuteShadow${index})" stroke="white" stroke-width="2"/>
-        
-        <text x="14" y="18" text-anchor="middle" font-size="14" fill="white" 
-              style="text-shadow: 0 1px 2px rgba(0,0,0,0.3);">
-          ${emoji}
-        </text>
-        
-        ${cafe.rating && cafe.rating >= 4.5 ? `
-          <circle cx="22" cy="6" r="5" fill="#FFD700" stroke="white" stroke-width="1"/>
-          <text x="22" y="9" text-anchor="middle" font-size="8" fill="white" font-weight="bold">★</text>
-        ` : ''}
-        
-        ${isClose ? `
-          <circle cx="6" cy="6" r="4" fill="#00FF88" stroke="white" stroke-width="1"/>
-          <text x="6" y="9" text-anchor="middle" font-size="7" fill="white" font-weight="bold">!</text>
-        ` : ''}
-      </svg>
-    `;
-  };
-
-  // CUTE emoji mapping
-  const getCuteEmoji = (cafe) => {
-    const venueType = (cafe.type || cafe.placeType || '').toLowerCase();
-    return venueType === 'restaurant' ? '🍽️' : '☕';
-  };
 
   // Set initial load complete
   useEffect(() => {
     if (mapLoaded && googleMapsReady && !hasInitialLoad) {
       setHasInitialLoad(true);
-      console.log('✅ Initial map load completed');
+      console.log('✅ Initial dark map load completed');
     }
   }, [mapLoaded, googleMapsReady, hasInitialLoad]);
 
@@ -683,7 +789,7 @@ const FullPageMap = ({
       <div className="map-error-container">
         <div className="map-error-content">
           <div className="error-icon">🗺️❌</div>
-          <h3>Google Maps Error</h3>
+          <h3>Dark Map Error</h3>
           <p>{errorMessage}</p>
           <button 
             className="btn-apple-base btn-primary"
@@ -697,12 +803,12 @@ const FullPageMap = ({
   }
 
   return (
-    <div className="full-page-map">
-      {/* Initial Loading Screen - Fast completion */}
+    <div className="full-page-map dark-map-theme">
+      {/* Initial Loading Screen */}
       {(!hasInitialLoad && (!mapLoaded || !googleMapsReady || loading)) && (
         <LoadingScreen 
-          message="Caricamento mappa..."
-          subMessage="Preparazione esperienza interattiva"
+          message="Caricamento mappa dark..."
+          subMessage="Preparazione esperienza dark interattiva"
           progress={loadingProgress}
         />
       )}
@@ -712,18 +818,18 @@ const FullPageMap = ({
         <MapUpdateLoader
           loading={isMapUpdating || (hasInitialLoad && loading)}
           searchType={cafeType}
-          forcefulMode={false} // Disable forceful mode for instant feel
+          forcefulMode={false}
         />
       )}
 
-      {/* Map Container */}
+      {/* Dark Map Container */}
       <div 
         ref={mapRef} 
-        className="map-canvas"
+        className="map-canvas dark-map-canvas"
         style={{ 
           width: '100%', 
           height: '100%',
-          backgroundColor: '#f5f5f5',
+          backgroundColor: '#1a1a1a',
           borderRadius: isEmbedMode ? '12px' : '0'
         }}
       />
@@ -751,7 +857,7 @@ const FullPageMap = ({
         />
       )}
 
-      {/* Cafe Popup */}
+      {/* Enhanced Cafe Popup for Dark Theme */}
       {selectedCafe && mapLoaded && (
         <CafePopup
           cafe={selectedCafe}
@@ -760,11 +866,31 @@ const FullPageMap = ({
         />
       )}
 
-      {/* Error Message */}
+      {/* Dark Theme Error Message */}
       {error && (
-        <div className="map-error-toast">
+        <div className="map-error-toast dark-theme">
           <span>❌ {error.message || 'Error loading data'}</span>
           <button onClick={onRefresh}>Retry</button>
+        </div>
+      )}
+
+      {/* Dark Map Debug Info (Development Only) */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="dark-map-debug-info" style={{
+          position: 'absolute',
+          bottom: '10px',
+          left: '10px',
+          background: 'rgba(0, 0, 0, 0.8)',
+          color: '#00D4FF',
+          padding: '8px 12px',
+          borderRadius: '8px',
+          fontSize: '12px',
+          fontFamily: 'monospace',
+          border: '1px solid rgba(0, 212, 255, 0.3)',
+          backdropFilter: 'blur(10px)'
+        }}>
+          🌑 Dark Map | {cafeType}: {cafes.filter(c => (c.type || c.placeType) === cafeType).length} | 
+          Total: {cafes.length} | Method: {detectionMethod || 'unknown'}
         </div>
       )}
     </div>

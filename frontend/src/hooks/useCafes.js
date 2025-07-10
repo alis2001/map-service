@@ -1,11 +1,11 @@
-// hooks/useCafes.js - COMPLETE UPDATED VERSION - Removed Pubs Support
+// hooks/useCafes.js - UPDATED FOR INSTANT FILTERING & DARK MAP
 // Location: /frontend/src/hooks/useCafes.js
 
 import { useQuery } from 'react-query';
 import { useRef, useCallback } from 'react';
 import { placesAPI, apiUtils } from '../services/apiService';
 
-// UPDATED: Smart hook with reduced API calls and better Italian venue support (no pubs)
+// UPDATED: Ultra-fast hook with perfect type filtering for dark map
 export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
   const lastSearchParamsRef = useRef(null);
   const isSearchingRef = useRef(false);
@@ -44,7 +44,7 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
       isSearchingRef.current = true;
 
       try {
-        console.log('☕ Fetching Italian venues:', {
+        console.log('☕ Fetching venues for dark map:', {
           latitude: latitude.toFixed(4),
           longitude: longitude.toFixed(4),
           radius,
@@ -52,18 +52,20 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
           searchKey
         });
 
-        const result = await placesAPI.getNearbyPlaces(latitude, longitude, {
+        // UPDATED: Get ALL places in one call for instant filtering
+        const result = await placesAPI.getAllNearbyPlaces(latitude, longitude, {
           radius,
-          type,
-          limit: 25
+          limit: 50 // Get more data for better filtering
         });
 
-        console.log('✅ Italian venues fetched successfully:', {
-          count: result.count,
-          places: result.places?.length || 0
+        console.log('✅ All venues fetched for dark map:', {
+          totalPlaces: result.totalPlaces,
+          cafes: result.cafePlaces?.length || 0,
+          restaurants: result.restaurantPlaces?.length || 0
         });
 
-        const enhancedPlaces = result.places.map(place => {
+        // ENHANCED: Process all places with dark map optimizations
+        const enhancedCafes = (result.cafePlaces || []).map(place => {
           const formatted = apiUtils.formatPlace(place);
           
           if (latitude && longitude && formatted.location) {
@@ -77,11 +79,14 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
             formatted.formattedDistance = apiUtils.formatDistance(distance);
           }
 
-          // UPDATED: Italian venue specific properties (no pub)
-          formatted.emoji = getItalianVenueEmoji(formatted.type, formatted.name);
-          formatted.displayType = getItalianVenueDisplayType(formatted.type);
+          // ENHANCED: Dark map specific properties
+          formatted.emoji = getVenueEmoji('cafe', formatted.name);
+          formatted.displayType = 'Bar/Caffetteria';
+          formatted.markerColor = getCafeMarkerColor(formatted);
+          formatted.markerSize = getMarkerSize(formatted.distance);
           formatted.isVeryClose = formatted.distance && formatted.distance < 200;
           formatted.walkingTime = getWalkingTime(formatted.distance);
+          formatted.darkMapReady = true; // Flag for dark map compatibility
           
           if (formatted.rating) {
             formatted.ratingStars = '★'.repeat(Math.floor(formatted.rating)) + 
@@ -89,98 +94,139 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
             formatted.ratingText = `${formatted.rating}/5`;
           }
 
-          formatted.features = detectItalianFeatures(formatted.name, formatted.type);
+          return formatted;
+        });
+
+        const enhancedRestaurants = (result.restaurantPlaces || []).map(place => {
+          const formatted = apiUtils.formatPlace(place);
+          
+          if (latitude && longitude && formatted.location) {
+            const distance = apiUtils.calculateDistance(
+              latitude,
+              longitude,
+              formatted.location.latitude,
+              formatted.location.longitude
+            );
+            formatted.distance = Math.round(distance);
+            formatted.formattedDistance = apiUtils.formatDistance(distance);
+          }
+
+          // ENHANCED: Dark map specific properties
+          formatted.emoji = getVenueEmoji('restaurant', formatted.name);
+          formatted.displayType = 'Ristorante';
+          formatted.markerColor = getRestaurantMarkerColor(formatted);
+          formatted.markerSize = getMarkerSize(formatted.distance);
+          formatted.isVeryClose = formatted.distance && formatted.distance < 200;
+          formatted.walkingTime = getWalkingTime(formatted.distance);
+          formatted.darkMapReady = true; // Flag for dark map compatibility
+          
+          if (formatted.rating) {
+            formatted.ratingStars = '★'.repeat(Math.floor(formatted.rating)) + 
+                                   '☆'.repeat(5 - Math.floor(formatted.rating));
+            formatted.ratingText = `${formatted.rating}/5`;
+          }
 
           return formatted;
         });
 
-        // UPDATED: Smart sorting for Italian context (no pub priority)
-        enhancedPlaces.sort((a, b) => {
-          if (a.isVeryClose && b.isVeryClose) {
-            return (b.rating || 0) - (a.rating || 0);
-          }
-          
-          if (a.distance < 500 && b.distance >= 500) return -1;
-          if (b.distance < 500 && a.distance >= 500) return 1;
-          
-          return (a.distance || Infinity) - (b.distance || Infinity);
+        // SMART SORTING for dark map visibility
+        [enhancedCafes, enhancedRestaurants].forEach(places => {
+          places.sort((a, b) => {
+            // Prioritize very close places
+            if (a.isVeryClose && !b.isVeryClose) return -1;
+            if (!a.isVeryClose && b.isVeryClose) return 1;
+            
+            // Then by rating
+            if (a.isVeryClose && b.isVeryClose) {
+              return (b.rating || 0) - (a.rating || 0);
+            }
+            
+            // Finally by distance
+            return (a.distance || Infinity) - (b.distance || Infinity);
+          });
         });
 
-        const enhancedResult = {
-          places: enhancedPlaces,
-          count: enhancedPlaces.length,
+        // RETURN: Combined data structure for instant filtering
+        const combinedResult = {
+          // All places combined for easy access
+          places: [...enhancedCafes, ...enhancedRestaurants],
+          
+          // Separated by type for instant filtering
+          cafePlaces: enhancedCafes,
+          restaurantPlaces: enhancedRestaurants,
+          
+          // Counts
+          count: enhancedCafes.length + enhancedRestaurants.length,
+          cafeCount: enhancedCafes.length,
+          restaurantCount: enhancedRestaurants.length,
+          
+          // User location
           userLocation: { latitude, longitude },
+          
+          // Dark map stats
           searchStats: {
-            veryClose: enhancedPlaces.filter(p => p.isVeryClose).length,
-            walkable: enhancedPlaces.filter(p => p.distance && p.distance < 1000).length,
-            total: enhancedPlaces.length
+            veryClose: [...enhancedCafes, ...enhancedRestaurants].filter(p => p.isVeryClose).length,
+            walkable: [...enhancedCafes, ...enhancedRestaurants].filter(p => p.distance && p.distance < 1000).length,
+            total: enhancedCafes.length + enhancedRestaurants.length,
+            byType: {
+              cafe: enhancedCafes.length,
+              restaurant: enhancedRestaurants.length
+            }
           }
         };
 
         lastSearchParamsRef.current = {
           params: { latitude, longitude, radius, type },
-          data: enhancedResult,
+          data: combinedResult,
           timestamp: Date.now()
         };
 
-        return enhancedResult;
+        return combinedResult;
 
       } catch (error) {
-        console.error('❌ Failed to fetch Italian venues:', error);
+        console.error('❌ Failed to fetch venues for dark map:', error);
         throw error;
       } finally {
         isSearchingRef.current = false;
       }
     },
-    // Update the useQuery configuration (around line 60-90)
     {
       enabled: !!(latitude && longitude && searchKey),
-      staleTime: 5 * 60 * 1000,    // Increased to 5 minutes
-      cacheTime: 30 * 60 * 1000,   // Increased to 30 minutes
+      staleTime: 3 * 60 * 1000,    // 3 minutes for faster updates
+      cacheTime: 15 * 60 * 1000,   // 15 minutes cache
       refetchOnWindowFocus: false,
-      refetchOnMount: true,    
+      refetchOnMount: true,
       retry: (failureCount, error) => {
-        console.log('🔄 Retry attempt:', failureCount, error?.message);
-        
         if (error?.response?.status === 429) {
-          console.log('🛑 Rate limited - implementing exponential backoff');
-          return failureCount < 2; // Reduce retry attempts for rate limits
+          return failureCount < 1;
         }
         if (error?.response?.status >= 400 && error?.response?.status < 500) {
           return false;
         }
-        return failureCount < 1; // Reduce overall retry attempts
+        return failureCount < 1;
       },
       retryDelay: (attemptIndex) => {
-        const baseDelay = 2000; // Start with 2 seconds
-        const delay = Math.min(baseDelay * Math.pow(2, attemptIndex), 30000); // Max 30 seconds
-        console.log(`⏳ Retry delay: ${delay}ms`);
-        return delay;
+        return Math.min(2000 * Math.pow(2, attemptIndex), 30000);
       },
       onError: (error) => {
-        console.error('❌ Failed to fetch Italian venues:', error);
+        console.error('❌ Failed to fetch venues for dark map:', error);
         isSearchingRef.current = false;
-        
-        // Track consecutive errors for backoff
-        if (error?.response?.status === 429) {
-          errorCountRef.current = Math.min((errorCountRef.current || 0) + 1, 5);
-          console.log(`🚦 Error count increased to: ${errorCountRef.current}`);
-        }
+        errorCountRef.current = Math.min((errorCountRef.current || 0) + 1, 5);
       },
       onSuccess: (data) => {
-        // Reset error count on success
         errorCountRef.current = 0;
-        console.log('✅ Italian venues data processed:', {
+        console.log('✅ Dark map venue data processed:', {
           totalPlaces: data.count,
-          veryClose: data.searchStats?.veryClose || 0,
-          walkable: data.searchStats?.walkable || 0
+          cafes: data.cafeCount,
+          restaurants: data.restaurantCount,
+          veryClose: data.searchStats?.veryClose || 0
         });
       }
     }
   );
 
-  // UPDATED: Italian venue emoji mapping (removed pub emoji)
-  const getItalianVenueEmoji = (type, name) => {
+  // DARK MAP: Venue emoji mapping with bright colors
+  const getVenueEmoji = (type, name) => {
     const nameLower = (name || '').toLowerCase();
     
     if (nameLower.includes('gelateria') || nameLower.includes('gelato')) return '🍦';
@@ -189,8 +235,6 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
     if (nameLower.includes('panetteria') || nameLower.includes('pane')) return '🥖';
     if (nameLower.includes('caffè') || nameLower.includes('caffe')) return '☕';
     
-    // REMOVED: pub-specific emojis
-    
     switch (type) {
       case 'restaurant': return '🍽️';
       case 'cafe':
@@ -198,28 +242,28 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
     }
   };
 
-  // UPDATED: Italian venue display types (removed pub)
-  const getItalianVenueDisplayType = (type) => {
-    switch (type) {
-      case 'cafe': return 'Bar/Caffetteria';
-      case 'restaurant': return 'Ristorante';
-      default: return 'Locale';
-    }
+  // DARK MAP: Bright marker colors for cafes
+  const getCafeMarkerColor = (place) => {
+    if (place.distance && place.distance < 200) return '#FFD700'; // Gold for very close
+    if (place.rating && place.rating >= 4.5) return '#FF6B6B';     // Bright red for high rated
+    if (place.distance && place.distance < 500) return '#4ECDC4';  // Bright teal for close
+    return '#FF9F43'; // Bright orange default
   };
 
-  // Detect Italian venue features
-  const detectItalianFeatures = (name, type) => {
-    const nameLower = (name || '').toLowerCase();
-    const features = [];
-    
-    if (nameLower.includes('wifi') || nameLower.includes('internet')) features.push('📶 WiFi');
-    if (nameLower.includes('terrazza') || nameLower.includes('giardino')) features.push('🌿 Esterno');
-    if (nameLower.includes('colazione') || nameLower.includes('breakfast')) features.push('🌅 Colazione');
-    if (nameLower.includes('aperitivo')) features.push('🍸 Aperitivo');
-    if (nameLower.includes('sportivo') || nameLower.includes('calcio')) features.push('⚽ Sport');
-    if (nameLower.includes('musica') || nameLower.includes('live')) features.push('🎵 Musica');
-    
-    return features;
+  // DARK MAP: Bright marker colors for restaurants  
+  const getRestaurantMarkerColor = (place) => {
+    if (place.distance && place.distance < 200) return '#FFD700'; // Gold for very close
+    if (place.rating && place.rating >= 4.5) return '#A55EEA';     // Bright purple for high rated
+    if (place.distance && place.distance < 500) return '#26DE81'; // Bright green for close
+    return '#FD79A8'; // Bright pink default
+  };
+
+  // DARK MAP: Dynamic marker sizes
+  const getMarkerSize = (distance) => {
+    if (!distance) return 28;
+    if (distance < 200) return 32; // Larger for very close
+    if (distance < 500) return 30; // Medium for close
+    return 28; // Standard size
   };
 
   // Calculate walking time
@@ -237,121 +281,108 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
     return `${hours}h ${mins}m a piedi`;
   };
 
-  // Extract data
-  const cafes = data?.places || [];
-  const count = data?.count || 0;
-  const userLocation = data?.userLocation || null;
-  const searchStats = data?.searchStats || { veryClose: 0, walkable: 0, total: 0 };
+  // EXTRACT DATA based on requested type for instant filtering
+  const getFilteredPlaces = () => {
+    if (!data) return [];
+    
+    switch (type) {
+      case 'cafe':
+        return data.cafePlaces || [];
+      case 'restaurant':
+        return data.restaurantPlaces || [];
+      default:
+        return data.places || [];
+    }
+  };
 
-  // Helper functions for Italian venues
+  const filteredPlaces = getFilteredPlaces();
+  const filteredCount = filteredPlaces.length;
+
+  // Helper functions for dark map
   const getVenuesByType = (venueType) => {
-    return cafes.filter(place => place.type === venueType);
+    if (!data) return [];
+    
+    switch (venueType) {
+      case 'cafe':
+        return data.cafePlaces || [];
+      case 'restaurant':
+        return data.restaurantPlaces || [];
+      default:
+        return [];
+    }
   };
 
   const getVenuesWithinWalkingDistance = (maxMinutes = 10) => {
     const maxDistance = (maxMinutes / 60) * 5 * 1000;
-    return cafes.filter(place => place.distance && place.distance <= maxDistance);
+    return filteredPlaces.filter(place => place.distance && place.distance <= maxDistance);
   };
 
   const getTopRatedVenues = (minRating = 4.0, maxCount = 10) => {
-    return cafes
+    return filteredPlaces
       .filter(place => place.rating && place.rating >= minRating)
       .sort((a, b) => (b.rating || 0) - (a.rating || 0))
       .slice(0, maxCount);
   };
 
-  const searchVenues = (searchTerm) => {
-    const term = searchTerm.toLowerCase();
-    return cafes.filter(place => 
-      place.name.toLowerCase().includes(term) ||
-      place.address.toLowerCase().includes(term) ||
-      place.displayType?.toLowerCase().includes(term) ||
-      place.features?.some(feature => feature.toLowerCase().includes(term))
-    );
-  };
-
-  const getVenueById = (venueId) => {
-    return cafes.find(place => 
-      place.id === venueId || place.googlePlaceId === venueId
-    );
-  };
-
-  // UPDATED: Italian venue statistics (removed pub stats)
-  const getItalianVenueStats = () => {
-    const stats = {
-      total: count,
+  const getDarkMapStats = () => {
+    if (!data) return { total: 0, byType: { cafe: 0, restaurant: 0 } };
+    
+    return {
+      total: data.count || 0,
       byType: {
-        caffeterias: getVenuesByType('cafe').length,
-        restaurants: getVenuesByType('restaurant').length
-        // REMOVED: pubs: getVenuesByType('pub').length
+        cafe: data.cafeCount || 0,
+        restaurant: data.restaurantCount || 0
       },
-      byDistance: {
-        veryClose: searchStats.veryClose,
-        walkable: searchStats.walkable,
-        nearby: count
-      },
-      byFeatures: {},
-      avgRating: 0,
-      topRated: getTopRatedVenues(4.5, 5)
+      veryClose: data.searchStats?.veryClose || 0,
+      walkable: data.searchStats?.walkable || 0,
+      currentFilter: type,
+      filteredCount: filteredCount
     };
-
-    const ratedVenues = cafes.filter(place => place.rating);
-    if (ratedVenues.length > 0) {
-      stats.avgRating = ratedVenues.reduce((sum, place) => sum + place.rating, 0) / ratedVenues.length;
-      stats.avgRating = Math.round(stats.avgRating * 10) / 10;
-    }
-
-    cafes.forEach(place => {
-      if (place.features) {
-        place.features.forEach(feature => {
-          stats.byFeatures[feature] = (stats.byFeatures[feature] || 0) + 1;
-        });
-      }
-    });
-
-    return stats;
   };
 
   return {
-    cafes,
-    count,
-    userLocation,
-    searchStats,
+    // MAIN DATA - Filtered by type for instant display
+    cafes: filteredPlaces,
+    count: filteredCount,
+    userLocation: data?.userLocation || null,
+    searchStats: data?.searchStats || { veryClose: 0, walkable: 0, total: 0 },
     loading,
     error,
     refetch,
     isFetching,
     
-    // Helper functions
+    // RAW DATA - All venues for instant switching
+    allData: data,
+    allPlaces: data?.places || [],
+    
+    // HELPER FUNCTIONS
     getVenuesByType,
     getVenuesWithinWalkingDistance,
     getTopRatedVenues,
-    searchVenues,
-    getVenueById,
-    getItalianVenueStats,
+    getDarkMapStats,
     
-    // Computed values
-    hasData: count > 0,
-    isEmpty: !loading && count === 0,
+    // COMPUTED VALUES
+    hasData: filteredCount > 0,
+    isEmpty: !loading && filteredCount === 0,
     isRefreshing: isFetching && !loading,
     
-    // UPDATED: Italian venue specific helpers (removed pub helpers)
-    getCaffeterias: () => getVenuesByType('cafe'),
+    // TYPE-SPECIFIC HELPERS for instant switching
+    getCafes: () => getVenuesByType('cafe'),
     getRestaurants: () => getVenuesByType('restaurant'),
-    // REMOVED: getPubs: () => getVenuesByType('pub'),
-    getVeryCloseVenues: () => cafes.filter(p => p.isVeryClose),
+    getVeryCloseVenues: () => filteredPlaces.filter(p => p.isVeryClose),
     getWalkableVenues: () => getVenuesWithinWalkingDistance(15),
     
-    // Performance indicators
+    // PERFORMANCE INDICATORS
     performance: {
       lastSearchTime: lastSearchParamsRef.current?.timestamp,
       cacheHit: !loading && !!data,
-      searchInProgress: isSearchingRef.current
+      searchInProgress: isSearchingRef.current,
+      dataComplete: !!(data?.cafePlaces && data?.restaurantPlaces)
     }
   };
 };
 
-// UPDATED: Hook for searching Italian venues by text (no pub support)
+// UPDATED: Text search hook with dark map support
 export const usePlaceSearch = (query, userLocation = null) => {
   const {
     data,
@@ -359,13 +390,13 @@ export const usePlaceSearch = (query, userLocation = null) => {
     error,
     refetch
   } = useQuery(
-    ['italianPlaceSearch', query?.trim(), userLocation?.latitude, userLocation?.longitude],
+    ['placeSearch', query?.trim(), userLocation?.latitude, userLocation?.longitude],
     async () => {
       if (!query || query.trim().length < 2) {
         return { places: [], count: 0 };
       }
 
-      console.log('🔍 Searching Italian venues:', { query, userLocation });
+      console.log('🔍 Searching places for dark map:', { query, userLocation });
 
       try {
         const result = await placesAPI.searchPlaces(query.trim(), {
@@ -388,8 +419,10 @@ export const usePlaceSearch = (query, userLocation = null) => {
             formatted.formattedDistance = apiUtils.formatDistance(distance);
           }
 
-          formatted.emoji = apiUtils.getTypeEmoji(formatted.type);
-          formatted.displayType = getItalianVenueDisplayType(formatted.type);
+          // DARK MAP: Enhanced formatting
+          formatted.emoji = formatted.type === 'restaurant' ? '🍽️' : '☕';
+          formatted.displayType = formatted.type === 'restaurant' ? 'Ristorante' : 'Bar/Caffetteria';
+          formatted.darkMapReady = true;
           
           if (formatted.rating) {
             formatted.ratingStars = '★'.repeat(Math.floor(formatted.rating)) + 
@@ -414,7 +447,7 @@ export const usePlaceSearch = (query, userLocation = null) => {
           count: enhancedPlaces.length
         };
       } catch (error) {
-        console.error('❌ Italian venue search failed:', error);
+        console.error('❌ Search failed for dark map:', error);
         throw error;
       }
     },
@@ -427,14 +460,6 @@ export const usePlaceSearch = (query, userLocation = null) => {
     }
   );
 
-  const getItalianVenueDisplayType = (type) => {
-    switch (type) {
-      case 'cafe': return 'Bar/Caffetteria';
-      case 'restaurant': return 'Ristorante';
-      default: return 'Locale';
-    }
-  };
-
   return {
     places: data?.places || [],
     count: data?.count || 0,
@@ -446,7 +471,7 @@ export const usePlaceSearch = (query, userLocation = null) => {
   };
 };
 
-// UPDATED: Hook for getting Italian venue details (no pub support)
+// UPDATED: Hook for place details with dark map enhancements
 export const usePlaceDetails = (placeId, userLocation = null) => {
   const {
     data: place,
@@ -454,11 +479,11 @@ export const usePlaceDetails = (placeId, userLocation = null) => {
     error,
     refetch
   } = useQuery(
-    ['italianPlaceDetails', placeId],
+    ['placeDetails', placeId],
     async () => {
       if (!placeId) return null;
 
-      console.log('📍 Fetching Italian venue details:', placeId);
+      console.log('📍 Fetching place details for dark map:', placeId);
 
       const result = await placesAPI.getPlaceDetails(placeId, userLocation);
       
@@ -479,8 +504,10 @@ export const usePlaceDetails = (placeId, userLocation = null) => {
         formatted.formattedDistance = apiUtils.formatDistance(distance);
       }
 
-      formatted.emoji = apiUtils.getTypeEmoji(formatted.type);
-      formatted.displayType = getItalianVenueDisplayType(formatted.type);
+      // DARK MAP: Enhanced formatting
+      formatted.emoji = formatted.type === 'restaurant' ? '🍽️' : '☕';
+      formatted.displayType = formatted.type === 'restaurant' ? 'Ristorante' : 'Bar/Caffetteria';
+      formatted.darkMapReady = true;
       
       if (formatted.rating) {
         formatted.ratingStars = '★'.repeat(Math.floor(formatted.rating)) + 
@@ -497,14 +524,6 @@ export const usePlaceDetails = (placeId, userLocation = null) => {
       retry: 2
     }
   );
-
-  const getItalianVenueDisplayType = (type) => {
-    switch (type) {
-      case 'cafe': return 'Bar/Caffetteria';
-      case 'restaurant': return 'Ristorante'; 
-      default: return 'Locale';
-    }
-  };
 
   return {
     place,
