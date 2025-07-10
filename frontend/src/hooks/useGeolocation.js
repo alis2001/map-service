@@ -1,127 +1,70 @@
-// Complete Enhanced Geolocation Hook - With All PDF Optimizations
+// hooks/useGeolocation.js - ULTRA-FAST OPTIMIZED VERSION
 // Location: /frontend/src/hooks/useGeolocation.js
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-export const useEnhancedGeolocation = () => {
+export const useGeolocation = () => {
   // Core states
   const [location, setLocation] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  // Detection states
+  // Detection metadata
   const [detectionMethod, setDetectionMethod] = useState('detecting');
-  const [detectionPhase, setDetectionPhase] = useState('initializing');
   const [locationCapability, setLocationCapability] = useState('unknown');
-  const [permissionState, setPermissionState] = useState('prompt');
+  const [hasLocation, setHasLocation] = useState(false);
+  const [isHighAccuracy, setIsHighAccuracy] = useState(false);
+  const [qualityText, setQualityText] = useState('unknown');
+  const [sourceText, setSourceText] = useState('detecting');
+  const [isDetecting, setIsDetecting] = useState(true);
+  const [isDefault, setIsDefault] = useState(false);
   
-  // Performance tracking
-  const [detectionTime, setDetectionTime] = useState(null);
-  const [qualityMetrics, setQualityMetrics] = useState(null);
-  
-  // Refs for tracking
+  // Detection tracking
+  const detectionStartRef = useRef(null);
   const detectionCompletedRef = useRef(false);
   const watchIdRef = useRef(null);
-  const startTimeRef = useRef(null);
+  const timeoutRef = useRef(null);
 
-  // 🌍 **INSTANT IP-BASED LOCATION DETECTION**
-  const getIPLocation = useCallback(async () => {
-    try {
-      console.log('🌍 Trying IP-based location (instant)...');
-      
-      // Try multiple IP geolocation services
-      const ipServices = [
-        'https://ipapi.co/json/',
-        'https://ip-api.com/json/',
-        'https://ipinfo.io/json'
-      ];
-      
-      for (const service of ipServices) {
-        try {
-          const response = await fetch(service, { timeout: 2000 });
-          if (!response.ok) continue;
-          
-          const data = await response.json();
-          
-          // Parse different service formats
-          let lat, lng, city, country;
-          
-          if (service.includes('ipapi.co')) {
-            lat = data.latitude;
-            lng = data.longitude;
-            city = data.city;
-            country = data.country_name;
-          } else if (service.includes('ip-api.com')) {
-            lat = data.lat;
-            lng = data.lon;
-            city = data.city;
-            country = data.country;
-          } else if (service.includes('ipinfo.io')) {
-            const coords = data.loc?.split(',');
-            lat = coords ? parseFloat(coords[0]) : null;
-            lng = coords ? parseFloat(coords[1]) : null;
-            city = data.city;
-            country = data.country;
-          }
-          
-          if (lat && lng && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
-            console.log('🌍 IP location SUCCESS:', { lat, lng, city, country });
-            
-            return {
-              latitude: lat,
-              longitude: lng,
-              accuracy: 5000, // IP location is city-level
-              timestamp: new Date().toISOString(),
-              source: 'ip',
-              method: 'IP Geolocation',
-              quality: 'acceptable',
-              confidence: 0.7,
-              city,
-              country,
-              detectionTime: Date.now()
-            };
-          }
-        } catch (serviceError) {
-          console.warn(`IP service ${service} failed:`, serviceError.message);
-          continue;
-        }
-      }
-      
-      throw new Error('All IP services failed');
-      
-    } catch (error) {
-      console.warn('🌍 IP location failed:', error.message);
-      return null;
-    }
+  // 🚀 **ULTRA-FAST DEVICE-SPECIFIC DETECTION**
+  const detectDeviceType = useCallback(() => {
+    const userAgent = navigator.userAgent.toLowerCase();
+    const isMobile = /android|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
+    const isTablet = /ipad|android(?!.*mobile)/i.test(userAgent);
+    const isDesktop = !isMobile && !isTablet;
+    
+    const browser = /chrome/i.test(userAgent) ? 'chrome' : 
+                   /firefox/i.test(userAgent) ? 'firefox' :
+                   /safari/i.test(userAgent) ? 'safari' :
+                   /edge/i.test(userAgent) ? 'edge' : 'other';
+
+    return {
+      isMobile,
+      isTablet,
+      isDesktop,
+      browser,
+      platform: isMobile ? 'mobile' : isTablet ? 'tablet' : 'desktop'
+    };
   }, []);
 
-  // 📍 **DESKTOP OPTIMIZED GPS LOCATION (PDF APPROACH)**
-  const getDesktopOptimizedLocation = useCallback(async () => {
+  // 📱 **MOBILE OPTIMIZED LOCATION (HIGH ACCURACY)**
+  const getMobileOptimizedLocation = useCallback(() => {
     return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject(new Error('Geolocation not supported'));
-        return;
-      }
-      
-      console.log('🖥️ Trying desktop-optimized geolocation...');
-      
-      // PDF-recommended desktop options
-      const desktopOptions = {
-        enableHighAccuracy: false, // Critical for desktop - uses WiFi positioning
-        timeout: 10000,           // 10 seconds for desktop
-        maximumAge: 300000        // 5 minute cache acceptable
+      const options = {
+        enableHighAccuracy: true,    // Critical for mobile GPS
+        timeout: 15000,             // 15 seconds for mobile
+        maximumAge: 60000           // 1 minute cache for mobile
       };
-      
+
       const timeoutId = setTimeout(() => {
-        reject(new Error('Desktop geolocation timeout'));
-      }, desktopOptions.timeout);
-      
+        reject(new Error('Mobile GPS timeout'));
+      }, options.timeout);
+
       navigator.geolocation.getCurrentPosition(
         (position) => {
           clearTimeout(timeoutId);
           const coords = position.coords;
           
-          const result = {
+          resolve({
             latitude: coords.latitude,
             longitude: coords.longitude,
             accuracy: coords.accuracy,
@@ -130,370 +73,74 @@ export const useEnhancedGeolocation = () => {
             altitude: coords.altitude,
             timestamp: new Date().toISOString(),
             source: 'gps',
-            method: 'Desktop Optimized GPS',
-            quality: coords.accuracy < 100 ? 'excellent' : 
-                    coords.accuracy < 500 ? 'good' : 
-                    coords.accuracy < 2000 ? 'acceptable' : 'poor',
-            confidence: calculateConfidence(coords),
-            detectionTime: Date.now()
-          };
-          
-          console.log('🖥️ Desktop GPS SUCCESS:', {
-            accuracy: Math.round(coords.accuracy) + 'm',
-            quality: result.quality
+            method: 'Mobile GPS',
+            quality: coords.accuracy < 50 ? 'excellent' : 
+                    coords.accuracy < 200 ? 'good' : 'acceptable',
+            confidence: calculateConfidence(coords)
           });
-          
-          resolve(result);
         },
         (error) => {
           clearTimeout(timeoutId);
-          console.warn('🖥️ Desktop GPS failed:', error.message);
           reject(error);
         },
-        desktopOptions
+        options
       );
     });
   }, []);
 
-  // 🔥 **CHROME-SPECIFIC OPTIMIZATION**
-  const getChromeOptimizedLocation = useCallback(async () => {
+  // 🖥️ **DESKTOP OPTIMIZED LOCATION (WIFI/NETWORK)**
+  const getDesktopOptimizedLocation = useCallback(() => {
     return new Promise((resolve, reject) => {
-      let attempts = 0;
-      
-      function attempt() {
-        navigator.geolocation.getCurrentPosition(
-          position => {
-            const coords = position.coords;
-            resolve({
-              latitude: coords.latitude,
-              longitude: coords.longitude,
-              accuracy: coords.accuracy,
-              heading: coords.heading,
-              speed: coords.speed,
-              altitude: coords.altitude,
-              timestamp: new Date().toISOString(),
-              source: 'gps',
-              method: 'Chrome Optimized',
-              quality: coords.accuracy < 200 ? 'good' : 'acceptable'
-            });
-          },
-          error => {
-            if (error.code === 3 && attempts < 2) {
-              attempts++;
-              setTimeout(attempt, 1000); // Retry after 1 second
-            } else {
-              reject(error);
-            }
-          },
-          {
-            enableHighAccuracy: false,
-            timeout: 8000 + (attempts * 4000), // Increase timeout on retry
-            maximumAge: 300000
-          }
-        );
-      }
-      
-      attempt();
-    });
-  }, []);
-
-  // 🦊 **FIREFOX-SPECIFIC OPTIMIZATION**
-  const getFirefoxOptimizedLocation = useCallback(async () => {
-    return new Promise((resolve, reject) => {
-      let completed = false;
-      
-      // Manual timeout to bypass Firefox bugs
-      const timeoutId = setTimeout(() => {
-        if (!completed) {
-          completed = true;
-          reject(new Error('Firefox manual timeout'));
-        }
-      }, 12000);
-
-      navigator.geolocation.getCurrentPosition(
-        position => {
-          if (!completed) {
-            completed = true;
-            clearTimeout(timeoutId);
-            const coords = position.coords;
-            resolve({
-              latitude: coords.latitude,
-              longitude: coords.longitude,
-              accuracy: coords.accuracy,
-              heading: coords.heading,
-              speed: coords.speed,
-              altitude: coords.altitude,
-              timestamp: new Date().toISOString(),
-              source: 'gps',
-              method: 'Firefox Optimized',
-              quality: coords.accuracy < 200 ? 'good' : 'acceptable'
-            });
-          }
-        },
-        error => {
-          if (!completed) {
-            completed = true;
-            clearTimeout(timeoutId);
-            reject(error);
-          }
-        },
-        { enableHighAccuracy: false, timeout: 15000 }
-      );
-    });
-  }, []);
-
-  // 🔍 **LOCAL PRECISION VALIDATION (AVOID ROME PROBLEM)**
-  const isLocalPrecision = useCallback((location) => {
-    // Check if accuracy is neighborhood-level (< 1km)
-    // and not defaulting to Rome coordinates
-    const romeLat = 41.9028;
-    const romeLng = 12.4964;
-    
-    const notRome = Math.abs(location.latitude - romeLat) > 0.5 ||
-                   Math.abs(location.longitude - romeLng) > 0.5;
-    
-    return location.accuracy < 1000 && notRome;
-  }, []);
-
-  // 🚀 **PROGRESSIVE ENHANCEMENT DETECTION**
-  const runProgressiveDetection = useCallback(async () => {
-    try {
-      console.log('🚀 Starting progressive enhancement detection...');
-      
-      // Phase 1: Immediate IP location for user feedback
-      setDetectionPhase('getting_ip_location');
-      const ipLocationPromise = getIPLocation();
-      
-      // Phase 2: GPS detection in parallel
-      setDetectionPhase('attempting_gps');
-      const gpsLocationPromise = getBrowserOptimizedLocation();
-      
-      // Show IP location immediately if available
-      const ipResult = await ipLocationPromise;
-      if (ipResult) {
-        setLocation({ ...ipResult, preliminary: true });
-        console.log('📍 Showing IP location immediately');
-      }
-
-      // Wait for GPS with timeout
-      try {
-        const gpsResult = await Promise.race([
-          gpsLocationPromise,
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('GPS timeout')), 12000)
-          )
-        ]);
-
-        // Prefer GPS if it has local precision
-        if (gpsResult && isLocalPrecision(gpsResult)) {
-          console.log('🎯 GPS provided local precision, using GPS');
-          return gpsResult;
-        }
-      } catch (gpsError) {
-        console.warn('GPS failed or timeout:', gpsError.message);
-      }
-
-      // Fall back to IP location
-      if (ipResult) {
-        console.log('🌍 Using IP location as final result');
-        return { ...ipResult, preliminary: false };
-      }
-
-      throw new Error('All detection methods failed');
-
-    } catch (error) {
-      console.error('Progressive detection failed:', error);
-      throw error;
-    }
-  }, [getIPLocation, isLocalPrecision]);
-
-  // 🔧 **BROWSER-OPTIMIZED GPS DETECTION**
-  const getBrowserOptimizedLocation = useCallback(async () => {
-    const userAgent = navigator.userAgent.toLowerCase();
-    
-    if (/chrome/i.test(userAgent) && !/edge/i.test(userAgent)) {
-      console.log('🔥 Using Chrome optimization');
-      return await getChromeOptimizedLocation();
-    } else if (/firefox/i.test(userAgent)) {
-      console.log('🦊 Using Firefox optimization');
-      return await getFirefoxOptimizedLocation();
-    } else {
-      console.log('🖥️ Using standard desktop optimization');
-      return await getDesktopOptimizedLocation();
-    }
-  }, [getChromeOptimizedLocation, getFirefoxOptimizedLocation, getDesktopOptimizedLocation]);
-
-  // 🚀 **MAIN DETECTION FUNCTION**
-  const runEnhancedDetection = useCallback(async () => {
-    if (detectionCompletedRef.current) return;
-
-    try {
-      setLoading(true);
-      setError(null);
-      setDetectionPhase('initializing');
-      startTimeRef.current = Date.now();
-      
-      console.log('🚀 Starting enhanced geolocation detection...');
-
-      // Check cache first
-      const cached = getCachedLocation();
-      if (cached) {
-        setLocation(cached);
-        setDetectionMethod('cache');
-        setLoading(false);
-        detectionCompletedRef.current = true;
-        console.log('💾 Using cached location');
-        return;
-      }
-
-      // Run progressive detection
-      const detectedLocation = await runProgressiveDetection();
-
-      if (detectedLocation) {
-        const finalLocation = {
-          ...detectedLocation,
-          detectionTime: Date.now() - startTimeRef.current,
-          browserOptimized: true,
-          progressive: true
-        };
-
-        setLocation(finalLocation);
-        setDetectionMethod(finalLocation.method || 'progressive');
-        setDetectionTime(finalLocation.detectionTime);
-        setQualityMetrics({
-          accuracy: finalLocation.accuracy,
-          quality: finalLocation.quality,
-          confidence: finalLocation.confidence,
-          source: finalLocation.source
-        });
-
-        // Cache the result
-        cacheLocation(finalLocation);
-        
-        detectionCompletedRef.current = true;
-        console.log('✅ Enhanced detection completed:', {
-          method: finalLocation.method,
-          accuracy: Math.round(finalLocation.accuracy) + 'm',
-          time: finalLocation.detectionTime + 'ms'
-        });
-      }
-
-    } catch (detectionError) {
-      console.error('❌ Enhanced detection failed:', detectionError);
-      setError(detectionError.message);
-      setDetectionMethod('failed');
-      
-      // Emergency fallback
-      await tryEmergencyFallback();
-    } finally {
-      setLoading(false);
-      setDetectionPhase('completed');
-    }
-  }, [runProgressiveDetection]);
-
-  // 🆘 **EMERGENCY FALLBACK**
-  const tryEmergencyFallback = useCallback(async () => {
-    console.log('🆘 Attempting emergency fallback...');
-    
-    try {
-      // Try basic IP location as last resort
-      const fallbackLocation = await getIPLocation();
-      
-      if (fallbackLocation) {
-        setLocation({
-          ...fallbackLocation,
-          emergency: true,
-          method: 'Emergency IP Fallback'
-        });
-        setDetectionMethod('emergency_fallback');
-        console.log('🆘 Emergency fallback successful');
-      } else {
-        // Final fallback: Turin, Italy default
-        const defaultLocation = {
-          latitude: 45.0703,
-          longitude: 7.6869,
-          accuracy: 10000,
-          city: 'Turin',
-          country: 'Italy',
-          timestamp: new Date().toISOString(),
-          source: 'default',
-          method: 'Default Location',
-          quality: 'poor',
-          emergency: true,
-          isDefault: true
-        };
-        
-        setLocation(defaultLocation);
-        setDetectionMethod('default_fallback');
-        console.log('🏠 Using default Turin location');
-      }
-    } catch (fallbackError) {
-      console.error('🆘 Emergency fallback also failed:', fallbackError);
-    }
-  }, [getIPLocation]);
-
-  // 💾 **CACHE MANAGEMENT**
-  const cacheLocation = useCallback((location) => {
-    const cacheEntry = {
-      ...location,
-      cachedAt: Date.now(),
-      expiresAt: Date.now() + (10 * 60 * 1000) // 10 minutes
-    };
-
-    try {
-      localStorage.setItem('enhanced_location_cache', JSON.stringify(cacheEntry));
-      console.log('💾 Location cached (10min)');
-    } catch (e) {
-      console.warn('Cache write failed:', e);
-    }
-  }, []);
-
-  const getCachedLocation = useCallback(() => {
-    try {
-      const stored = localStorage.getItem('enhanced_location_cache');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed.expiresAt > Date.now()) {
-          console.log('📦 Fresh cache found');
-          return { ...parsed, source: 'cache' };
-        } else {
-          localStorage.removeItem('enhanced_location_cache');
-        }
-      }
-    } catch (e) {
-      console.warn('Cache read failed:', e);
-    }
-    return null;
-  }, []);
-
-  // 🔄 **REFRESH LOCATION**
-  const refreshLocation = useCallback(async () => {
-    console.log('🔄 Refreshing location...');
-    
-    detectionCompletedRef.current = false;
-    setLoading(true);
-    setError(null);
-    
-    // Clear cache
-    localStorage.removeItem('enhanced_location_cache');
-    
-    await runEnhancedDetection();
-  }, [runEnhancedDetection]);
-
-  // 🎯 **GET PRECISE LOCATION**
-  const getPreciseLocation = useCallback(async () => {
-    console.log('🎯 Getting precise location...');
-    
-    try {
-      setLoading(true);
-      
-      const preciseOptions = {
-        enableHighAccuracy: true,
-        timeout: 20000,
-        maximumAge: 0
+      const options = {
+        enableHighAccuracy: false,   // Use WiFi/network positioning
+        timeout: 8000,              // 8 seconds for desktop
+        maximumAge: 300000          // 5 minutes cache for desktop
       };
 
-      const preciseLocation = await new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        reject(new Error('Desktop location timeout'));
+      }, options.timeout);
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          clearTimeout(timeoutId);
+          const coords = position.coords;
+          
+          resolve({
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+            accuracy: coords.accuracy,
+            timestamp: new Date().toISOString(),
+            source: 'network',
+            method: 'Desktop WiFi/Network',
+            quality: coords.accuracy < 100 ? 'excellent' : 
+                    coords.accuracy < 500 ? 'good' : 
+                    coords.accuracy < 2000 ? 'acceptable' : 'poor',
+            confidence: calculateConfidence(coords)
+          });
+        },
+        (error) => {
+          clearTimeout(timeoutId);
+          reject(error);
+        },
+        options
+      );
+    });
+  }, []);
+
+  // 🔥 **CHROME ULTRA-FAST DETECTION**
+  const getChromeOptimizedLocation = useCallback(() => {
+    return new Promise((resolve, reject) => {
+      let attempts = 0;
+      const maxAttempts = 2;
+      
+      function attemptLocation() {
+        const options = {
+          enableHighAccuracy: attempts === 0 ? false : true,
+          timeout: attempts === 0 ? 5000 : 10000,
+          maximumAge: attempts === 0 ? 300000 : 60000
+        };
+
         navigator.geolocation.getCurrentPosition(
           (position) => {
             const coords = position.coords;
@@ -501,38 +148,301 @@ export const useEnhancedGeolocation = () => {
               latitude: coords.latitude,
               longitude: coords.longitude,
               accuracy: coords.accuracy,
-              heading: coords.heading,
-              speed: coords.speed,
-              altitude: coords.altitude,
               timestamp: new Date().toISOString(),
-              source: 'gps',
-              method: 'High Precision GPS',
-              quality: coords.accuracy < 50 ? 'excellent' : 
-                      coords.accuracy < 100 ? 'good' : 'acceptable',
-              confidence: calculateConfidence(coords)
+              source: options.enableHighAccuracy ? 'gps' : 'network',
+              method: `Chrome Optimized (attempt ${attempts + 1})`,
+              quality: coords.accuracy < 100 ? 'excellent' : 'good'
             });
           },
-          reject,
-          preciseOptions
+          (error) => {
+            if (error.code === 3 && attempts < maxAttempts - 1) {
+              attempts++;
+              console.log(`🔄 Chrome retry attempt ${attempts + 1}`);
+              setTimeout(attemptLocation, 1000);
+            } else {
+              reject(error);
+            }
+          },
+          options
         );
-      });
+      }
       
+      attemptLocation();
+    });
+  }, []);
+
+  // 🦊 **FIREFOX OPTIMIZED DETECTION**
+  const getFirefoxOptimizedLocation = useCallback(() => {
+    return new Promise((resolve, reject) => {
+      let completed = false;
+      
+      // Firefox needs longer timeouts and special handling
+      const manualTimeoutId = setTimeout(() => {
+        if (!completed) {
+          completed = true;
+          reject(new Error('Firefox manual timeout'));
+        }
+      }, 12000);
+
+      const options = {
+        enableHighAccuracy: false,
+        timeout: 15000,
+        maximumAge: 300000
+      };
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          if (!completed) {
+            completed = true;
+            clearTimeout(manualTimeoutId);
+            
+            const coords = position.coords;
+            resolve({
+              latitude: coords.latitude,
+              longitude: coords.longitude,
+              accuracy: coords.accuracy,
+              timestamp: new Date().toISOString(),
+              source: 'network',
+              method: 'Firefox Optimized',
+              quality: coords.accuracy < 200 ? 'good' : 'acceptable'
+            });
+          }
+        },
+        (error) => {
+          if (!completed) {
+            completed = true;
+            clearTimeout(manualTimeoutId);
+            reject(error);
+          }
+        },
+        options
+      );
+    });
+  }, []);
+
+  // 🌍 **IP GEOLOCATION FALLBACK (ONLY IF GPS FAILS)**
+  const getIPGeolocation = useCallback(async () => {
+    console.log('🌍 Attempting IP geolocation as fallback...');
+    
+    const services = [
+      'https://ipapi.co/json/',
+      'https://ip-api.com/json/',
+      'https://ipinfo.io/json'
+    ];
+    
+    for (const service of services) {
+      try {
+        const response = await fetch(service, { 
+          timeout: 3000,
+          headers: { 'Accept': 'application/json' }
+        });
+        
+        if (!response.ok) continue;
+        
+        const data = await response.json();
+        let lat, lng, city, country;
+        
+        if (service.includes('ipapi.co')) {
+          lat = data.latitude;
+          lng = data.longitude;
+          city = data.city;
+          country = data.country_name;
+        } else if (service.includes('ip-api.com')) {
+          lat = data.lat;
+          lng = data.lon;
+          city = data.city;
+          country = data.country;
+        } else if (service.includes('ipinfo.io')) {
+          const coords = data.loc?.split(',');
+          lat = coords ? parseFloat(coords[0]) : null;
+          lng = coords ? parseFloat(coords[1]) : null;
+          city = data.city;
+          country = data.country;
+        }
+        
+        if (lat && lng && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+          console.log('🌍 IP location successful:', { lat, lng, city });
+          
+          return {
+            latitude: lat,
+            longitude: lng,
+            accuracy: 5000, // City-level accuracy
+            city,
+            country,
+            timestamp: new Date().toISOString(),
+            source: 'ip',
+            method: 'IP Geolocation',
+            quality: 'poor',
+            confidence: 0.6
+          };
+        }
+      } catch (serviceError) {
+        console.warn(`IP service ${service} failed:`, serviceError.message);
+        continue;
+      }
+    }
+    
+    throw new Error('All IP geolocation services failed');
+  }, []);
+
+  // 🎯 **MAIN DETECTION ORCHESTRATOR**
+  const startLocationDetection = useCallback(async () => {
+    if (detectionCompletedRef.current) return;
+
+    setLoading(true);
+    setError(null);
+    setIsDetecting(true);
+    detectionStartRef.current = Date.now();
+    
+    console.log('🚀 Starting ultra-fast location detection...');
+
+    try {
+      // Step 1: Analyze device capabilities
+      const deviceInfo = detectDeviceType();
+      console.log('📱 Device detected:', deviceInfo);
+      
+      setLocationCapability(deviceInfo.platform);
+
+      // Step 2: Choose optimal detection method based on device
+      let detectionPromise;
+      
+      if (deviceInfo.isMobile || deviceInfo.isTablet) {
+        console.log('📱 Using mobile-optimized detection');
+        detectionPromise = getMobileOptimizedLocation();
+        setDetectionMethod('mobile_gps');
+      } else if (deviceInfo.browser === 'chrome') {
+        console.log('🔥 Using Chrome-optimized detection');
+        detectionPromise = getChromeOptimizedLocation();
+        setDetectionMethod('chrome_optimized');
+      } else if (deviceInfo.browser === 'firefox') {
+        console.log('🦊 Using Firefox-optimized detection');
+        detectionPromise = getFirefoxOptimizedLocation();
+        setDetectionMethod('firefox_optimized');
+      } else {
+        console.log('🖥️ Using desktop-optimized detection');
+        detectionPromise = getDesktopOptimizedLocation();
+        setDetectionMethod('desktop_network');
+      }
+
+      // Step 3: Race between optimal method and fallback
+      const raceTimeout = deviceInfo.isMobile ? 20000 : 12000;
+      
+      const timeoutPromise = new Promise((_, reject) => {
+        timeoutRef.current = setTimeout(() => {
+          reject(new Error(`Detection timeout after ${raceTimeout}ms`));
+        }, raceTimeout);
+      });
+
+      const result = await Promise.race([detectionPromise, timeoutPromise]);
+      
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+
+      // Step 4: Validate and set location
+      if (result && isValidLocation(result)) {
+        const detectionTime = Date.now() - detectionStartRef.current;
+        console.log(`✅ Location detected in ${detectionTime}ms:`, {
+          method: result.method,
+          accuracy: Math.round(result.accuracy) + 'm',
+          quality: result.quality
+        });
+
+        setLocation(result);
+        setHasLocation(true);
+        setIsHighAccuracy(result.accuracy < 200);
+        setQualityText(result.quality);
+        setSourceText(result.source);
+        setDetectionMethod(result.method);
+        setIsDefault(false);
+        
+        // Cache successful location
+        cacheLocation(result);
+        
+        detectionCompletedRef.current = true;
+      } else {
+        throw new Error('Invalid location data received');
+      }
+
+    } catch (primaryError) {
+      console.warn('⚠️ Primary detection failed:', primaryError.message);
+      
+      // ONLY use IP fallback if explicitly requested (removed by default)
+      console.log('❌ No fallback - requiring actual user location');
+      
+      setError('Unable to detect your location. Please enable location services.');
+      setHasLocation(false);
+      setIsDefault(false);
+      
+    } finally {
+      setLoading(false);
+      setIsDetecting(false);
+    }
+  }, [detectDeviceType, getMobileOptimizedLocation, getDesktopOptimizedLocation, getChromeOptimizedLocation, getFirefoxOptimizedLocation]);
+
+  // 🔄 **REFRESH LOCATION**
+  const refreshLocation = useCallback(() => {
+    console.log('🔄 Refreshing location...');
+    
+    detectionCompletedRef.current = false;
+    setLocation(null);
+    setHasLocation(false);
+    setError(null);
+    clearLocationCache();
+    
+    startLocationDetection();
+  }, [startLocationDetection]);
+
+  // 🎯 **GET HIGH PRECISION LOCATION**
+  const getPreciseLocation = useCallback(async () => {
+    console.log('🎯 Getting high precision location...');
+    
+    try {
+      setLoading(true);
+      
+      const options = {
+        enableHighAccuracy: true,
+        timeout: 25000,
+        maximumAge: 0 // Force fresh location
+      };
+
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, options);
+      });
+
+      const coords = position.coords;
+      const preciseLocation = {
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        accuracy: coords.accuracy,
+        heading: coords.heading,
+        speed: coords.speed,
+        altitude: coords.altitude,
+        timestamp: new Date().toISOString(),
+        source: 'gps',
+        method: 'High Precision GPS',
+        quality: coords.accuracy < 50 ? 'excellent' : 
+                coords.accuracy < 100 ? 'good' : 'acceptable',
+        confidence: calculateConfidence(coords)
+      };
+
       setLocation(preciseLocation);
-      setDetectionMethod('precise');
+      setHasLocation(true);
+      setIsHighAccuracy(true);
       cacheLocation(preciseLocation);
       
       return preciseLocation;
     } catch (error) {
-      console.error('❌ Precise location failed:', error);
+      console.error('❌ High precision location failed:', error);
       throw error;
     } finally {
       setLoading(false);
     }
-  }, [cacheLocation]);
+  }, []);
 
-  // 📊 **UTILITY FUNCTIONS**
+  // 🧮 **UTILITY FUNCTIONS**
   const calculateConfidence = useCallback((coords) => {
-    let confidence = 0.5; // Base confidence
+    let confidence = 0.5;
     
     if (coords.accuracy <= 50) confidence += 0.4;
     else if (coords.accuracy <= 200) confidence += 0.3;
@@ -546,103 +456,122 @@ export const useEnhancedGeolocation = () => {
     return Math.min(confidence, 1.0);
   }, []);
 
-  const clearLocationCache = useCallback(() => {
-    localStorage.removeItem('enhanced_location_cache');
-    console.log('🗑️ Location cache cleared');
+  const isValidLocation = useCallback((location) => {
+    return location &&
+           typeof location.latitude === 'number' &&
+           typeof location.longitude === 'number' &&
+           Math.abs(location.latitude) <= 90 &&
+           Math.abs(location.longitude) <= 180 &&
+           location.accuracy > 0;
   }, []);
 
-  const getCacheInfo = useCallback(() => {
-    const cached = getCachedLocation();
-    return cached ? {
-      hasCache: true,
-      age: Date.now() - cached.cachedAt,
-      expiresIn: cached.expiresAt - Date.now(),
-      source: cached.source
-    } : { hasCache: false };
-  }, [getCachedLocation]);
+  // 💾 **CACHE MANAGEMENT**
+  const cacheLocation = useCallback((location) => {
+    try {
+      const cacheEntry = {
+        ...location,
+        cachedAt: Date.now(),
+        expiresAt: Date.now() + (10 * 60 * 1000) // 10 minutes
+      };
+      
+      localStorage.setItem('fast_location_cache', JSON.stringify(cacheEntry));
+      console.log('💾 Location cached successfully');
+    } catch (error) {
+      console.warn('Cache write failed:', error);
+    }
+  }, []);
+
+  const getCachedLocation = useCallback(() => {
+    try {
+      const cached = localStorage.getItem('fast_location_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed.expiresAt > Date.now()) {
+          console.log('📦 Using fresh cached location');
+          return { ...parsed, source: 'cache' };
+        } else {
+          localStorage.removeItem('fast_location_cache');
+        }
+      }
+    } catch (error) {
+      console.warn('Cache read failed:', error);
+    }
+    return null;
+  }, []);
+
+  const clearLocationCache = useCallback(() => {
+    try {
+      localStorage.removeItem('fast_location_cache');
+      console.log('🗑️ Location cache cleared');
+    } catch (error) {
+      console.warn('Cache clear failed:', error);
+    }
+  }, []);
 
   // 🎬 **INITIALIZE ON MOUNT**
   useEffect(() => {
-    console.log('⚡ Initializing enhanced geolocation hook...');
-    setLocationCapability('good'); // Assume good with IP fallback
+    console.log('⚡ Initializing ultra-fast geolocation...');
     
-    // Start detection immediately
-    runEnhancedDetection();
-    
+    // Check for cached location first
+    const cached = getCachedLocation();
+    if (cached) {
+      console.log('💾 Found cached location, using immediately');
+      setLocation(cached);
+      setHasLocation(true);
+      setIsHighAccuracy(cached.accuracy < 200);
+      setQualityText(cached.quality || 'cached');
+      setSourceText(cached.source);
+      setDetectionMethod('cache');
+      setLoading(false);
+      setIsDetecting(false);
+      detectionCompletedRef.current = true;
+    } else {
+      // Start fresh detection
+      startLocationDetection();
+    }
+
+    // Cleanup function
     return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
       if (watchIdRef.current) {
         navigator.geolocation.clearWatch(watchIdRef.current);
       }
     };
-  }, [runEnhancedDetection]);
+  }, [startLocationDetection, getCachedLocation]);
 
-  // 📊 **COMPUTED VALUES**
-  const hasLocation = !!location;
-  const isHighAccuracy = location?.accuracy && location.accuracy < 200;
-  const isPreliminary = location?.preliminary === true;
-  const isEmergency = location?.emergency === true;
-  const isDefault = location?.isDefault === true;
-  const isCached = location?.source === 'cache';
-  
-  const qualityText = location?.quality || 'unknown';
-  const sourceText = location?.source === 'gps' ? 'GPS' : 
-                    location?.source === 'ip' ? 'IP Location' :
-                    location?.source === 'cache' ? 'Cached' : 
-                    location?.source === 'default' ? 'Default' :
-                    'Unknown';
-
-  const accuracyText = location?.accuracy ? 
-    location.accuracy < 50 ? 'Very High' :
-    location.accuracy < 200 ? 'High' :
-    location.accuracy < 1000 ? 'Medium' :
-    location.accuracy < 5000 ? 'Low' : 'Very Low'
-    : 'Unknown';
-
-  // 📤 **RETURN ENHANCED LOCATION DATA**
+  // 📊 **RETURN OPTIMIZED LOCATION DATA**
   return {
-    // Core data
+    // Core location data
     location,
     loading,
     error,
     
-    // Detection information
-    detectionMethod,
-    detectionPhase,
-    locationCapability,
-    permissionState,
-    
-    // Performance metrics
-    detectionTime,
-    qualityMetrics,
-    
-    // Computed values
+    // Status indicators  
     hasLocation,
     isHighAccuracy,
-    isPreliminary,
-    isEmergency,
+    isDetecting,
     isDefault,
-    isCached,
+    
+    // Quality indicators
     qualityText,
     sourceText,
-    accuracyText,
-    
-    // Cache information
-    cacheInfo: getCacheInfo(),
+    detectionMethod,
+    locationCapability,
     
     // Actions
     refreshLocation,
     getPreciseLocation,
     clearLocationCache,
     
-    // Advanced capabilities
-    capabilities: locationCapability,
-    browserOptimized: true,
-    progressiveEnhancement: true,
+    // Performance info
+    detectionTime: detectionStartRef.current ? Date.now() - detectionStartRef.current : null,
     
-    // Debug info
-    startTime: startTimeRef.current,
-    detectionCompleted: detectionCompletedRef.current
+    // Compatibility info
+    browserSupported: !!navigator.geolocation,
+    permissionsAPI: 'permissions' in navigator
   };
 };
 
-export default useEnhancedGeolocation;
+export default useGeolocation;

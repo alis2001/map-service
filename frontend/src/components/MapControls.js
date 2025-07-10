@@ -1,4 +1,4 @@
-// components/MapControls.js - SIMPLIFIED WITHOUT LOCATION CONTROLS
+// components/MapControls.js - ENHANCED WITH LOCATION CONTROLS
 // Location: /frontend/src/components/MapControls.js
 
 import React, { useState } from 'react';
@@ -11,9 +11,17 @@ const MapControls = ({
   hasUserLocation,
   cafesCount,
   isEmbedMode,
-  userLocation
+  userLocation,
+  onLocationRetry,
+  onPreciseLocation,
+  locationLoading,
+  locationError,
+  detectionMethod,
+  qualityText,
+  sourceText
 }) => {
   const [isExpanded, setIsExpanded] = useState(!isEmbedMode);
+  const [isLocationActionsExpanded, setIsLocationActionsExpanded] = useState(false);
 
   const handleTypeChange = (newType) => {
     if (onSearchChange) {
@@ -32,6 +40,33 @@ const MapControls = ({
       onRefresh();
     }
   };
+
+  const handleLocationRetry = () => {
+    if (onLocationRetry) {
+      onLocationRetry();
+    }
+  };
+
+  const handlePreciseLocation = () => {
+    if (onPreciseLocation) {
+      onPreciseLocation();
+    }
+  };
+
+  // Get location status indicator
+  const getLocationStatus = () => {
+    if (locationLoading) return { text: 'Rilevamento...', color: '#F59E0B', icon: '🔄' };
+    if (locationError) return { text: 'Errore posizione', color: '#EF4444', icon: '⚠️' };
+    if (!hasUserLocation) return { text: 'Nessuna posizione', color: '#6B7280', icon: '📍' };
+    
+    // Quality-based status
+    if (qualityText === 'excellent') return { text: 'Precisione alta', color: '#10B981', icon: '🎯' };
+    if (qualityText === 'good') return { text: 'Buona precisione', color: '#10B981', icon: '📍' };
+    if (qualityText === 'acceptable') return { text: 'Precisione media', color: '#F59E0B', icon: '📍' };
+    return { text: 'Posizione rilevata', color: '#10B981', icon: '📍' };
+  };
+
+  const locationStatus = getLocationStatus();
 
   // Italian venue type options
   const typeOptions = [
@@ -73,6 +108,56 @@ const MapControls = ({
       {/* Main Controls */}
       <div className={`controls-panel ${isExpanded ? 'expanded' : 'collapsed'}`}>
         
+        {/* Simple Location Status */}
+        <div className="location-status-card">
+          <div className="status-header">
+            <div className="status-indicator">
+              <div 
+                className="status-dot"
+                style={{ backgroundColor: locationStatus.color }}
+              />
+              <span className="status-text" style={{ color: locationStatus.color }}>
+                {locationStatus.icon} {hasUserLocation ? 'Posizione rilevata' : 'Posizione richiesta'}
+              </span>
+            </div>
+            {!hasUserLocation && (
+              <button
+                className="location-expand-btn"
+                onClick={() => setIsLocationActionsExpanded(!isLocationActionsExpanded)}
+                title="Opzioni posizione"
+              >
+                {isLocationActionsExpanded ? '▼' : '▶'}
+              </button>
+            )}
+          </div>
+          
+          {/* Location Actions - Only show when no location */}
+          {isLocationActionsExpanded && !hasUserLocation && (
+            <div className="location-actions">
+              <button
+                className="location-action-btn retry-btn"
+                onClick={handleLocationRetry}
+                disabled={locationLoading}
+                title="Rileva nuovamente la posizione"
+              >
+                <span className="btn-icon">🔄</span>
+                <span className="btn-text">
+                  {locationLoading ? 'Rilevamento...' : 'Rileva Posizione'}
+                </span>
+              </button>
+              
+              {locationError && (
+                <div className="location-error">
+                  <span className="error-icon">⚠️</span>
+                  <span className="error-text">
+                    Abilita la localizzazione nelle impostazioni del browser
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        
         {/* Search Stats */}
         <div className="search-stats">
           <div className="stats-item">
@@ -85,14 +170,14 @@ const MapControls = ({
               {radiusOptions.find(r => r.value === searchRadius)?.label || `${searchRadius}m`}
             </span>
           </div>
-          {hasUserLocation && (
-            <div className="stats-item">
-              <span className="stats-icon" style={{ color: '#10B981' }}>📍</span>
-              <span className="stats-label" style={{ color: '#10B981', fontWeight: '600' }}>
-                Posizione
-              </span>
-            </div>
-          )}
+          <div className="stats-item">
+            <span className="stats-icon" style={{ color: locationStatus.color }}>
+              {hasUserLocation ? '📍' : '❓'}
+            </span>
+            <span className="stats-label" style={{ color: locationStatus.color, fontWeight: '600' }}>
+              {hasUserLocation ? 'Localizzato' : 'Non localizzato'}
+            </span>
+          </div>
         </div>
 
         {/* Type Selector */}
@@ -159,7 +244,7 @@ const MapControls = ({
             <span className="button-icon">🔄</span>
             <span className="button-text">Aggiorna Ricerca</span>
             <span className="button-subtext">
-              {hasUserLocation ? 'Nella tua zona' : 'In questa area'}
+              {hasUserLocation ? 'Nella tua zona' : 'Richiede posizione'}
             </span>
           </button>
         </div>
@@ -202,34 +287,163 @@ const MapControls = ({
                 {cafeType === 'cafe' && 'I bar italiani servono caffè eccellente, aperitivi e spuntini tutto il giorno. Perfetti per colazione o pausa caffè.'}
                 {cafeType === 'restaurant' && 'Ristoranti autentici, pizzerie e osterie per pranzo e cena. Scopri la vera cucina italiana.'}
               </div>
-              {hasUserLocation && userLocation && (
-                <div className="location-context" style={{ 
-                  marginTop: '8px', 
-                  fontSize: '11px', 
-                  color: '#6B7280',
-                  padding: '6px 8px',
-                  background: 'rgba(79, 70, 229, 0.05)',
-                  borderRadius: '6px'
-                }}>
-                  📍 Posizione rilevata automaticamente • 
-                  {userLocation.source === 'gps' && 'GPS ad alta precisione'}
-                  {userLocation.source === 'browser' && 'Localizzazione di rete'}
-                  {userLocation.source === 'cache' && 'Posizione salvata'}
-                </div>
-              )}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Status Indicator */}
-      <div className="status-indicator">
-        <div className={`status-dot ${hasUserLocation ? 'connected' : 'disconnected'}`} />
-        <span className="status-text">
-          {hasUserLocation ? 'Posizione rilevata' : 'Posizione predefinita'}
-        </span>
-        <span className="venue-context"> • Locali italiani</span>
-      </div>
+      <style jsx>{`
+        .location-status-card {
+          background: rgba(255, 255, 255, 0.9);
+          border: 1px solid rgba(255, 255, 255, 0.3);
+          border-radius: 12px;
+          padding: 12px;
+          margin-bottom: 16px;
+          backdrop-filter: blur(10px);
+        }
+
+        .status-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 8px;
+        }
+
+        .status-indicator {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .status-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.6; }
+        }
+
+        .status-text {
+          font-size: 14px;
+          font-weight: 600;
+        }
+
+        .location-expand-btn {
+          background: none;
+          border: none;
+          color: #6B7280;
+          font-size: 12px;
+          cursor: pointer;
+          padding: 4px;
+          border-radius: 4px;
+          transition: all 0.2s ease;
+        }
+
+        .location-expand-btn:hover {
+          background: rgba(0, 0, 0, 0.05);
+          color: #374151;
+        }
+
+        .location-details {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          margin-bottom: 8px;
+          padding: 8px;
+          background: rgba(0, 0, 0, 0.02);
+          border-radius: 8px;
+        }
+
+        .location-info {
+          display: flex;
+          justify-content: space-between;
+          font-size: 12px;
+        }
+
+        .info-label {
+          color: #6B7280;
+          font-weight: 500;
+        }
+
+        .info-value {
+          color: #374151;
+          font-weight: 600;
+        }
+
+        .location-actions {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          margin-top: 8px;
+        }
+
+        .location-action-btn {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 12px;
+          border: none;
+          border-radius: 8px;
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s ease;
+        }
+
+        .retry-btn {
+          background: linear-gradient(135deg, #F97316, #EA580C);
+          color: white;
+        }
+
+        .precise-btn {
+          background: linear-gradient(135deg, #10B981, #059669);
+          color: white;
+        }
+
+        .location-action-btn:hover:not(:disabled) {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .location-action-btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+          transform: none;
+        }
+
+        .btn-icon {
+          font-size: 14px;
+        }
+
+        .btn-text {
+          flex: 1;
+        }
+
+        .location-error {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 12px;
+          background: rgba(239, 68, 68, 0.1);
+          border: 1px solid rgba(239, 68, 68, 0.2);
+          border-radius: 8px;
+          font-size: 12px;
+        }
+
+        .error-icon {
+          color: #EF4444;
+        }
+
+        .error-text {
+          color: #DC2626;
+          font-weight: 500;
+          line-height: 1.3;
+        }
+      `}</style>
     </div>
   );
 };

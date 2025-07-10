@@ -27,8 +27,13 @@ const FullPageMap = ({
   locationLoading,
   locationError,
   detectionMethod,
-  locationCapability
+  locationCapability,
+  onLocationRetry,
+  onPreciseLocation,
+  qualityText,
+  sourceText
 }) => {
+
   const mapRef = useRef(null);
   const googleMapRef = useRef(null);
   const markersRef = useRef(new Map());
@@ -233,11 +238,11 @@ const FullPageMap = ({
     }
   }, [shouldTriggerNewSearch, onCenterChange]);
 
-  // UPDATED: Shorter minimum display time for faster feel
+  // UPDATED: Enhanced loading management with perfect timing
   useEffect(() => {
     if (!loading && !markersLoading && isMapUpdating) {
-      // Shorter minimum display time - just 800ms
-      const minDisplayTime = 800; // Reduced from 1500ms
+      // Show loader for minimum 2-3 seconds for smooth UX
+      const minDisplayTime = 2500; // 2.5 seconds minimum
       const loaderStartTime = loaderStartTimeRef.current || Date.now();
       
       setTimeout(() => {
@@ -246,12 +251,14 @@ const FullPageMap = ({
         
         setTimeout(() => {
           setIsMapUpdating(false);
-          console.log('⚡ Map update completed - FAST hide');
+          console.log('✨ Beautiful loading animation completed');
         }, remainingTime);
-      }, 100); // Quicker completion check
+      }, 300); // Small buffer for smooth transition
     }
   }, [loading, markersLoading, isMapUpdating]);
 
+  // ENHANCED: Map initialization with light theme and POI hiding
+  // ENHANCED: Map initialization with light theme and POI hiding (CORRECTED VERSION)
   useEffect(() => {
     if (mapInitialized || !mapRef.current) return;
 
@@ -289,95 +296,173 @@ const FullPageMap = ({
           rotateControl: false,
           fullscreenControl: !isEmbedMode,
           
-          // Dark elegant map style
+          // CORRECTED: Light theme with streets and roads visible, only hiding POI markers
+          // UPDATED: Beautiful dark creative theme
           styles: [
             {
               "featureType": "all",
               "elementType": "geometry",
-              "stylers": [{ "color": "#1a1a1a" }]
+              "stylers": [{ "color": "#1a1a1a" }] // Rich dark background
             },
             {
               "featureType": "all",
               "elementType": "labels.text.fill",
-              "stylers": [{ "color": "#ffffff" }]
+              "stylers": [{ "color": "#ffffff" }] // White text for contrast
             },
             {
               "featureType": "all",
               "elementType": "labels.text.stroke",
-              "stylers": [{ "color": "#000000" }]
+              "stylers": [{ "color": "#000000" }] // Black text stroke
             },
             {
               "featureType": "administrative",
               "elementType": "geometry.stroke",
               "stylers": [
                 { "color": "#444444" },
-                { "weight": 0.6 }
+                { "weight": 0.8 }
               ]
+            },
+            {
+              "featureType": "administrative",
+              "elementType": "labels.text.fill",
+              "stylers": [{ "color": "#8a8a8a" }]
             },
             {
               "featureType": "landscape",
               "elementType": "geometry",
-              "stylers": [{ "color": "#161616" }]
+              "stylers": [{ "color": "#161616" }] // Very dark landscape
             },
+            
+            // ONLY HIDE POI ICONS/MARKERS - KEEP EVERYTHING ELSE
             {
               "featureType": "poi",
-              "elementType": "geometry",
-              "stylers": [{ "color": "#2a2a2a" }]
+              "elementType": "labels.icon",
+              "stylers": [{ "visibility": "off" }] // Hide POI icons only
             },
             {
-              "featureType": "poi",
-              "elementType": "labels.text.fill",
-              "stylers": [{ "color": "#8a8a8a" }]
+              "featureType": "poi.business",
+              "elementType": "all",
+              "stylers": [{ "visibility": "off" }] // Hide business markers
             },
+            {
+              "featureType": "poi.attraction",
+              "elementType": "labels.icon",
+              "stylers": [{ "visibility": "off" }]
+            },
+            {
+              "featureType": "poi.medical",
+              "elementType": "labels.icon", 
+              "stylers": [{ "visibility": "off" }]
+            },
+            {
+              "featureType": "poi.place_of_worship",
+              "elementType": "labels.icon",
+              "stylers": [{ "visibility": "off" }]
+            },
+            {
+              "featureType": "poi.school",
+              "elementType": "labels.icon",
+              "stylers": [{ "visibility": "off" }]
+            },
+            {
+              "featureType": "poi.sports_complex",
+              "elementType": "labels.icon",
+              "stylers": [{ "visibility": "off" }]
+            },
+            
+            // PARKS - Dark theme with subtle green
             {
               "featureType": "poi.park",
               "elementType": "geometry",
-              "stylers": [{ "color": "#1e3a1e" }]
+              "stylers": [{ "color": "#1e3a1e" }] // Dark green for parks
             },
             {
               "featureType": "poi.park",
               "elementType": "labels.text.fill",
-              "stylers": [{ "color": "#4CAF50" }]
+              "stylers": [{ "color": "#4CAF50" }] // Bright green text
             },
+            {
+              "featureType": "poi.park",
+              "elementType": "labels.icon",
+              "stylers": [{ "visibility": "off" }]
+            },
+            
+            // ROADS - Beautiful dark theme
             {
               "featureType": "road",
               "elementType": "geometry.fill",
-              "stylers": [{ "color": "#2c2c2c" }]
+              "stylers": [{ "color": "#2c2c2c" }] // Dark gray roads
+            },
+            {
+              "featureType": "road",
+              "elementType": "geometry.stroke",
+              "stylers": [{ "color": "#3c3c3c" }] // Slightly lighter stroke
             },
             {
               "featureType": "road",
               "elementType": "labels.text.fill",
-              "stylers": [{ "color": "#8a8a8a" }]
+              "stylers": [{ "color": "#8a8a8a" }] // Light gray road labels
             },
             {
               "featureType": "road.arterial",
               "elementType": "geometry",
-              "stylers": [{ "color": "#373737" }]
+              "stylers": [{ "color": "#373737" }] // Medium dark arterial roads
             },
             {
               "featureType": "road.highway",
               "elementType": "geometry",
-              "stylers": [{ "color": "#3c3c3c" }]
+              "stylers": [{ "color": "#3c3c3c" }] // Dark highways with subtle accent
             },
             {
               "featureType": "road.highway",
               "elementType": "labels.text.fill",
-              "stylers": [{ "color": "#f3d19c" }]
+              "stylers": [{ "color": "#f3d19c" }] // Golden highway labels
             },
             {
-              "featureType": "transit",
+              "featureType": "road.local",
               "elementType": "geometry",
-              "stylers": [{ "color": "#2f3948" }]
+              "stylers": [{ "color": "#2a2a2a" }] // Very dark local roads
             },
+            
+            // TRANSIT - Dark with accent colors
+            {
+              "featureType": "transit.line",
+              "elementType": "geometry",
+              "stylers": [{ "color": "#2f3948" }] // Dark blue-gray transit lines
+            },
+            {
+              "featureType": "transit.station",
+              "elementType": "labels.icon",
+              "stylers": [{ "visibility": "off" }]
+            },
+            {
+              "featureType": "transit.station",
+              "elementType": "labels.text.fill",
+              "stylers": [{ "color": "#515c6d" }] // Muted blue-gray station text
+            },
+            
+            // WATER - Beautiful dark blue
             {
               "featureType": "water",
               "elementType": "geometry",
-              "stylers": [{ "color": "#17263c" }]
+              "stylers": [{ "color": "#17263c" }] // Deep dark blue water
             },
             {
               "featureType": "water",
               "elementType": "labels.text.fill",
-              "stylers": [{ "color": "#515c6d" }]
+              "stylers": [{ "color": "#515c6d" }] // Muted blue water labels
+            },
+            
+            // CREATIVE ACCENTS - Adding some subtle color variety
+            {
+              "featureType": "administrative.country",
+              "elementType": "geometry.stroke",
+              "stylers": [{ "color": "#4a5568" }] // Subtle blue-gray borders
+            },
+            {
+              "featureType": "administrative.locality",
+              "elementType": "labels.text.fill",
+              "stylers": [{ "color": "#a0aec0" }] // Light blue-gray city labels
             }
           ],
           
@@ -387,13 +472,69 @@ const FullPageMap = ({
           draggable: true,
           scrollwheel: true,
           
+          // CRITICAL: Disable Google's default markers
           disableDefaultUI: false,
-          clickableIcons: true
+          clickableIcons: false // This disables POI markers
         };
 
         try {
           googleMapRef.current = new window.google.maps.Map(mapRef.current, mapOptions);
           console.log('✅ WWDC-style Google Map instance created successfully');
+          
+          // 🚫 HIDE ONLY POI MARKERS - KEEP STREETS AND ROADS
+          if (googleMapRef.current) {
+            console.log('🚫 Hiding only POI markers, keeping streets visible...');
+            
+            // Only hide POI icons and business markers, not the entire map
+            const stylesToHide = [
+              {
+                featureType: 'poi.business',
+                elementType: 'all',
+                stylers: [{ visibility: 'off' }]
+              },
+              {
+                featureType: 'poi.place_of_worship',
+                elementType: 'labels.icon',
+                stylers: [{ visibility: 'off' }]
+              },
+              {
+                featureType: 'poi.school',
+                elementType: 'labels.icon',
+                stylers: [{ visibility: 'off' }]
+              },
+              {
+                featureType: 'poi.medical',
+                elementType: 'labels.icon',
+                stylers: [{ visibility: 'off' }]
+              },
+              {
+                featureType: 'poi.government',
+                elementType: 'labels.icon',
+                stylers: [{ visibility: 'off' }]
+              },
+              {
+                featureType: 'poi.attraction',
+                elementType: 'labels.icon',
+                stylers: [{ visibility: 'off' }]
+              },
+              {
+                featureType: 'poi.sports_complex',
+                elementType: 'labels.icon',
+                stylers: [{ visibility: 'off' }]
+              }
+            ];
+            
+            // Apply the styles - this will keep roads and streets
+            googleMapRef.current.setOptions({
+              styles: [
+                ...mapOptions.styles, // Your corrected light styles above
+                ...stylesToHide // Only hide POI icons, not geography
+              ]
+            });
+            
+            console.log('✅ POI markers hidden, streets and roads remain visible');
+          }
+          
         } catch (mapCreationError) {
           console.error('❌ Failed to create Google Map instance:', mapCreationError);
           setMapError('Error creating map instance');
@@ -597,139 +738,128 @@ const FullPageMap = ({
   }, [userLocation, searchRadius, mapLoaded]);
 
   // ENHANCED: WWDC-style venue markers with loading tracking
+  // ENHANCED: WWDC-style venue markers with optimized clearing and type filtering
   useEffect(() => {
     if (!googleMapRef.current || !mapLoaded) return;
 
-    console.log('☕ Updating WWDC-style venue markers:', cafes.length);
+    console.log('☕ Starting optimized marker update:', {
+      totalCafes: cafes.length,
+      selectedType: cafeType,
+      mapReady: mapLoaded
+    });
 
-    // Start markers loading
+    // 🧹 STEP 1: COMPLETELY CLEAR ALL EXISTING MARKERS
+    console.log('🧹 Clearing all existing markers...');
+    markersRef.current.forEach((marker, markerId) => {
+      marker.setMap(null); // Remove from map
+      marker = null; // Clear reference
+    });
+    markersRef.current.clear(); // Clear the Map completely
+    console.log('✅ All previous markers cleared');
+
+    // 🔄 STEP 2: SHOW BEAUTIFUL LOADING ANIMATION
     setMarkersLoading(true);
     setMarkersLoaded(false);
 
-    // Clear existing markers efficiently
-    markersRef.current.forEach(marker => {
-      marker.setMap(null);
-    });
-    markersRef.current.clear();
-
-    // If no cafes, mark as loaded immediately
-    if (cafes.length === 0) {
-      setMarkersLoading(false);
-      setMarkersLoaded(true);
-      return;
-    }
-
-    // Create new markers for venues
-    const bounds = new window.google.maps.LatLngBounds();
-    let markersAdded = 0;
-    
-    // Process markers in batches for better performance
-    const processBatch = (startIndex) => {
-      const batchSize = 5; // Process 5 markers at a time
-      const endIndex = Math.min(startIndex + batchSize, cafes.length);
-      
-      for (let i = startIndex; i < endIndex; i++) {
-        const cafe = cafes[i];
+    // Add a small delay for smooth UX
+    setTimeout(() => {
+      // 🎯 STEP 3: FILTER CAFES BY SELECTED TYPE ONLY
+      const filteredCafes = cafes.filter(cafe => {
+        const cafeType_normalized = (cafe.type || cafe.placeType || '').toLowerCase();
+        const selectedType_normalized = cafeType.toLowerCase();
         
-        if (!cafe.location || !cafe.location.latitude || !cafe.location.longitude) {
-          console.warn('Skipping cafe with invalid location:', cafe.name);
-          continue;
-        }
-
-        const position = {
-          lat: cafe.location.latitude,
-          lng: cafe.location.longitude
-        };
-
-        // WWDC-style venue markers
-        const markerSVG = `
-          <svg width="36" height="44" viewBox="0 0 36 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <filter id="wwdcVenueFilter${i}" x="-50%" y="-50%" width="200%" height="200%">
-                <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.3)"/>
-              </filter>
-              <linearGradient id="wwdcVenueGradient${i}" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" style="stop-color:${getWWDCVenueColor(cafe)};stop-opacity:1" />
-                <stop offset="100%" style="stop-color:${getWWDCVenueColorSecondary(cafe)};stop-opacity:1" />
-              </linearGradient>
-            </defs>
-            
-            <!-- Pin shadow -->
-            <ellipse cx="18" cy="41" rx="10" ry="3" fill="rgba(0,0,0,0.2)"/>
-            
-            <!-- Main pin shape with WWDC gradient -->
-            <path d="M18 0C8.059 0 0 8.059 0 18C0 28 18 44 18 44S36 28 36 18C36 8.059 27.941 0 18 0Z" 
-                  fill="url(#wwdcVenueGradient${i})" 
-                  filter="url(#wwdcVenueFilter${i})"/>
-            
-            <!-- Inner circle with glassmorphism -->
-            <circle cx="18" cy="18" r="12" fill="rgba(255,255,255,0.15)" 
-                    stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
-            
-            <!-- Venue icon -->
-            <text x="18" y="23" text-anchor="middle" font-size="16" fill="white" font-weight="600">
-              ${getVenueEmoji(cafe)}
-            </text>
-            
-            <!-- Distance pulse for very close venues -->
-            ${cafe.distance && cafe.distance < 200 ? `
-              <circle cx="18" cy="18" r="15" fill="none" stroke="#00FF88" stroke-width="2" opacity="0.8">
-                <animate attributeName="r" values="12;18;12" dur="2s" repeatCount="indefinite"/>
-                <animate attributeName="opacity" values="0.8;0.3;0.8" dur="2s" repeatCount="indefinite"/>
-              </circle>
-            ` : ''}
-            
-            <!-- WWDC-style rating badge -->
-            ${cafe.rating && cafe.rating >= 4.5 ? `
-              <circle cx="28" cy="8" r="6" fill="url(#wwdcVenueGradient${i})" stroke="white" stroke-width="2"/>
-              <text x="28" y="11" text-anchor="middle" font-size="8" fill="white" font-weight="bold">★</text>
-            ` : ''}
-          </svg>
-        `;
-
-        const marker = new window.google.maps.Marker({
-          position: position,
-          map: googleMapRef.current,
-          title: `${cafe.emoji || getVenueEmoji(cafe)} ${cafe.name}${cafe.rating ? ` (${cafe.rating}⭐)` : ''}${cafe.distance ? ` - ${cafe.formattedDistance}` : ''}`,
-          icon: {
-            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(markerSVG),
-            scaledSize: new window.google.maps.Size(36, 44),
-            anchor: new window.google.maps.Point(18, 44)
-          },
-          zIndex: cafe.distance ? Math.round(1000 - cafe.distance / 10) : 500,
-          animation: cafe.distance && cafe.distance < 200 ? 
-            window.google.maps.Animation.BOUNCE : null,
-          optimized: false
+        console.log('🔍 Filtering cafe:', {
+          name: cafe.name,
+          cafeType: cafeType_normalized,
+          selectedType: selectedType_normalized,
+          matches: cafeType_normalized === selectedType_normalized
         });
+        
+        return cafeType_normalized === selectedType_normalized;
+      });
 
-        // Add click listener
-        marker.addListener('click', () => {
-          if (onCafeSelect) {
-            onCafeSelect(cafe);
-          }
-        });
+      console.log(`🎯 Filtered results: ${filteredCafes.length}/${cafes.length} places match type "${cafeType}"`);
 
-        bounds.extend(position);
-        markersRef.current.set(cafe.id || cafe.googlePlaceId, marker);
-        markersAdded++;
-      }
-
-      // Process next batch or finish
-      if (endIndex < cafes.length) {
-        // Process next batch after a small delay for smooth loading
-        setTimeout(() => processBatch(endIndex), 50);
-      } else {
-        // All markers processed
-        console.log('✅ WWDC-style venue markers updated:', markersAdded);
+      // If no places match, mark as loaded immediately
+      if (filteredCafes.length === 0) {
+        console.log('📍 No places match current filter, showing empty map');
         setMarkersLoading(false);
         setMarkersLoaded(true);
+        return;
       }
-    };
 
-    // Start processing markers
-    processBatch(0);
+      // 🎨 STEP 4: CREATE NEW MARKERS FOR FILTERED PLACES ONLY
+      const bounds = new window.google.maps.LatLngBounds();
+      let markersAdded = 0;
+      
+      // Process markers in batches for smooth animation
+      const processBatch = (startIndex) => {
+        const batchSize = 3; // Smaller batches for smoother loading
+        const endIndex = Math.min(startIndex + batchSize, filteredCafes.length);
+        
+        for (let i = startIndex; i < endIndex; i++) {
+          const cafe = filteredCafes[i];
+          
+          if (!cafe.location || !cafe.location.latitude || !cafe.location.longitude) {
+            console.warn('⚠️ Skipping cafe with invalid location:', cafe.name);
+            continue;
+          }
 
-  }, [cafes, mapLoaded, onCafeSelect, cafeType]); // Added cafeType dependency
+          const position = {
+            lat: cafe.location.latitude,
+            lng: cafe.location.longitude
+          };
+
+          // Enhanced marker with type-specific styling
+          const markerSVG = createEnhancedMarkerSVG(cafe, i, cafeType);
+
+          const marker = new window.google.maps.Marker({
+            position: position,
+            map: googleMapRef.current,
+            title: `${getVenueEmoji(cafe)} ${cafe.name}${cafe.rating ? ` (${cafe.rating}⭐)` : ''}${cafe.distance ? ` - ${cafe.formattedDistance}` : ''}`,
+            icon: {
+              url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(markerSVG),
+              scaledSize: new window.google.maps.Size(36, 44),
+              anchor: new window.google.maps.Point(18, 44)
+            },
+            zIndex: cafe.distance ? Math.round(1000 - cafe.distance / 10) : 500,
+            animation: cafe.distance && cafe.distance < 200 ? 
+              window.google.maps.Animation.DROP : null, // Smooth drop animation
+            optimized: false
+          });
+
+          // Add click listener
+          marker.addListener('click', () => {
+            if (onCafeSelect) {
+              onCafeSelect(cafe);
+            }
+          });
+
+          bounds.extend(position);
+          markersRef.current.set(cafe.id || cafe.googlePlaceId, marker);
+          markersAdded++;
+          
+          console.log(`✅ Added ${cafeType} marker: ${cafe.name}`);
+        }
+
+        // Continue with next batch or finish
+        if (endIndex < filteredCafes.length) {
+          // Process next batch with smooth delay
+          setTimeout(() => processBatch(endIndex), 200); // 200ms between batches
+        } else {
+          // All markers processed
+          console.log(`🎉 Marker update complete: ${markersAdded} ${cafeType} markers added`);
+          setMarkersLoading(false);
+          setMarkersLoaded(true);
+        }
+      };
+
+      // Start processing markers
+      processBatch(0);
+
+    }, 500); // 500ms delay for smooth UX
+
+  }, [cafes, mapLoaded, onCafeSelect, cafeType]); // Added cafeType dependency for filtering
 
   // FIXED: Proper color coding - Orange for cafe/bar, Red for restaurant
   const getWWDCVenueColor = (cafe) => {
@@ -741,6 +871,79 @@ const FullPageMap = ({
     // Everything else (cafe, bar, etc.) gets orange
     return '#F97316'; // Orange for cafes/bars
   };
+  // 🎨 CREATE ENHANCED MARKER SVG WITH TYPE-SPECIFIC STYLING
+const createEnhancedMarkerSVG = (cafe, index, selectedType) => {
+  // Type-specific colors
+  const getTypeColors = (type) => {
+    switch (type) {
+      case 'restaurant':
+        return {
+          primary: '#EF4444',
+          secondary: '#DC2626',
+          accent: '#FEE2E2'
+        };
+      case 'cafe':
+      default:
+        return {
+          primary: '#F97316',
+          secondary: '#EA580C', 
+          accent: '#FED7AA'
+        };
+    }
+  };
+
+  const colors = getTypeColors(selectedType);
+  const emoji = getVenueEmoji(cafe);
+  
+  return `
+    <svg width="36" height="44" viewBox="0 0 36 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="wwdcVenueFilter${index}" x="-50%" y="-50%" width="200%" height="200%">
+          <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="rgba(0,0,0,0.4)"/>
+        </filter>
+        <linearGradient id="wwdcVenueGradient${index}" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style="stop-color:${colors.primary};stop-opacity:1" />
+          <stop offset="100%" style="stop-color:${colors.secondary};stop-opacity:1" />
+        </linearGradient>
+        <radialGradient id="pulseGradient${index}" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" style="stop-color:${colors.primary};stop-opacity:0.3" />
+          <stop offset="100%" style="stop-color:${colors.primary};stop-opacity:0" />
+        </radialGradient>
+      </defs>
+      
+      <!-- Pulsing ring for very close venues -->
+      ${cafe.distance && cafe.distance < 200 ? `
+        <circle cx="18" cy="18" r="20" fill="url(#pulseGradient${index})">
+          <animate attributeName="r" values="15;25;15" dur="2s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values="0.6;0.2;0.6" dur="2s" repeatCount="indefinite"/>
+        </circle>
+      ` : ''}
+      
+      <!-- Pin shadow -->
+      <ellipse cx="18" cy="41" rx="12" ry="4" fill="rgba(0,0,0,0.3)"/>
+      
+      <!-- Main pin shape with enhanced gradient -->
+      <path d="M18 0C8.059 0 0 8.059 0 18C0 28 18 44 18 44S36 28 36 18C36 8.059 27.941 0 18 0Z" 
+            fill="url(#wwdcVenueGradient${index})" 
+            filter="url(#wwdcVenueFilter${index})"/>
+      
+      <!-- Inner circle with glassmorphism -->
+      <circle cx="18" cy="18" r="13" fill="rgba(255,255,255,0.2)" 
+              stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
+      
+      <!-- Venue emoji -->
+      <text x="18" y="23" text-anchor="middle" font-size="16" fill="white" font-weight="600">
+        ${emoji}
+      </text>
+      
+      <!-- Rating badge for high-rated venues -->
+      ${cafe.rating && cafe.rating >= 4.5 ? `
+        <circle cx="28" cy="8" r="7" fill="${colors.primary}" stroke="white" stroke-width="2"/>
+        <text x="28" y="11" text-anchor="middle" font-size="9" fill="white" font-weight="bold">★</text>
+      ` : ''}
+    </svg>
+  `;
+};
 
   const getWWDCVenueColorSecondary = (cafe) => {
     // FIXED: Matching secondary colors
@@ -844,12 +1047,11 @@ const FullPageMap = ({
         style={{ 
           width: '100%', 
           height: '100%',
-          backgroundColor: '#000000',
+          backgroundColor: '#1a1a1a', // UPDATED: Dark background to match
           borderRadius: isEmbedMode ? '12px' : '0'
         }}
       />
 
-      {/* Map Controls - WITHOUT location controls */}
       {showControls && mapLoaded && (
         <MapControls
           cafeType={cafeType}
@@ -860,6 +1062,13 @@ const FullPageMap = ({
           cafesCount={cafes.length}
           isEmbedMode={isEmbedMode}
           userLocation={userLocation}
+          onLocationRetry={onLocationRetry}
+          onPreciseLocation={onPreciseLocation}
+          locationLoading={locationLoading}
+          locationError={locationError}
+          detectionMethod={detectionMethod}
+          qualityText={qualityText}
+          sourceText={sourceText}
         />
       )}
 

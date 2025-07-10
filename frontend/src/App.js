@@ -1,4 +1,4 @@
-// App.js - ULTRA-FAST LOADING - Instant Ready
+// App.js - UPDATED VERSION - No Default Location, Ultra-Fast Detection
 // Location: /map-service/frontend/src/App.js
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -33,53 +33,56 @@ function App() {
 }
 
 function MapApp() {
-  // ULTRA-FAST initialization states
+  // Backend status
   const [backendReady, setBackendReady] = useState(false);
   const [backendError, setBackendError] = useState(null);
   const [appReady, setAppReady] = useState(false);
   
   // App state management
   const [selectedCafe, setSelectedCafe] = useState(null);
-  const [mapCenter, setMapCenter] = useState({
-    lat: parseFloat(process.env.REACT_APP_DEFAULT_LOCATION_LAT) || 45.0703,
-    lng: parseFloat(process.env.REACT_APP_DEFAULT_LOCATION_LNG) || 7.6869
-  });
-  const [zoom, setZoom] = useState(parseInt(process.env.REACT_APP_DEFAULT_ZOOM) || 15);
+  const [mapCenter, setMapCenter] = useState(null); // No default center
+  const [zoom, setZoom] = useState(15);
   const [searchRadius, setSearchRadius] = useState(1500);
   const [cafeType, setCafeType] = useState('cafe');
   const [showControls, setShowControls] = useState(true);
+  const [locationRequested, setLocationRequested] = useState(false);
 
-  // ULTRA-FAST geolocation hook
+  // 🚀 **ULTRA-FAST GEOLOCATION HOOK**
   const { 
     location: userLocation, 
     loading: locationLoading, 
     error: locationError,
-    detectionMethod,
-    locationCapability,
     hasLocation,
     isHighAccuracy,
     qualityText,
     sourceText,
     isDetecting,
-    isDefault
+    detectionMethod,
+    refreshLocation,
+    getPreciseLocation
   } = useGeolocation();
 
+  // Only fetch cafes when we have a real user location
   const {
     cafes,
     loading: cafesLoading,
     error: cafesError,
     refetch: refetchCafes
-  } = useCafes(mapCenter.lat, mapCenter.lng, searchRadius, cafeType);
+  } = useCafes(
+    mapCenter?.lat, 
+    mapCenter?.lng, 
+    searchRadius, 
+    cafeType
+  );
 
-  // 🏥 **ULTRA-FAST BACKEND CHECK**
+  // 🏥 **BACKEND HEALTH CHECK**
   const checkBackendHealth = useCallback(async () => {
     try {
-      console.log('🔍 Ultra-fast backend check...');
-      
+      console.log('🔍 Checking backend health...');
       const healthResult = await healthAPI.checkHealth();
       
       if (healthResult.success && (healthResult.status === 'OK' || healthResult.status === 'healthy' || healthResult.status === 'DEGRADED')) {
-        console.log('✅ Backend ready instantly');
+        console.log('✅ Backend ready');
         setBackendReady(true);
         setBackendError(null);
         return true;
@@ -94,39 +97,39 @@ function MapApp() {
     }
   }, []);
 
-  // 🚀 **INSTANT INITIALIZATION**
+  // 🚀 **APP INITIALIZATION**
   useEffect(() => {
-    console.log('🚀 Starting INSTANT app initialization...');
+    console.log('🚀 Starting app initialization...');
     
-    const initializeInstantly = async () => {
+    const initializeApp = async () => {
       // Quick backend check
       const backendOk = await checkBackendHealth();
       
       if (backendOk) {
-        console.log('⚡ App ready INSTANTLY');
+        console.log('⚡ App ready');
         setAppReady(true);
       } else {
-        // Don't block the app - continue with degraded mode
+        // Continue with degraded mode
         console.log('⚡ App ready with degraded backend');
         setAppReady(true);
       }
     };
 
-    // Start immediately - no artificial delays
-    initializeInstantly();
+    initializeApp();
   }, [checkBackendHealth]);
 
-  // 🗺️ **INSTANT MAP CENTER UPDATE**
+  // 🗺️ **MAP CENTER UPDATE - Only from Real User Location**
   useEffect(() => {
-    if (userLocation && !locationLoading && hasLocation && !isDefault) {
-      console.log('📍 INSTANT map update to user location:', {
+    if (userLocation && hasLocation && !locationLoading) {
+      console.log('📍 Setting map center to user location:', {
         lat: userLocation.latitude.toFixed(6),
         lng: userLocation.longitude.toFixed(6),
         source: sourceText,
-        quality: qualityText
+        quality: qualityText,
+        method: detectionMethod
       });
       
-      // Instantly move to user location
+      // Set map center to user's actual location
       setMapCenter({
         lat: userLocation.latitude,
         lng: userLocation.longitude
@@ -134,17 +137,21 @@ function MapApp() {
       
       // Smart zoom based on accuracy
       if (isHighAccuracy) {
-        setZoom(17);
+        setZoom(17); // High accuracy = close zoom
+      } else if (userLocation.accuracy < 1000) {
+        setZoom(16); // Good accuracy = medium zoom
       } else {
-        setZoom(16);
+        setZoom(15); // Lower accuracy = wider zoom
       }
+      
+      setLocationRequested(true);
     }
-  }, [userLocation, locationLoading, hasLocation, isHighAccuracy, qualityText, sourceText, isDefault]);
+  }, [userLocation, hasLocation, locationLoading, isHighAccuracy, qualityText, sourceText, detectionMethod]);
 
-  // 🔄 **INSTANT CAFE DATA REFRESH**
+  // 🔄 **CAFE DATA REFRESH**
   useEffect(() => {
-    if (mapCenter.lat && mapCenter.lng && appReady) {
-      console.log('🔄 INSTANT cafe data refresh');
+    if (mapCenter && mapCenter.lat && mapCenter.lng && appReady) {
+      console.log('🔄 Refreshing cafe data for location');
       refetchCafes();
     }
   }, [mapCenter, searchRadius, cafeType, refetchCafes, appReady]);
@@ -152,18 +159,9 @@ function MapApp() {
   // 🎛️ **URL PARAMETERS**
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const embedLat = urlParams.get('lat');
-    const embedLng = urlParams.get('lng');
     const embedType = urlParams.get('type');
     const embedRadius = urlParams.get('radius');
     const hideControls = urlParams.get('hideControls');
-
-    if (embedLat && embedLng) {
-      setMapCenter({
-        lat: parseFloat(embedLat),
-        lng: parseFloat(embedLng)
-      });
-    }
 
     if (embedType && ['cafe', 'restaurant'].includes(embedType)) {
       setCafeType(embedType);
@@ -181,17 +179,41 @@ function MapApp() {
   // 📱 **DETECT EMBED MODE**
   const isEmbedMode = new URLSearchParams(window.location.search).get('embed') === 'true';
 
-  // 🎬 **MINIMAL LOADING SCREEN - Only show for 500ms max**
+  // 🎬 **LOADING SCREEN CONDITIONS**
   if (!appReady) {
     return (
       <LoadingScreen 
-        message="Avvio mappa..."
-        subMessage={backendError || "Preparazione"}
-        progress={90} // Always show high progress
+        message="Avvio applicazione..."
+        subMessage={backendError || "Preparazione servizi"}
+        progress={85}
         showRetry={!!backendError}
         onRetry={() => {
           setBackendError(null);
           checkBackendHealth();
+        }}
+      />
+    );
+  }
+
+  // 📍 **WAITING FOR LOCATION**
+  if (locationLoading || isDetecting || !hasLocation) {
+    return (
+      <LoadingScreen 
+        message={
+          locationLoading ? "Rilevamento posizione..." :
+          isDetecting ? "Localizzazione in corso..." :
+          locationError ? "Posizione richiesta" : "Attesa posizione..."
+        }
+        subMessage={
+          locationError ? 
+            "Abilita la localizzazione per utilizzare l'app" :
+            `Metodo: ${detectionMethod || 'in corso'} • Qualità: ${qualityText || 'rilevamento'}`
+        }
+        progress={locationLoading ? 60 : 90}
+        showRetry={!!locationError}
+        onRetry={() => {
+          console.log('🔄 User requested location retry');
+          refreshLocation();
         }}
       />
     );
@@ -227,9 +249,23 @@ function MapApp() {
     setSelectedCafe(null);
   };
 
+  const handleLocationRetry = () => {
+    console.log('🔄 Retrying location detection...');
+    refreshLocation();
+  };
+
+  const handlePreciseLocation = async () => {
+    try {
+      console.log('🎯 Getting precise location...');
+      await getPreciseLocation();
+    } catch (error) {
+      console.error('❌ Precise location failed:', error);
+    }
+  };
+
   return (
     <div className="map-app">
-      {/* INSTANT Full-Page Map */}
+      {/* Main Map Interface */}
       <FullPageMap
         center={mapCenter}
         zoom={zoom}
@@ -250,31 +286,14 @@ function MapApp() {
         locationLoading={locationLoading}
         locationError={locationError}
         detectionMethod={detectionMethod}
-        locationCapability={locationCapability}
+        locationCapability={hasLocation ? 'good' : 'unknown'}
+        onLocationRetry={handleLocationRetry}
+        onPreciseLocation={handlePreciseLocation}
+        qualityText={qualityText}
+        sourceText={sourceText}
       />
 
-      {/* Debug info (only in development) */}
-      {process.env.NODE_ENV === 'development' && (
-        <div style={{
-          position: 'fixed',
-          bottom: '10px',
-          right: '10px',
-          background: 'rgba(0,0,0,0.8)',
-          color: 'white',
-          padding: '8px 12px',
-          borderRadius: '8px',
-          fontSize: '11px',
-          fontFamily: 'monospace',
-          zIndex: 10000,
-          maxWidth: '300px'
-        }}>
-          <div>🗺️ Map: {mapCenter.lat.toFixed(4)}, {mapCenter.lng.toFixed(4)}</div>
-          <div>📍 Location: {sourceText} ({qualityText})</div>
-          <div>☕ Cafes: {cafes.length} found</div>
-          <div>⚡ Backend: {backendReady ? 'Ready' : 'Loading'}</div>
-          {isDefault && <div style={{color: '#fbbf24'}}>🎯 Using default Turin location</div>}
-        </div>
-      )}
+
     </div>
   );
 }
