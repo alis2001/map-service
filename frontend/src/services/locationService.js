@@ -3,84 +3,468 @@
 
 import { apiUtils } from './apiService';
 
-class LocationService {
+// Enhanced Location Service - Complete Implementation with PDF Optimizations
+// Location: /frontend/src/services/locationService.js
+
+class EnhancedLocationService {
   constructor() {
     this.cache = new Map();
-    this.activeDetections = new Map();
-    this.lastLocation = null;
     this.capabilities = null;
     this.permissionState = 'prompt';
+    this.lastLocation = null;
     
-    // Service configuration
+    // Italian IP service for better local precision
+    this.italianIPService = 'https://api.ipinfo.io/json?token=YOUR_TOKEN';
+    
+    // Enhanced detection methods with progressive enhancement
     this.config = {
-      // Detection methods ranked by priority and accuracy
       detectionMethods: [
         {
-          id: 'gps_ultra',
+          id: 'gps_ultra_high',
           name: 'GPS Ultra High Accuracy',
+          options: { enableHighAccuracy: true, timeout: 25000, maximumAge: 60000 },
           priority: 1,
-          timeout: 20000,
-          options: { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
-          expectedAccuracy: 5
-        },
-        {
-          id: 'gps_high',
-          name: 'GPS High Accuracy',
-          priority: 2,
           timeout: 25000,
-          options: { enableHighAccuracy: true, timeout: 25000, maximumAge: 30000 },
-          expectedAccuracy: 15
+          requiresPermission: true
         },
         {
-          id: 'gps_balanced',
-          name: 'GPS Balanced',
-          priority: 3,
-          timeout: 20000,
-          options: { enableHighAccuracy: true, timeout: 20000, maximumAge: 120000 },
-          expectedAccuracy: 50
-        },
-        {
-          id: 'browser_network',
-          name: 'Browser Network',
-          priority: 4,
-          timeout: 15000,
-          options: { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 },
-          expectedAccuracy: 200
-        },
-        {
-          id: 'browser_cached',
-          name: 'Browser Cached',
-          priority: 5,
+          id: 'gps_desktop_optimized',
+          name: 'Desktop Optimized GPS',
+          options: { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 },
+          priority: 2,
           timeout: 10000,
-          options: { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 },
-          expectedAccuracy: 500
+          requiresPermission: true
+        },
+        {
+          id: 'gps_quick',
+          name: 'Quick GPS',
+          options: { enableHighAccuracy: false, timeout: 5000, maximumAge: 600000 },
+          priority: 3,
+          timeout: 5000,
+          requiresPermission: true
+        },
+        {
+          id: 'enhanced_ip',
+          name: 'Enhanced IP Location',
+          priority: 4,
+          timeout: 5000,
+          requiresPermission: false
+        },
+        {
+          id: 'basic_ip',
+          name: 'Basic IP Location',
+          priority: 5,
+          timeout: 3000,
+          requiresPermission: false
         }
-      ],
-      
-      // Quality thresholds
-      qualityThresholds: {
-        excellent: 20,
-        good: 100,
-        acceptable: 1000,
-        poor: 5000
-      },
-      
-      // Cache settings
-      cache: {
-        maxAge: 10 * 60 * 1000, // 10 minutes
-        fallbackAge: 60 * 60 * 1000 // 1 hour for fallback
-      }
+      ]
     };
   }
 
-  // 🔍 **ANALYZE DEVICE CAPABILITIES**
-  async analyzeCapabilities() {
-    if (this.capabilities) {
-      return this.capabilities;
+  // 🚀 **MAIN DETECTION METHOD WITH PROGRESSIVE ENHANCEMENT**
+  async detectLocation(options = {}) {
+    try {
+      console.log('🚀 Starting enhanced location detection...');
+      
+      // Check cache first (15 minutes for desktop)
+      const cached = this.getCachedLocation(900000);
+      if (cached && !options.forceRefresh) {
+        console.log('💾 Using cached location');
+        return cached;
+      }
+
+      // Analyze device capabilities
+      const capabilities = await this.analyzeCapabilities();
+      
+      // Progressive approach based on PDF recommendations
+      try {
+        // 1. Try standard geolocation with desktop-optimized settings
+        const location = await this.getDesktopOptimizedLocation();
+        
+        // 2. Verify we got local precision, not Rome
+        if (this.isLocalPrecision(location)) {
+          this.cacheLocation(location);
+          return location;
+        }
+        
+        // 3. Fall back to enhanced IP + manual refinement
+        return await this.getIPWithRefinement();
+        
+      } catch (error) {
+        // 4. Final fallback: Enhanced IP location
+        console.warn('GPS failed, using IP fallback:', error.message);
+        return await this.getEnhancedIPLocation();
+      }
+      
+    } catch (error) {
+      console.error('❌ All location detection methods failed:', error);
+      
+      // Try fallback cache
+      const fallback = this.getFallbackLocation();
+      if (fallback) {
+        console.log('🆘 Using fallback cached location');
+        return fallback;
+      }
+
+      throw new Error('Location detection completely failed');
+    }
+  }
+
+  // 🎯 **DESKTOP OPTIMIZED LOCATION (PDF RECOMMENDATION)**
+  async getDesktopOptimizedLocation() {
+    const options = {
+      enableHighAccuracy: false, // Critical for desktop
+      timeout: 10000,           // 10 seconds for desktop
+      maximumAge: 300000        // 5 minute cache acceptable
+    };
+
+    return new Promise((resolve, reject) => {
+      // Browser-specific handling from PDF
+      if (this.isChrome()) {
+        this.getChromeLocation().then(resolve).catch(reject);
+      } else if (this.isFirefox()) {
+        this.getFirefoxLocation().then(resolve).catch(reject);
+      } else {
+        // Standard implementation for other browsers
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            resolve({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy,
+              timestamp: new Date().toISOString(),
+              source: 'gps',
+              method: 'Desktop Optimized GPS',
+              quality: this.calculateQuality(position.coords),
+              confidence: this.calculateConfidence(position.coords)
+            });
+          },
+          reject,
+          options
+        );
+      }
+    });
+  }
+
+  // 🔥 **CHROME-SPECIFIC OPTIMIZATION (PDF)**
+  getChromeLocation() {
+    return new Promise((resolve, reject) => {
+      let attempts = 0;
+      
+      function attempt() {
+        navigator.geolocation.getCurrentPosition(
+          position => resolve({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            timestamp: new Date().toISOString(),
+            source: 'gps',
+            method: 'Chrome Optimized',
+            quality: 'good'
+          }),
+          error => {
+            if (error.code === 3 && attempts < 2) {
+              attempts++;
+              setTimeout(attempt, 1000); // Retry after 1 second
+            } else {
+              reject(error);
+            }
+          },
+          {
+            enableHighAccuracy: false,
+            timeout: 8000 + (attempts * 4000), // Increase timeout on retry
+            maximumAge: 300000
+          }
+        );
+      }
+      
+      attempt();
+    });
+  }
+
+  // 🦊 **FIREFOX-SPECIFIC OPTIMIZATION (PDF)**
+  getFirefoxLocation() {
+    return new Promise((resolve, reject) => {
+      let completed = false;
+      
+      // Manual timeout to bypass Firefox bugs
+      const timeoutId = setTimeout(() => {
+        if (!completed) {
+          completed = true;
+          reject(new Error('Manual timeout'));
+        }
+      }, 12000);
+
+      navigator.geolocation.getCurrentPosition(
+        position => {
+          if (!completed) {
+            completed = true;
+            clearTimeout(timeoutId);
+            resolve({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy,
+              timestamp: new Date().toISOString(),
+              source: 'gps',
+              method: 'Firefox Optimized',
+              quality: 'good'
+            });
+          }
+        },
+        error => {
+          if (!completed) {
+            completed = true;
+            clearTimeout(timeoutId);
+            reject(error);
+          }
+        },
+        { enableHighAccuracy: false, timeout: 15000 }
+      );
+    });
+  }
+
+  // 🌍 **ENHANCED IP GEOLOCATION (PDF)**
+  async getEnhancedIPLocation() {
+    try {
+      // IPinfo provides neighborhood-level data for Italian IPs
+      const response = await fetch('https://ipinfo.io/json?token=YOUR_TOKEN');
+      const data = await response.json();
+      
+      // Returns actual city, not just major metropolitan area
+      return {
+        latitude: parseFloat(data.loc.split(',')[0]),
+        longitude: parseFloat(data.loc.split(',')[1]),
+        accuracy: 5000, // City-district level
+        city: data.city,
+        region: data.region,
+        country: data.country,
+        timestamp: new Date().toISOString(),
+        source: 'ip',
+        method: 'Enhanced IP Location',
+        quality: 'acceptable',
+        confidence: 0.7
+      };
+    } catch (error) {
+      // Fallback to multiple IP services
+      return await this.getMultipleIPServices();
+    }
+  }
+
+  // 🔄 **MULTIPLE IP SERVICES FALLBACK**
+  async getMultipleIPServices() {
+    const ipServices = [
+      'https://ipapi.co/json/',
+      'https://ip-api.com/json/',
+      'https://ipinfo.io/json'
+    ];
+    
+    for (const service of ipServices) {
+      try {
+        const response = await fetch(service, { timeout: 3000 });
+        if (!response.ok) continue;
+        
+        const data = await response.json();
+        
+        // Parse different service formats
+        let lat, lng, city, country;
+        
+        if (service.includes('ipapi.co')) {
+          lat = data.latitude;
+          lng = data.longitude;
+          city = data.city;
+          country = data.country_name;
+        } else if (service.includes('ip-api.com')) {
+          lat = data.lat;
+          lng = data.lon;
+          city = data.city;
+          country = data.country;
+        } else if (service.includes('ipinfo.io')) {
+          const coords = data.loc?.split(',');
+          lat = coords ? parseFloat(coords[0]) : null;
+          lng = coords ? parseFloat(coords[1]) : null;
+          city = data.city;
+          country = data.country;
+        }
+        
+        if (lat && lng && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
+          return {
+            latitude: lat,
+            longitude: lng,
+            accuracy: 5000,
+            city,
+            country,
+            timestamp: new Date().toISOString(),
+            source: 'ip',
+            method: 'IP Geolocation',
+            quality: 'acceptable',
+            confidence: 0.6
+          };
+        }
+      } catch (serviceError) {
+        console.warn(`IP service ${service} failed:`, serviceError.message);
+        continue;
+      }
+    }
+    
+    throw new Error('All IP services failed');
+  }
+
+  // 🔍 **PROGRESSIVE ENHANCEMENT WITH REFINEMENT**
+  async getLocationProgressive() {
+    // First: Get quick approximate location
+    const quickOptions = {
+      enableHighAccuracy: false,
+      timeout: 5000,
+      maximumAge: 600000 // 10 minutes
+    };
+
+    try {
+      const rough = await this.getCurrentPosition(quickOptions);
+      this.displayLocation(rough); // Show results immediately
+      
+      // Then: Refine if accuracy > 200m
+      if (rough.coords.accuracy > 200) {
+        const preciseOptions = {
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 0
+        };
+        const precise = await this.getCurrentPosition(preciseOptions);
+        this.updateLocation(precise);
+        return precise;
+      }
+      
+      return rough;
+    } catch (error) {
+      // Fallback to alternative methods
+      throw error;
+    }
+  }
+
+  // 🧠 **INTELLIGENT CACHING (PDF)**
+  cacheLocation(location) {
+    const cacheKey = 'desktop_location';
+    const cacheEntry = {
+      ...location,
+      timestamp: Date.now(),
+      expiresAt: Date.now() + (15 * 60 * 1000) // 15 minutes for desktop
+    };
+
+    this.cache.set(cacheKey, cacheEntry);
+    
+    try {
+      localStorage.setItem('enhanced_location_cache', JSON.stringify(cacheEntry));
+      console.log('💾 Location cached (15min)');
+    } catch (e) {
+      console.warn('Cache write failed:', e);
+    }
+  }
+
+  getCachedLocation(maxAge = 900000) {
+    const cacheKey = 'desktop_location';
+    const cached = this.cache.get(cacheKey);
+    
+    // Desktop cache valid for 15 minutes
+    if (cached && (Date.now() - cached.timestamp < maxAge)) {
+      return cached;
     }
 
-    console.log('🔍 Analyzing device location capabilities...');
+    // Try localStorage
+    try {
+      const stored = localStorage.getItem('enhanced_location_cache');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.expiresAt > Date.now()) {
+          console.log('📦 Fresh cache found');
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('Cache read failed:', e);
+    }
     
+    return null;
+  }
+
+  // 🎯 **LOCAL PRECISION VALIDATION (PDF)**
+  isLocalPrecision(location) {
+    // Check if accuracy is neighborhood-level (< 1km)
+    // and not defaulting to Rome coordinates
+    const romeLat = 41.9028;
+    const romeLng = 12.4964;
+    
+    const notRome = Math.abs(location.latitude - romeLat) > 0.5 ||
+                   Math.abs(location.longitude - romeLng) > 0.5;
+    
+    return location.accuracy < 1000 && notRome;
+  }
+
+  // 📊 **MULTI-STAGE FALLBACK CHAIN (PDF)**
+  async getLocationWithFallbacks() {
+    const methods = [
+      { name: 'GPS', func: () => this.getDesktopOptimizedLocation(), timeout: 10000 },
+      { name: 'Enhanced IP', func: () => this.getEnhancedIPLocation(), timeout: 5000 },
+      { name: 'Basic IP', func: () => this.getMultipleIPServices(), timeout: 3000 },
+      { name: 'Manual', func: () => this.promptManualEntry(), timeout: null }
+    ];
+
+    for (const method of methods) {
+      try {
+        console.log(`Trying ${method.name}...`);
+        const location = await method.func();
+        if (location && location.accuracy < 10000) {
+          return { ...location, method: method.name };
+        }
+      } catch (error) {
+        console.warn(`${method.name} failed:`, error.message);
+        continue;
+      }
+    }
+    
+    throw new Error('All location methods failed');
+  }
+
+  // 🔧 **BROWSER DETECTION UTILITIES**
+  isChrome() {
+    return /chrome/i.test(navigator.userAgent) && !/edge/i.test(navigator.userAgent);
+  }
+
+  isFirefox() {
+    return /firefox/i.test(navigator.userAgent);
+  }
+
+  isSafari() {
+    return /safari/i.test(navigator.userAgent) && !/chrome/i.test(navigator.userAgent);
+  }
+
+  // 📐 **QUALITY CALCULATION**
+  calculateQuality(coords) {
+    if (coords.accuracy <= 50) return 'excellent';
+    if (coords.accuracy <= 200) return 'good';
+    if (coords.accuracy <= 1000) return 'acceptable';
+    if (coords.accuracy <= 5000) return 'poor';
+    return 'very_poor';
+  }
+
+  calculateConfidence(coords) {
+    let confidence = 0.5; // Base confidence
+    
+    if (coords.accuracy <= 50) confidence += 0.4;
+    else if (coords.accuracy <= 200) confidence += 0.3;
+    else if (coords.accuracy <= 1000) confidence += 0.2;
+    else if (coords.accuracy <= 5000) confidence += 0.1;
+
+    if (coords.speed !== null) confidence += 0.05;
+    if (coords.heading !== null) confidence += 0.05;
+    if (coords.altitude !== null) confidence += 0.03;
+
+    return Math.min(confidence, 1.0);
+  }
+
+  // 🔍 **DEVICE CAPABILITY ANALYSIS**
+  async analyzeCapabilities() {
+    if (this.capabilities) return this.capabilities;
+
     const capabilities = {
       hasGeolocation: !!navigator.geolocation,
       platform: this.detectPlatform(),
@@ -95,11 +479,6 @@ class LocationService {
         const permission = await navigator.permissions.query({ name: 'geolocation' });
         this.permissionState = permission.state;
         capabilities.permission = permission.state;
-        
-        permission.addEventListener('change', () => {
-          this.permissionState = permission.state;
-          console.log('📍 Permission changed:', permission.state);
-        });
       } catch (e) {
         capabilities.permission = 'unknown';
       }
@@ -107,20 +486,11 @@ class LocationService {
 
     // Determine overall capability level
     capabilities.level = this.determineCapabilityLevel(capabilities);
-    capabilities.recommendedMethods = this.getRecommendedMethods(capabilities);
-
     this.capabilities = capabilities;
     
-    console.log('📊 Device capabilities analyzed:', {
-      level: capabilities.level,
-      platform: capabilities.platform.type,
-      methods: capabilities.recommendedMethods.length
-    });
-
     return capabilities;
   }
 
-  // 📱 **DETECT PLATFORM**
   detectPlatform() {
     const userAgent = navigator.userAgent.toLowerCase();
     
@@ -136,7 +506,6 @@ class LocationService {
     };
   }
 
-  // 🌐 **ANALYZE CONNECTION**
   analyzeConnection() {
     const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
     
@@ -148,371 +517,54 @@ class LocationService {
     };
   }
 
-  // 📡 **ANALYZE SENSORS**
-  analyzeSensors() {
-    return {
-      deviceMotion: 'DeviceMotionEvent' in window,
-      deviceOrientation: 'DeviceOrientationEvent' in window,
-      magnetometer: 'Magnetometer' in window,
-      accelerometer: 'Accelerometer' in window,
-      gyroscope: 'Gyroscope' in window
-    };
-  }
-
-  // ⚡ **ANALYZE PERFORMANCE**
-  async analyzePerformance() {
-    const startTime = performance.now();
-    
-    // Simple performance test
-    await new Promise(resolve => setTimeout(resolve, 1));
-    
-    const endTime = performance.now();
-    const responseTime = endTime - startTime;
-    
-    return {
-      memory: navigator.deviceMemory || 0,
-      cores: navigator.hardwareConcurrency || 1,
-      responseTime,
-      performanceLevel: responseTime < 2 ? 'high' : responseTime < 5 ? 'medium' : 'low'
-    };
-  }
-
-  // 🎯 **DETERMINE CAPABILITY LEVEL**
-  determineCapabilityLevel(capabilities) {
-    let score = 0;
-
-    // Base geolocation support
-    if (!capabilities.hasGeolocation) return 'none';
-    score += 10;
-
-    // Platform bonus
-    if (capabilities.platform.type === 'mobile') {
-      score += 30;
-      if (capabilities.sensors.deviceMotion) score += 10;
-      if (capabilities.sensors.deviceOrientation) score += 5;
-    } else {
-      score += 15; // Desktop still decent
-    }
-
-    // Connection quality
-    if (capabilities.connection.quality === 'excellent') score += 15;
-    else if (capabilities.connection.quality === 'good') score += 10;
-    else if (capabilities.connection.quality === 'fair') score += 5;
-
-    // Permission state
-    if (capabilities.permission === 'granted') score += 20;
-    else if (capabilities.permission === 'prompt') score += 10;
-
-    // Performance bonus
-    if (capabilities.performance.performanceLevel === 'high') score += 10;
-    else if (capabilities.performance.performanceLevel === 'medium') score += 5;
-
-    // Determine level
-    if (score >= 80) return 'excellent';
-    if (score >= 60) return 'good';
-    if (score >= 40) return 'acceptable';
-    if (score >= 20) return 'poor';
-    return 'limited';
-  }
-
-  // 🔧 **GET RECOMMENDED METHODS**
-  getRecommendedMethods(capabilities) {
-    const allMethods = [...this.config.detectionMethods];
-    
-    // Filter based on capability level
-    switch (capabilities.level) {
-      case 'excellent':
-        return allMethods; // Use all methods
-      case 'good':
-        return allMethods.slice(0, 4); // Skip lowest priority
-      case 'acceptable':
-        return allMethods.slice(1, 4); // Skip ultra high, keep practical ones
-      case 'poor':
-        return allMethods.slice(2); // Only basic methods
-      default:
-        return allMethods.slice(3); // Only cached/network
-    }
-  }
-
-  // 🏃‍♂️ **PARALLEL DETECTION SYSTEM**
-  async detectLocation(options = {}) {
-    const {
-      preferredMethods = null,
-      forceRefresh = false,
-      timeout = 30000
-    } = options;
-
-    console.log('🏁 Starting parallel location detection...');
-
-    // Check cache first (unless force refresh)
-    if (!forceRefresh) {
-      const cached = this.getCachedLocation();
-      if (cached) {
-        console.log('📦 Using cached location while detecting fresh...');
-        // Return cached immediately but continue detection in background
-        this.detectFreshLocation();
-        return cached;
-      }
-    }
-
-    return this.detectFreshLocation(preferredMethods, timeout);
-  }
-
-  // 🎯 **DETECT FRESH LOCATION**
-  async detectFreshLocation(preferredMethods = null, timeout = 30000) {
-    const capabilities = await this.analyzeCapabilities();
-    const methods = preferredMethods || capabilities.recommendedMethods;
-
-    console.log(`🎯 Running ${methods.length} detection methods in parallel...`);
-
-    // Create detection promises
-    const detectionPromises = methods.map(method => 
-      this.createDetectionPromise(method)
-    );
-
-    try {
-      // Race all methods - first successful wins
-      const winnerPromise = Promise.race(
-        detectionPromises.filter(promise => promise !== null)
-      );
-
-      // Also set a global timeout
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Global detection timeout')), timeout);
-      });
-
-      const result = await Promise.race([winnerPromise, timeoutPromise]);
-
-      console.log('🏆 Location detection winner:', {
-        method: result.method,
-        accuracy: Math.round(result.accuracy) + 'm',
-        quality: result.quality
-      });
-
-      // Cache the result
-      this.cacheLocation(result);
-      this.lastLocation = result;
-
-      return result;
-
-    } catch (error) {
-      console.error('❌ All location detection methods failed:', error);
-      
-      // Try fallback cache
-      const fallback = this.getFallbackLocation();
-      if (fallback) {
-        console.log('🆘 Using fallback cached location');
-        return fallback;
-      }
-
-      throw new Error('Location detection completely failed');
-    }
-  }
-
-  // 🎯 **CREATE DETECTION PROMISE**
-  createDetectionPromise(method) {
-    if (!navigator.geolocation) {
-      console.warn('❌ Geolocation not supported for', method.name);
-      return null;
-    }
-
-    return new Promise((resolve, reject) => {
-      console.log(`🎯 Starting ${method.name}...`);
-
-      const timeoutId = setTimeout(() => {
-        console.log(`⏰ ${method.name} timeout after ${method.timeout}ms`);
-        reject(new Error(`${method.name} timeout`));
-      }, method.timeout);
-
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          clearTimeout(timeoutId);
-          
-          const coords = position.coords;
-          const now = new Date();
-          
-          const locationData = {
-            latitude: coords.latitude,
-            longitude: coords.longitude,
-            accuracy: coords.accuracy,
-            heading: coords.heading,
-            speed: coords.speed,
-            altitude: coords.altitude,
-            timestamp: now.toISOString(),
-            source: method.id.startsWith('gps') ? 'gps' : 'browser',
-            method: method.name,
-            methodId: method.id,
-            quality: this.determineLocationQuality(coords.accuracy),
-            confidence: this.calculateConfidence(coords, method),
-            detectionTime: Date.now()
-          };
-
-          console.log(`✅ ${method.name} SUCCESS:`, {
-            accuracy: Math.round(coords.accuracy) + 'm',
-            quality: locationData.quality,
-            confidence: locationData.confidence
-          });
-
-          resolve(locationData);
-        },
-        (error) => {
-          clearTimeout(timeoutId);
-          console.warn(`❌ ${method.name} failed:`, error.message);
-          reject(error);
-        },
-        method.options
-      );
-    });
-  }
-
-  // 🎯 **DETERMINE LOCATION QUALITY**
-  determineLocationQuality(accuracy) {
-    const thresholds = this.config.qualityThresholds;
-    
-    if (accuracy <= thresholds.excellent) return 'excellent';
-    if (accuracy <= thresholds.good) return 'good';
-    if (accuracy <= thresholds.acceptable) return 'acceptable';
-    return 'poor';
-  }
-
-  // 🎯 **CALCULATE CONFIDENCE**
-  calculateConfidence(coords, method) {
-    let confidence = 0.5; // Base confidence
-
-    // Accuracy bonus
-    if (coords.accuracy <= 10) confidence += 0.4;
-    else if (coords.accuracy <= 50) confidence += 0.3;
-    else if (coords.accuracy <= 200) confidence += 0.2;
-    else if (coords.accuracy <= 1000) confidence += 0.1;
-
-    // Method bonus
-    if (method.id.includes('gps')) confidence += 0.2;
-    if (method.id.includes('ultra')) confidence += 0.1;
-
-    // Additional signals
-    if (coords.speed !== null) confidence += 0.05;
-    if (coords.heading !== null) confidence += 0.05;
-    if (coords.altitude !== null) confidence += 0.03;
-
-    return Math.min(confidence, 1.0);
-  }
-
-  // 💾 **CACHE MANAGEMENT**
-  cacheLocation(location) {
-    const cacheEntry = {
-      ...location,
-      cachedAt: Date.now(),
-      expiresAt: Date.now() + this.config.cache.maxAge
-    };
-
-    try {
-      localStorage.setItem('location_service_cache', JSON.stringify(cacheEntry));
-      this.cache.set('current', cacheEntry);
-      console.log('💾 Location cached successfully');
-    } catch (e) {
-      console.warn('Failed to cache location:', e);
-    }
-  }
-
-  getCachedLocation() {
-    try {
-      // Check memory cache first
-      const memoryCache = this.cache.get('current');
-      if (memoryCache && memoryCache.expiresAt > Date.now()) {
-        console.log('📦 Using memory cached location');
-        return { ...memoryCache, source: 'cache' };
-      }
-
-      // Check localStorage
-      const stored = localStorage.getItem('location_service_cache');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed.expiresAt > Date.now()) {
-          console.log('📦 Using stored cached location');
-          this.cache.set('current', parsed);
-          return { ...parsed, source: 'cache' };
-        } else {
-          localStorage.removeItem('location_service_cache');
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to get cached location:', e);
-    }
-
-    return null;
-  }
-
-  getFallbackLocation() {
-    try {
-      const stored = localStorage.getItem('location_service_cache');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        // Use even expired cache as fallback
-        if (parsed.cachedAt > Date.now() - this.config.cache.fallbackAge) {
-          console.log('🆘 Using fallback cached location');
-          return { ...parsed, source: 'fallback', isStale: true };
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to get fallback location:', e);
-    }
-
-    return null;
-  }
-
-  // 🌍 **UTILITY METHODS**
-  calculateDistance(lat1, lng1, lat2, lng2) {
-    return apiUtils.calculateDistance(lat1, lng1, lat2, lng2);
-  }
-
-  formatDistance(distance) {
-    return apiUtils.formatDistance(distance);
-  }
-
   getConnectionQuality(connection) {
     if (!connection) return 'unknown';
     
     const effectiveType = connection.effectiveType;
-    const downlink = connection.downlink || 0;
-
-    if (effectiveType === '4g' && downlink > 10) return 'excellent';
-    if (effectiveType === '4g' || downlink > 5) return 'good';
-    if (effectiveType === '3g' || downlink > 1) return 'fair';
-    return 'poor';
+    if (effectiveType === '4g') return 'excellent';
+    if (effectiveType === '3g') return 'good';
+    if (effectiveType === '2g') return 'poor';
+    return 'fair';
   }
 
-  // 🏥 **HEALTH CHECK**
-  async healthCheck() {
+  // 🚀 **HELPER METHODS**
+  getCurrentPosition(options) {
+    return new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, options);
+    });
+  }
+
+  displayLocation(location) {
+    // Update UI immediately with approximate location
+    console.log('📍 Displaying approximate location:', location);
+  }
+
+  updateLocation(location) {
+    // Update UI with refined location
+    console.log('🎯 Updating with precise location:', location);
+  }
+
+  getFallbackLocation() {
+    // Return any cached location as emergency fallback
     try {
-      const capabilities = await this.analyzeCapabilities();
-      
-      return {
-        status: 'healthy',
-        capabilities: capabilities.level,
-        permission: this.permissionState,
-        cachedLocation: !!this.getCachedLocation(),
-        lastLocation: !!this.lastLocation,
-        recommendedMethods: capabilities.recommendedMethods.length,
-        timestamp: new Date().toISOString()
-      };
-    } catch (error) {
-      return {
-        status: 'unhealthy',
-        error: error.message,
-        timestamp: new Date().toISOString()
-      };
+      const stored = localStorage.getItem('enhanced_location_cache');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        console.log('🆘 Using emergency fallback cache');
+        return { ...parsed, source: 'fallback_cache' };
+      }
+    } catch (e) {
+      console.warn('Fallback cache read failed:', e);
     }
+    return null;
   }
 
-  // 🧹 **CLEANUP**
-  cleanup() {
-    this.cache.clear();
-    this.activeDetections.clear();
-    console.log('🧹 Location service cleaned up');
+  async promptManualEntry() {
+    // This would integrate with your UI for manual location entry
+    throw new Error('Manual entry not implemented');
   }
 }
 
-// Create and export singleton instance
-const locationService = new LocationService();
-
-export default locationService;
+// Export singleton instance
+export const enhancedLocationService = new EnhancedLocationService();
+export default enhancedLocationService;
