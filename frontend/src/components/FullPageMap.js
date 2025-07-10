@@ -1,4 +1,4 @@
-// components/FullPageMap.js - FIXED VERSION with Perfect Filtering & Beautiful Markers
+// components/FullPageMap.js - ULTRA-OPTIMIZED for Instant Interactivity
 // Location: /map-service/frontend/src/components/FullPageMap.js
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
@@ -46,50 +46,108 @@ const FullPageMap = ({
   const [googleMapsReady, setGoogleMapsReady] = useState(false);
   const [googleMapsError, setGoogleMapsError] = useState(null);
   const [loadingProgress, setLoadingProgress] = useState(0);
-  const [markersLoaded, setMarkersLoaded] = useState(false);
-  const [markersLoading, setMarkersLoading] = useState(false);
-  const errorCountRef = useRef(0);
-  const loaderStartTimeRef = useRef(null);
   const [isMapUpdating, setIsMapUpdating] = useState(false);
   const [hasInitialLoad, setHasInitialLoad] = useState(false);
   
-  // Smart movement detection
+  // INSTANT MOVEMENT DETECTION - Much more responsive
   const lastSearchLocationRef = useRef(null);
   const isUserDraggingRef = useRef(false);
   const debounceTimeoutRef = useRef(null);
-  const immediateSearchTimeoutRef = useRef(null);
-  
-  // CRITICAL: Track current filter to prevent mixed results
   const currentFilterRef = useRef(cafeType);
-  const lastSuccessfulSearchRef = useRef(null);
-  const activeMarkersRef = useRef(new Set()); // Track currently displayed markers
+  const activeMarkersRef = useRef(new Set());
+
+  // ⚡ INSTANT TRIGGER DISTANCE - Ultra responsive
+  const shouldTriggerNewSearch = useCallback((newCenter) => {
+    if (!lastSearchLocationRef.current) {
+      return true;
+    }
+
+    const lastLocation = lastSearchLocationRef.current;
+    
+    const R = 6371e3;
+    const φ1 = lastLocation.lat * Math.PI / 180;
+    const φ2 = newCenter.lat * Math.PI / 180;
+    const Δφ = (newCenter.lat - lastLocation.lat) * Math.PI / 180;
+    const Δλ = (newCenter.lng - lastLocation.lng) * Math.PI / 180;
+
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distance = R * c;
+
+    // ULTRA-FAST trigger - 200m minimum for instant response
+    const instantTrigger = Math.max(searchRadius * 0.15, 200);
+    const hasMovedSignificantly = distance > instantTrigger;
+
+    if (hasMovedSignificantly) {
+      console.log(`⚡ INSTANT TRIGGER: Moved ${Math.round(distance)}m > ${Math.round(instantTrigger)}m`);
+    }
+
+    return hasMovedSignificantly;
+  }, [searchRadius]);
+
+  // 🚀 ULTRA-FAST CENTER CHANGE HANDLER
+  const handleMapCenterChange = useCallback((newCenter) => {
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+
+    const shouldSearch = shouldTriggerNewSearch(newCenter);
+    
+    // INSTANT response - very short delay
+    const delay = shouldSearch ? 400 : 800; // Much faster
+
+    console.log(`⚡ INSTANT search scheduled in ${delay}ms`);
+
+    debounceTimeoutRef.current = setTimeout(() => {
+      if (!isUserDraggingRef.current && shouldSearch) {
+        console.log('⚡ INSTANT search triggered!');
+        lastSearchLocationRef.current = newCenter;
+        
+        if (onCenterChange) {
+          onCenterChange(newCenter);
+        }
+      } else if (!shouldSearch) {
+        setTimeout(() => {
+          setIsMapUpdating(false);
+        }, 200);
+      }
+    }, delay);
+  }, [onCenterChange, shouldTriggerNewSearch, hasInitialLoad]);
+
+  // ⚡ INSTANT LOADING MANAGEMENT
+  useEffect(() => {
+    if (!loading && isMapUpdating) {
+      // Very short minimum display time for instant feel
+      const minDisplayTime = 800; // Reduced to 0.8 seconds
+      
+      setTimeout(() => {
+        setIsMapUpdating(false);
+        console.log('✨ INSTANT completion');
+      }, minDisplayTime);
+    }
+  }, [loading, isMapUpdating]);
 
   // Fast loading progress simulation
   useEffect(() => {
     if (!mapLoaded && googleMapsReady && !hasInitialLoad) {
       const interval = setInterval(() => {
         setLoadingProgress(prev => {
-          const newProgress = prev + Math.random() * 20;
+          const newProgress = prev + Math.random() * 25; // Faster progress
           if (newProgress >= 100) {
             clearInterval(interval);
             return 100;
           }
           return newProgress;
         });
-      }, 150);
+      }, 100); // Faster intervals
       
       return () => clearInterval(interval);
     }
   }, [mapLoaded, googleMapsReady, hasInitialLoad]);
 
-  useEffect(() => {
-    if (mapLoaded && googleMapsReady && !hasInitialLoad) {
-      setHasInitialLoad(true);
-      console.log('✅ Initial map load completed');
-    }
-  }, [mapLoaded, googleMapsReady, hasInitialLoad]);
-
-  // IMPROVED: Better Google Maps availability checking
+  // ✅ Google Maps initialization
   const checkGoogleMapsAvailability = useCallback(() => {
     return new Promise((resolve) => {
       if (window.google && window.google.maps && window.google.maps.Map) {
@@ -125,12 +183,12 @@ const FullPageMap = ({
       window.addEventListener('googleMapsError', handleGoogleMapsError);
 
       const timeoutId = setTimeout(() => {
-        console.error('❌ Google Maps loading timeout after 15 seconds');
-        setGoogleMapsError('Google Maps failed to load within 15 seconds. Please check your internet connection and API key.');
+        console.error('❌ Google Maps loading timeout');
+        setGoogleMapsError('Google Maps failed to load. Please check your internet connection.');
         setGoogleMapsReady(false);
         resolve(false);
         cleanup();
-      }, 15000);
+      }, 10000); // Shorter timeout
 
       const checkInterval = setInterval(() => {
         if (window.google && window.google.maps && window.google.maps.Map) {
@@ -141,108 +199,26 @@ const FullPageMap = ({
           cleanup();
           clearInterval(checkInterval);
         }
-      }, 500);
+      }, 200); // Faster polling
 
       setTimeout(() => {
         clearInterval(checkInterval);
-      }, 15000);
+      }, 10000);
     });
   }, []);
 
-  // UPDATED: Smaller trigger distance for more responsive updates
-  const shouldTriggerNewSearch = useCallback((newCenter) => {
-    if (!lastSearchLocationRef.current) {
-      return true;
-    }
-
-    const lastLocation = lastSearchLocationRef.current;
-    
-    const R = 6371e3;
-    const φ1 = lastLocation.lat * Math.PI / 180;
-    const φ2 = newCenter.lat * Math.PI / 180;
-    const Δφ = (newCenter.lat - lastLocation.lat) * Math.PI / 180;
-    const Δλ = (newCenter.lng - lastLocation.lng) * Math.PI / 180;
-
-    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-              Math.cos(φ1) * Math.cos(φ2) *
-              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const distance = R * c;
-
-    const ultraFastThreshold = Math.max(searchRadius * 0.05, 30);
-    const hasMovedSignificantly = distance > ultraFastThreshold;
-
-    if (hasMovedSignificantly) {
-      console.log(`🚀 ULTRA-FAST TRIGGER: Moved ${Math.round(distance)}m > ${Math.round(ultraFastThreshold)}m`);
-    }
-
-    return hasMovedSignificantly;
-  }, [searchRadius]);
-
-  const handleMapCenterChange = useCallback((newCenter) => {
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-    }
-    if (immediateSearchTimeoutRef.current) {
-      clearTimeout(immediateSearchTimeoutRef.current);
-    }
-
-    const shouldSearch = shouldTriggerNewSearch(newCenter);
-    
-    // LONGER delays for forceful API completion
-    const delay = shouldSearch ? 1200 : 1800; // Increased delays for forceful API
-
-    console.log(`⚡ FORCEFUL search scheduled in ${delay}ms, shouldSearch: ${shouldSearch}`);
-
-    debounceTimeoutRef.current = setTimeout(() => {
-      if (!isUserDraggingRef.current && shouldSearch) {
-        console.log('⚡ FORCEFUL search triggered!');
-        lastSearchLocationRef.current = newCenter;
-        
-        if (onCenterChange) {
-          onCenterChange(newCenter);
-        }
-      } else if (!shouldSearch) {
-        setTimeout(() => {
-          setIsMapUpdating(false);
-        }, 400);
-      }
-    }, delay);
-  }, [onCenterChange, shouldTriggerNewSearch, hasInitialLoad]);
-
-  // ENHANCED: Perfect loading management with longer minimum display
-  useEffect(() => {
-    if (!loading && !markersLoading && isMapUpdating) {
-      // LONGER minimum display time for forceful API completion
-      const minDisplayTime = 6000; // Increased to 6 seconds for forceful completion
-      const loaderStartTime = loaderStartTimeRef.current || Date.now();
-      
-      setTimeout(() => {
-        const elapsedTime = Date.now() - loaderStartTime;
-        const remainingTime = Math.max(0, minDisplayTime - elapsedTime);
-        
-        setTimeout(() => {
-          setIsMapUpdating(false);
-          console.log('✨ FORCEFUL API completion - Beautiful loading finished');
-        }, remainingTime);
-      }, 800); // Increased buffer for smooth transition
-    }
-  }, [loading, markersLoading, isMapUpdating]);
-
-  // ENHANCED: Map initialization with dark theme
+  // 🗺️ Map initialization
   useEffect(() => {
     if (mapInitialized || !mapRef.current) return;
 
     const initMap = async () => {
       try {
-        console.log('🗺️ Initializing WWDC-style Google Map...');
+        console.log('🗺️ Initializing interactive map...');
         
         const isReady = await checkGoogleMapsAvailability();
         if (!isReady) {
           return;
         }
-
-        console.log('🗺️ Creating WWDC-style Google Map instance...');
 
         if (!mapRef.current) {
           console.error('❌ Map container ref is null');
@@ -255,7 +231,7 @@ const FullPageMap = ({
           zoom: zoom,
           mapTypeId: window.google.maps.MapTypeId.ROADMAP,
           
-          // UI Controls - WWDC minimal
+          // UI Controls - minimal for speed
           zoomControl: true,
           zoomControlOptions: {
             position: window.google.maps.ControlPosition.RIGHT_BOTTOM,
@@ -267,38 +243,33 @@ const FullPageMap = ({
           rotateControl: false,
           fullscreenControl: !isEmbedMode,
           
-          // Beautiful dark creative theme
+          // Beautiful light theme for better marker visibility
           styles: [
             {
               "featureType": "all",
               "elementType": "geometry",
-              "stylers": [{ "color": "#1a1a1a" }]
+              "stylers": [{ "color": "#f5f5f5" }]
             },
             {
               "featureType": "all",
               "elementType": "labels.text.fill",
-              "stylers": [{ "color": "#ffffff" }]
-            },
-            {
-              "featureType": "all",
-              "elementType": "labels.text.stroke",
-              "stylers": [{ "color": "#000000" }]
+              "stylers": [{ "color": "#333333" }]
             },
             {
               "featureType": "administrative",
               "elementType": "geometry.stroke",
               "stylers": [
-                { "color": "#444444" },
+                { "color": "#c9c9c9" },
                 { "weight": 0.8 }
               ]
             },
             {
               "featureType": "landscape",
               "elementType": "geometry",
-              "stylers": [{ "color": "#161616" }]
+              "stylers": [{ "color": "#f9f9f9" }]
             },
             
-            // ONLY HIDE POI ICONS/MARKERS - KEEP EVERYTHING ELSE
+            // Hide POI icons for cleaner look
             {
               "featureType": "poi",
               "elementType": "labels.icon",
@@ -310,90 +281,64 @@ const FullPageMap = ({
               "stylers": [{ "visibility": "off" }]
             },
             
-            // PARKS - Dark theme with subtle green
+            // Parks in light green
             {
               "featureType": "poi.park",
               "elementType": "geometry",
-              "stylers": [{ "color": "#1e3a1e" }]
-            },
-            {
-              "featureType": "poi.park",
-              "elementType": "labels.text.fill",
-              "stylers": [{ "color": "#4CAF50" }]
-            },
-            {
-              "featureType": "poi.park",
-              "elementType": "labels.icon",
-              "stylers": [{ "visibility": "off" }]
+              "stylers": [{ "color": "#e8f5e8" }]
             },
             
-            // ROADS - Beautiful dark theme
+            // Roads in light colors
             {
               "featureType": "road",
               "elementType": "geometry.fill",
-              "stylers": [{ "color": "#2c2c2c" }]
+              "stylers": [{ "color": "#ffffff" }]
             },
             {
               "featureType": "road",
               "elementType": "geometry.stroke",
-              "stylers": [{ "color": "#3c3c3c" }]
-            },
-            {
-              "featureType": "road",
-              "elementType": "labels.text.fill",
-              "stylers": [{ "color": "#8a8a8a" }]
+              "stylers": [{ "color": "#d4d4d4" }]
             },
             {
               "featureType": "road.highway",
               "elementType": "geometry",
-              "stylers": [{ "color": "#3c3c3c" }]
-            },
-            {
-              "featureType": "road.highway",
-              "elementType": "labels.text.fill",
-              "stylers": [{ "color": "#f3d19c" }]
+              "stylers": [{ "color": "#f0f0f0" }]
             },
             
-            // WATER - Beautiful dark blue
+            // Water in light blue
             {
               "featureType": "water",
               "elementType": "geometry",
-              "stylers": [{ "color": "#17263c" }]
-            },
-            {
-              "featureType": "water",
-              "elementType": "labels.text.fill",
-              "stylers": [{ "color": "#515c6d" }]
+              "stylers": [{ "color": "#e6f3ff" }]
             }
           ],
           
-          // Gestures
+          // Gestures for responsiveness
           gestureHandling: 'greedy',
           disableDoubleClickZoom: false,
           draggable: true,
           scrollwheel: true,
           
-          // CRITICAL: Disable Google's default markers
+          // Disable default markers
           disableDefaultUI: false,
           clickableIcons: false
         };
 
         try {
           googleMapRef.current = new window.google.maps.Map(mapRef.current, mapOptions);
-          console.log('✅ WWDC-style Google Map instance created successfully');
+          console.log('✅ Interactive map created successfully');
           
         } catch (mapCreationError) {
-          console.error('❌ Failed to create Google Map instance:', mapCreationError);
+          console.error('❌ Failed to create map:', mapCreationError);
           setMapError('Error creating map instance');
           return;
         }
 
-        // Add map event listeners
+        // Add INSTANT event listeners
         googleMapRef.current.addListener('dragstart', () => {
           isUserDraggingRef.current = true;
           if (hasInitialLoad) {
             setIsMapUpdating(true);
-            loaderStartTimeRef.current = Date.now(); // Track start time
           }
         });
 
@@ -413,17 +358,18 @@ const FullPageMap = ({
           }
         });
 
+        // Quick tiles loading
         const tilesLoadedPromise = new Promise((resolve) => {
           const listener = googleMapRef.current.addListener('tilesloaded', () => {
             window.google.maps.event.removeListener(listener);
             resolve();
           });
-          setTimeout(resolve, 2000);
+          setTimeout(resolve, 1000); // Faster timeout
         });
 
         await tilesLoadedPromise;
 
-        console.log('✅ WWDC-style Google Map loaded successfully');
+        console.log('✅ Interactive map loaded');
         
         setMapLoaded(true);
         setMapError(null);
@@ -433,7 +379,7 @@ const FullPageMap = ({
         lastSearchLocationRef.current = { lat: center.lat, lng: center.lng };
 
       } catch (error) {
-        console.error('❌ Failed to initialize WWDC-style Google Map:', error);
+        console.error('❌ Failed to initialize map:', error);
         setMapError('Failed to initialize map: ' + error.message);
         setMapLoaded(false);
         setLoadingProgress(100);
@@ -452,11 +398,11 @@ const FullPageMap = ({
       const newCenter = { lat: center.lat, lng: center.lng };
       
       const isExternalChange = !lastSearchLocationRef.current || 
-        (Math.abs(currentCenter?.lat() - newCenter.lat) > 0.01 || 
-         Math.abs(currentCenter?.lng() - newCenter.lng) > 0.01);
+        (Math.abs(currentCenter?.lat() - newCenter.lat) > 0.001 || 
+         Math.abs(currentCenter?.lng() - newCenter.lng) > 0.001);
       
       if (isExternalChange) {
-        console.log('🗺️ Updating map center from props:', newCenter);
+        console.log('🗺️ Updating map center:', newCenter);
         googleMapRef.current.setCenter(newCenter);
         lastSearchLocationRef.current = newCenter;
         
@@ -468,7 +414,7 @@ const FullPageMap = ({
     }
   }, [center.lat, center.lng, zoom, mapLoaded, mapInitialized]);
 
-  // ENHANCED: WWDC-style blue pulsing user location marker
+  // User location marker
   useEffect(() => {
     if (!googleMapRef.current || !mapLoaded || !userLocation) return;
 
@@ -476,53 +422,28 @@ const FullPageMap = ({
       userMarkerRef.current.setMap(null);
     }
 
-    console.log('🎯 Creating WWDC-style user location marker:', {
-      latitude: userLocation.latitude,
-      longitude: userLocation.longitude,
-      accuracy: userLocation.accuracy,
-      source: userLocation.source
-    });
+    console.log('🎯 Creating user location marker');
 
     const userLocationSVG = `
-      <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
         <defs>
-          <filter id="wwdcShadow" x="-50%" y="-50%" width="200%" height="200%">
-            <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="rgba(0,122,255,0.4)"/>
-          </filter>
-          <radialGradient id="wwdcOuterPulse" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" style="stop-color:rgba(0,122,255,0.4);stop-opacity:1" />
-            <stop offset="70%" style="stop-color:rgba(88,86,214,0.2);stop-opacity:1" />
-            <stop offset="100%" style="stop-color:rgba(175,82,222,0);stop-opacity:0" />
-          </radialGradient>
-          <linearGradient id="wwdcInnerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <radialGradient id="userGradient" cx="50%" cy="50%" r="50%">
             <stop offset="0%" style="stop-color:#007AFF;stop-opacity:1" />
-            <stop offset="50%" style="stop-color:#5856D6;stop-opacity:1" />
-            <stop offset="100%" style="stop-color:#AF52DE;stop-opacity:1" />
-          </linearGradient>
+            <stop offset="70%" style="stop-color:#5856D6;stop-opacity:0.8" />
+            <stop offset="100%" style="stop-color:#007AFF;stop-opacity:0" />
+          </radialGradient>
         </defs>
         
-        <circle cx="24" cy="24" r="22" fill="url(#wwdcOuterPulse)" opacity="0.6">
-          <animate attributeName="r" values="18;28;18" dur="2s" repeatCount="indefinite"/>
-          <animate attributeName="opacity" values="0.6;0.2;0.6" dur="2s" repeatCount="indefinite"/>
+        <circle cx="16" cy="16" r="14" fill="url(#userGradient)" opacity="0.4">
+          <animate attributeName="r" values="10;18;10" dur="2s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values="0.4;0.1;0.4" dur="2s" repeatCount="indefinite"/>
         </circle>
         
-        <circle cx="24" cy="24" r="14" fill="rgba(0,122,255,0.3)" opacity="0.8">
-          <animate attributeName="opacity" values="0.8;0.4;0.8" dur="1.5s" repeatCount="indefinite"/>
+        <circle cx="16" cy="16" r="8" fill="#007AFF">
+          <animate attributeName="r" values="6;9;6" dur="1.5s" repeatCount="indefinite"/>
         </circle>
         
-        <circle cx="24" cy="24" r="10" fill="url(#wwdcInnerGradient)" filter="url(#wwdcShadow)">
-          <animate attributeName="r" values="8;11;8" dur="1s" repeatCount="indefinite"/>
-        </circle>
-        
-        <circle cx="24" cy="24" r="4" fill="white" opacity="0.9">
-          <animate attributeName="opacity" values="0.9;0.6;0.9" dur="1s" repeatCount="indefinite"/>
-        </circle>
-        
-        ${userLocation.accuracy < 100 ? `
-          <circle cx="24" cy="24" r="19" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1" stroke-dasharray="2,2">
-            <animateTransform attributeName="transform" type="rotate" values="0 24 24;360 24 24" dur="4s" repeatCount="indefinite"/>
-          </circle>
-        ` : ''}
+        <circle cx="16" cy="16" r="3" fill="white"/>
       </svg>
     `;
 
@@ -532,22 +453,21 @@ const FullPageMap = ({
         lng: userLocation.longitude 
       },
       map: googleMapRef.current,
-      title: `📍 Your location (±${Math.round(userLocation.accuracy || 0)}m accuracy) - ${userLocation.source}`,
+      title: `📍 Your location`,
       icon: {
         url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(userLocationSVG),
-        scaledSize: new window.google.maps.Size(48, 48),
-        anchor: new window.google.maps.Point(24, 24)
+        scaledSize: new window.google.maps.Size(32, 32),
+        anchor: new window.google.maps.Point(16, 16)
       },
       zIndex: 10000,
       optimized: false
     });
 
     userMarkerRef.current = userMarker;
-
-    console.log('🎯 WWDC-style blue pulsing user location marker updated');
+    console.log('🎯 User location marker updated');
   }, [userLocation, mapLoaded, locationLoading]);
 
-  // Update search radius circle
+  // Search radius circle
   useEffect(() => {
     if (!googleMapRef.current || !mapLoaded || !userLocation || !searchRadius) return;
 
@@ -563,292 +483,169 @@ const FullPageMap = ({
         },
         radius: searchRadius,
         map: googleMapRef.current,
-        fillColor: '#007AFF',
+        fillColor: cafeType === 'restaurant' ? '#EF4444' : '#F97316',
         fillOpacity: 0.1,
-        strokeColor: '#5856D6',
+        strokeColor: cafeType === 'restaurant' ? '#DC2626' : '#EA580C',
         strokeOpacity: 0.4,
         strokeWeight: 2,
         clickable: false
       });
 
       radiusCircleRef.current = circle;
-      console.log('🔍 WWDC-style search radius circle updated:', searchRadius);
+      console.log('🔍 Search radius circle updated:', searchRadius);
     }
-  }, [userLocation, searchRadius, mapLoaded]);
+  }, [userLocation, searchRadius, mapLoaded, cafeType]);
 
-  // CRITICAL FIX: Perfect venue filtering with beautiful markers - COMPLETELY REWRITTEN
+  // 🚀 INSTANT MARKER RENDERING - Perfect filtering with cute markers
   useEffect(() => {
     if (!googleMapRef.current || !mapLoaded) return;
 
-    console.log('☕ PERFECT FILTERING - Starting marker update:', {
+    console.log('☕ INSTANT FILTERING - Starting marker update:', {
       totalCafes: cafes.length,
       selectedType: cafeType,
-      currentFilter: currentFilterRef.current,
       mapReady: mapLoaded
     });
 
-    // 🚨 CRITICAL: Update current filter reference IMMEDIATELY
+    // Update current filter immediately
     currentFilterRef.current = cafeType;
 
-    // 🧹 STEP 1: COMPLETELY CLEAR ALL EXISTING MARKERS - AGGRESSIVE CLEARING
-    console.log('🧹 AGGRESSIVE CLEAR - Removing all existing markers...');
-    markersRef.current.forEach((marker, markerId) => {
-      try {
-        marker.setMap(null);
-        if (marker.removeListener) {
-          marker.removeListener();
-        }
-      } catch (e) {
-        console.warn('Error removing marker:', e);
-      }
+    // INSTANT CLEAR all existing markers
+    markersRef.current.forEach((marker) => {
+      marker.setMap(null);
     });
     markersRef.current.clear();
     activeMarkersRef.current.clear();
-    console.log('✅ AGGRESSIVE CLEAR - All previous markers destroyed');
 
-    // 🔄 STEP 2: SHOW BEAUTIFUL LOADING ANIMATION FOR LONGER
-    setMarkersLoading(true);
-    setMarkersLoaded(false);
-    loaderStartTimeRef.current = Date.now();
-
-    // MUCH LONGER delay for ultra-forceful API completion
-    setTimeout(() => {
-      // 🎯 STEP 3: PERFECT FILTERING - ULTRA STRICT TYPE MATCHING
-      console.log(`🎯 ULTRA-STRICT FILTERING for type: "${currentFilterRef.current}"`);
+    // INSTANT FILTER - Perfect type matching
+    const perfectlyFilteredCafes = cafes.filter(cafe => {
+      const cafeType_raw = cafe.type || cafe.placeType || '';
+      const cafeType_normalized = cafeType_raw.toLowerCase().trim();
+      const selectedType_normalized = currentFilterRef.current.toLowerCase().trim();
       
-      const perfectlyFilteredCafes = cafes.filter(cafe => {
-        const cafeType_raw = cafe.type || cafe.placeType || '';
-        const cafeType_normalized = cafeType_raw.toLowerCase().trim();
-        const selectedType_normalized = currentFilterRef.current.toLowerCase().trim();
-        
-        // ULTRA-STRICT EXACT MATCHING ONLY
-        const isExactMatch = cafeType_normalized === selectedType_normalized;
-        
-        console.log('🎯 ULTRA-STRICT FILTER:', {
-          name: cafe.name,
-          cafeType: cafeType_normalized,
-          selectedType: selectedType_normalized,
-          exactMatch: isExactMatch,
-          ACCEPTED: isExactMatch ? '✅' : '❌'
-        });
-        
-        return isExactMatch;
-      });
+      return cafeType_normalized === selectedType_normalized;
+    });
 
-      console.log(`🎯 ULTRA-STRICT FILTERING RESULT: ${perfectlyFilteredCafes.length}/${cafes.length} places exactly match "${currentFilterRef.current}"`);
+    console.log(`🎯 INSTANT FILTER: ${perfectlyFilteredCafes.length}/${cafes.length} places match "${currentFilterRef.current}"`);
 
-      // If no places match, complete loading immediately
-      if (perfectlyFilteredCafes.length === 0) {
-        console.log('📍 NO EXACT MATCHES - Showing empty map');
-        setMarkersLoading(false);
-        setMarkersLoaded(true);
+    if (perfectlyFilteredCafes.length === 0) {
+      console.log('📍 NO MATCHES - Empty map');
+      return;
+    }
+
+    // 🎨 INSTANT MARKER CREATION - Cute circular markers
+    perfectlyFilteredCafes.forEach((cafe, index) => {
+      if (!cafe.location || !cafe.location.latitude || !cafe.location.longitude) {
         return;
       }
 
-      // 🎨 STEP 4: CREATE ULTRA-BEAUTIFUL MARKERS FOR EXACT MATCHES ONLY
-      console.log('🎨 CREATING ULTRA-BEAUTIFUL MARKERS...');
-      let markersAdded = 0;
-      
-      // Process markers in smaller batches for ultra-smooth animation
-      const processBatch = (startIndex) => {
-        const batchSize = 1; // ONE marker at a time for smoothest animation
-        const endIndex = Math.min(startIndex + batchSize, perfectlyFilteredCafes.length);
-        
-        for (let i = startIndex; i < endIndex; i++) {
-          const cafe = perfectlyFilteredCafes[i];
-          
-          if (!cafe.location || !cafe.location.latitude || !cafe.location.longitude) {
-            console.warn('⚠️ SKIPPING - Invalid location:', cafe.name);
-            continue;
-          }
-
-          const position = {
-            lat: cafe.location.latitude,
-            lng: cafe.location.longitude
-          };
-
-          // 🎨 ULTRA-BEAUTIFUL ENHANCED MARKER
-          const markerSVG = createUltraBeautifulMarker(cafe, i, currentFilterRef.current);
-
-          console.log(`🎨 CREATING ULTRA-BEAUTIFUL MARKER ${i + 1}/${perfectlyFilteredCafes.length}: ${cafe.name} (${currentFilterRef.current})`);
-
-          const marker = new window.google.maps.Marker({
-            position: position,
-            map: googleMapRef.current,
-            title: `${getUltraBeautifulEmoji(cafe)} ${cafe.name}${cafe.rating ? ` (${cafe.rating}⭐)` : ''}${cafe.distance ? ` - ${cafe.formattedDistance}` : ''}`,
-            icon: {
-              url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(markerSVG),
-              scaledSize: new window.google.maps.Size(50, 62), // Larger, more beautiful markers
-              anchor: new window.google.maps.Point(25, 62),
-              optimized: false // Force high quality rendering
-            },
-            zIndex: cafe.distance ? Math.round(2000 - cafe.distance / 10) : 1000,
-            animation: cafe.distance && cafe.distance < 200 ? 
-              window.google.maps.Animation.DROP : 
-              window.google.maps.Animation.BOUNCE,
-            optimized: false // Force beautiful rendering
-          });
-
-          // Add click listener
-          marker.addListener('click', () => {
-            if (onCafeSelect) {
-              onCafeSelect(cafe);
-            }
-          });
-
-          // Track marker for type consistency
-          const markerId = cafe.id || cafe.googlePlaceId;
-          markersRef.current.set(markerId, marker);
-          activeMarkersRef.current.add(`${markerId}:${currentFilterRef.current}`);
-          markersAdded++;
-          
-          console.log(`✅ ULTRA-BEAUTIFUL MARKER ADDED: ${currentFilterRef.current} - ${cafe.name}`);
-        }
-
-        // Continue with next batch or finish
-        if (endIndex < perfectlyFilteredCafes.length) {
-          // LONGER delay between batches for ultra-forceful completion
-          setTimeout(() => processBatch(endIndex), 600); // Smooth one-by-one rendering
-        } else {
-          // All markers processed - ULTRA-FORCEFUL completion
-          console.log(`🎉 ULTRA-STRICT FILTERING COMPLETE: ${markersAdded} ${currentFilterRef.current} markers added`);
-          
-          // ULTRA-LONG completion delay for maximum quality
-          setTimeout(() => {
-            setMarkersLoading(false);
-            setMarkersLoaded(true);
-            console.log('✨ ULTRA-FORCEFUL API COMPLETION - Perfect filtering finished');
-          }, 1200); // Ultra-long delay for forceful completion
-        }
+      const position = {
+        lat: cafe.location.latitude,
+        lng: cafe.location.longitude
       };
 
-      // Start processing markers
-      processBatch(0);
+      // 🎨 CUTE CIRCULAR MARKER
+      const markerSVG = createCuteCircularMarker(cafe, index, currentFilterRef.current);
 
-    }, 1500); // ULTRA-LONG initial delay for maximum forceful API completion
+      const marker = new window.google.maps.Marker({
+        position: position,
+        map: googleMapRef.current,
+        title: `${getCuteEmoji(cafe)} ${cafe.name}${cafe.rating ? ` (${cafe.rating}⭐)` : ''}${cafe.distance ? ` - ${cafe.formattedDistance}` : ''}`,
+        icon: {
+          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(markerSVG),
+          scaledSize: new window.google.maps.Size(28, 28), // Small and cozy
+          anchor: new window.google.maps.Point(14, 14),
+          optimized: false
+        },
+        zIndex: cafe.distance ? Math.round(2000 - cafe.distance / 10) : 1000,
+        optimized: false
+      });
 
-  }, [cafes, mapLoaded, onCafeSelect, cafeType]); // Keep cafeType dependency for filtering
+      // Add click listener
+      marker.addListener('click', () => {
+        if (onCafeSelect) {
+          onCafeSelect(cafe);
+        }
+      });
 
-  // 🎨 CREATE ULTRA-BEAUTIFUL MARKER SVG
-  const createUltraBeautifulMarker = (cafe, index, selectedType) => {
-    // Ultra-beautiful type-specific colors
-    const getUltraBeautifulColors = (type) => {
-      switch (type) {
-        case 'restaurant':
-          return {
-            primary: '#EF4444',
-            secondary: '#DC2626',
-            accent: '#FEE2E2',
-            glow: '#FF6B6B',
-            shadow: 'rgba(239, 68, 68, 0.5)'
-          };
-        case 'cafe':
-        default:
-          return {
-            primary: '#F97316',
-            secondary: '#EA580C', 
-            accent: '#FED7AA',
-            glow: '#FFB347',
-            shadow: 'rgba(249, 115, 22, 0.5)'
-          };
-      }
-    };
+      // Track marker
+      const markerId = cafe.id || cafe.googlePlaceId;
+      markersRef.current.set(markerId, marker);
+      activeMarkersRef.current.add(`${markerId}:${currentFilterRef.current}`);
+    });
 
-    const colors = getUltraBeautifulColors(selectedType);
-    const emoji = getUltraBeautifulEmoji(cafe);
+    console.log(`🎉 INSTANT MARKERS: ${perfectlyFilteredCafes.length} cute ${currentFilterRef.current} markers added instantly`);
+
+  }, [cafes, mapLoaded, onCafeSelect, cafeType]);
+
+  // 🎨 CREATE CUTE CIRCULAR MARKER
+  const createCuteCircularMarker = (cafe, index, selectedType) => {
+    const colors = selectedType === 'restaurant' ? 
+      { primary: '#EF4444', secondary: '#FEE2E2', accent: '#FECACA' } :
+      { primary: '#F97316', secondary: '#FED7AA', accent: '#FDBA74' };
+    
+    const emoji = getCuteEmoji(cafe);
+    const isClose = cafe.distance && cafe.distance < 300;
     
     return `
-      <svg width="50" height="62" viewBox="0 0 50 62" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
         <defs>
-          <filter id="ultraFilter${index}" x="-50%" y="-50%" width="200%" height="200%">
-            <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="${colors.shadow}"/>
-            <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
-          </filter>
-          <linearGradient id="ultraGradient${index}" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" style="stop-color:${colors.primary};stop-opacity:1" />
-            <stop offset="30%" style="stop-color:${colors.glow};stop-opacity:1" />
-            <stop offset="70%" style="stop-color:${colors.secondary};stop-opacity:1" />
-            <stop offset="100%" style="stop-color:${colors.primary};stop-opacity:1" />
-          </linearGradient>
-          <radialGradient id="ultraPulse${index}" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" style="stop-color:${colors.primary};stop-opacity:0.6" />
-            <stop offset="100%" style="stop-color:${colors.primary};stop-opacity:0" />
+          <radialGradient id="cuteGradient${index}" cx="50%" cy="30%" r="70%">
+            <stop offset="0%" style="stop-color:white;stop-opacity:1" />
+            <stop offset="60%" style="stop-color:${colors.primary};stop-opacity:1" />
+            <stop offset="100%" style="stop-color:${colors.primary};stop-opacity:0.8" />
           </radialGradient>
-          <linearGradient id="ultraInner${index}" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" style="stop-color:rgba(255,255,255,0.4);stop-opacity:1" />
-            <stop offset="50%" style="stop-color:rgba(255,255,255,0.1);stop-opacity:1" />
-            <stop offset="100%" style="stop-color:rgba(255,255,255,0.3);stop-opacity:1" />
-          </linearGradient>
+          <filter id="cuteShadow${index}">
+            <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="${colors.primary}" flood-opacity="0.3"/>
+          </filter>
         </defs>
         
-        <!-- Ultra-beautiful pulsing ring for very close venues -->
-        ${cafe.distance && cafe.distance < 200 ? `
-          <circle cx="25" cy="25" r="30" fill="url(#ultraPulse${index})">
-            <animate attributeName="r" values="20;35;20" dur="2s" repeatCount="indefinite"/>
-            <animate attributeName="opacity" values="0.8;0.2;0.8" dur="2s" repeatCount="indefinite"/>
+        ${isClose ? `
+          <circle cx="14" cy="14" r="16" fill="${colors.primary}" opacity="0.2">
+            <animate attributeName="r" values="12;18;12" dur="2s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0.2;0.05;0.2" dur="2s" repeatCount="indefinite"/>
           </circle>
         ` : ''}
         
-        <!-- Ultra-soft pin shadow -->
-        <ellipse cx="25" cy="58" rx="18" ry="6" fill="rgba(0,0,0,0.2)" opacity="0.7"/>
+        <circle cx="14" cy="14" r="12" fill="url(#cuteGradient${index})" 
+                filter="url(#cuteShadow${index})" stroke="white" stroke-width="2"/>
         
-        <!-- Main ultra-beautiful pin shape -->
-        <path d="M25 2C13.954 2 5 10.954 5 22C5 36 25 60 25 60S45 36 45 22C45 10.954 36.046 2 25 2Z" 
-              fill="url(#ultraGradient${index})" 
-              filter="url(#ultraFilter${index})"
-              stroke="rgba(255,255,255,0.4)" 
-              stroke-width="2"/>
-        
-        <!-- Ultra-beautiful inner glassmorphism circle -->
-        <circle cx="25" cy="22" r="16" fill="url(#ultraInner${index})" 
-                stroke="rgba(255,255,255,0.6)" stroke-width="2"/>
-        
-        <!-- Ultra-sharp emoji -->
-        <text x="25" y="28" text-anchor="middle" font-size="20" fill="white" 
-              font-weight="900" style="text-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+        <text x="14" y="18" text-anchor="middle" font-size="14" fill="white" 
+              style="text-shadow: 0 1px 2px rgba(0,0,0,0.3);">
           ${emoji}
         </text>
         
-        <!-- Ultra-beautiful rating badge for high-rated venues -->
         ${cafe.rating && cafe.rating >= 4.5 ? `
-          <circle cx="38" cy="9" r="9" fill="${colors.primary}" stroke="white" stroke-width="2" filter="url(#ultraFilter${index})"/>
-          <text x="38" y="13" text-anchor="middle" font-size="11" fill="white" font-weight="bold">★</text>
+          <circle cx="22" cy="6" r="5" fill="#FFD700" stroke="white" stroke-width="1"/>
+          <text x="22" y="9" text-anchor="middle" font-size="8" fill="white" font-weight="bold">★</text>
         ` : ''}
         
-        <!-- Ultra-beautiful distance indicator for very close venues -->
-        ${cafe.distance && cafe.distance < 100 ? `
-          <circle cx="12" cy="9" r="7" fill="rgba(0,255,136,0.95)" stroke="white" stroke-width="2"/>
-          <text x="12" y="13" text-anchor="middle" font-size="9" fill="white" font-weight="bold">!</text>
+        ${isClose ? `
+          <circle cx="6" cy="6" r="4" fill="#00FF88" stroke="white" stroke-width="1"/>
+          <text x="6" y="9" text-anchor="middle" font-size="7" fill="white" font-weight="bold">!</text>
         ` : ''}
-        
-        <!-- Ultra-beautiful quality indicator -->
-        <circle cx="25" cy="22" r="2" fill="rgba(255,255,255,0.9)" opacity="0.8">
-          <animate attributeName="opacity" values="0.8;0.4;0.8" dur="1.5s" repeatCount="indefinite"/>
-        </circle>
       </svg>
     `;
   };
 
-  // ULTRA-BEAUTIFUL emoji mapping for exact venue types
-  const getUltraBeautifulEmoji = (cafe) => {
+  // CUTE emoji mapping
+  const getCuteEmoji = (cafe) => {
     const venueType = (cafe.type || cafe.placeType || '').toLowerCase();
-    
-    if (venueType === 'restaurant') {
-      return '🍽️'; // Always restaurant emoji for restaurants
-    }
-    
-    // Everything else gets coffee emoji (includes cafes and bars)
-    return '☕';
+    return venueType === 'restaurant' ? '🍽️' : '☕';
   };
 
-  // Comprehensive cleanup
+  // Set initial load complete
+  useEffect(() => {
+    if (mapLoaded && googleMapsReady && !hasInitialLoad) {
+      setHasInitialLoad(true);
+      console.log('✅ Initial map load completed');
+    }
+  }, [mapLoaded, googleMapsReady, hasInitialLoad]);
+
+  // Cleanup
   useEffect(() => {
     return () => {
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current);
-      }
-      if (immediateSearchTimeoutRef.current) {
-        clearTimeout(immediateSearchTimeoutRef.current);
       }
       
       if (userMarkerRef.current) {
@@ -878,7 +675,7 @@ const FullPageMap = ({
     window.location.reload();
   }, []);
 
-  // Determine the error message to show
+  // Error handling
   const errorMessage = mapError || googleMapsError;
 
   if (errorMessage) {
@@ -901,21 +698,21 @@ const FullPageMap = ({
 
   return (
     <div className="full-page-map">
-      {/* Initial Loading Screen - Only for first map load */}
+      {/* Initial Loading Screen - Fast completion */}
       {(!hasInitialLoad && (!mapLoaded || !googleMapsReady || loading)) && (
         <LoadingScreen 
           message="Caricamento mappa..."
-          subMessage="Preparazione dell'esperienza"
+          subMessage="Preparazione esperienza interattiva"
           progress={loadingProgress}
         />
       )}
 
-      {/* ENHANCED Map Update Loader with ultra-long display for forceful API completion */}
+      {/* INSTANT Map Update Loader */}
       {(isMapUpdating || (hasInitialLoad && loading)) && (
         <MapUpdateLoader
           loading={isMapUpdating || (hasInitialLoad && loading)}
           searchType={cafeType}
-          forcefulMode={true} // Enable ultra-forceful mode for maximum display time
+          forcefulMode={false} // Disable forceful mode for instant feel
         />
       )}
 
@@ -926,7 +723,7 @@ const FullPageMap = ({
         style={{ 
           width: '100%', 
           height: '100%',
-          backgroundColor: '#1a1a1a',
+          backgroundColor: '#f5f5f5',
           borderRadius: isEmbedMode ? '12px' : '0'
         }}
       />
@@ -941,7 +738,7 @@ const FullPageMap = ({
           cafesCount={cafes.filter(cafe => {
             const cafeType_normalized = (cafe.type || cafe.placeType || '').toLowerCase();
             return cafeType_normalized === cafeType.toLowerCase();
-          }).length} // Show ultra-strict filtered count
+          }).length}
           isEmbedMode={isEmbedMode}
           userLocation={userLocation}
           onLocationRetry={onLocationRetry}

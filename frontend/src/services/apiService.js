@@ -1,27 +1,77 @@
-// services/apiService.js - UPDATED VERSION with Enhanced Health Checking
+// services/apiService.js - ULTRA-FAST OPTIMIZED VERSION
 // Location: /map-service/frontend/src/services/apiService.js
 
 import axios from 'axios';
 
-// Create axios instance with base configuration
+// Create axios instance with optimized configuration
 const api = axios.create({
   baseURL: process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001',
-  timeout: 15000, // Increased timeout for health checks
+  timeout: 8000, // Reduced timeout for faster responses
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
+// ULTRA-FAST IN-MEMORY CACHE
+class UltraFastCache {
+  constructor() {
+    this.cache = new Map();
+    this.maxAge = 2 * 60 * 1000; // 2 minutes cache
+    this.maxSize = 100; // Max 100 cached items
+  }
+
+  generateKey(lat, lng, radius) {
+    // Round to reduce cache misses for nearby coordinates
+    const roundedLat = Math.round(lat * 100) / 100; // ~1km precision
+    const roundedLng = Math.round(lng * 100) / 100;
+    const roundedRadius = Math.round(radius / 500) * 500; // Round to nearest 500m
+    return `${roundedLat}-${roundedLng}-${roundedRadius}`;
+  }
+
+  get(key) {
+    const item = this.cache.get(key);
+    if (!item) return null;
+    
+    if (Date.now() - item.timestamp > this.maxAge) {
+      this.cache.delete(key);
+      return null;
+    }
+    
+    console.log('⚡ CACHE HIT:', key);
+    return item.data;
+  }
+
+  set(key, data) {
+    // Implement simple LRU by removing oldest items
+    if (this.cache.size >= this.maxSize) {
+      const firstKey = this.cache.keys().next().value;
+      this.cache.delete(firstKey);
+    }
+    
+    this.cache.set(key, {
+      data,
+      timestamp: Date.now()
+    });
+    
+    console.log('⚡ CACHED:', key, 'Items:', this.cache.size);
+  }
+
+  clear() {
+    this.cache.clear();
+    console.log('⚡ CACHE CLEARED');
+  }
+}
+
+const ultraFastCache = new UltraFastCache();
+
 // Request interceptor for debugging
 api.interceptors.request.use(
   (config) => {
     if (process.env.REACT_APP_DEBUG_MODE === 'true') {
-      console.log('🚀 API Request:', {
+      console.log('⚡ FAST API Request:', {
         method: config.method?.toUpperCase(),
         url: config.url,
-        params: config.params,
-        data: config.data,
-        timeout: config.timeout
+        params: config.params
       });
     }
     return config;
@@ -32,15 +82,14 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor for error handling
+// Response interceptor with enhanced error handling
 api.interceptors.response.use(
   (response) => {
     if (process.env.REACT_APP_DEBUG_MODE === 'true') {
-      console.log('✅ API Response:', {
+      console.log('⚡ FAST API Response:', {
         status: response.status,
-        data: response.data,
         url: response.config.url,
-        duration: response.config.metadata?.endTime - response.config.metadata?.startTime
+        dataCount: response.data.data?.places?.length || 0
       });
     }
     return response;
@@ -49,26 +98,24 @@ api.interceptors.response.use(
     console.error('❌ API Response Error:', {
       message: error.message,
       status: error.response?.status,
-      data: error.response?.data,
-      url: error.config?.url,
-      timeout: error.code === 'ECONNABORTED'
+      url: error.config?.url
     });
 
     // Handle specific error cases with Italian messages
     if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-      throw new Error('Timeout di connessione. Il servizio potrebbe essere sovraccarico.');
+      throw new Error('Connessione lenta. Riprova.');
     }
     
     if (error.code === 'NETWORK_ERROR' || error.message.includes('Network Error')) {
-      throw new Error('Errore di rete. Controlla la connessione internet.');
+      throw new Error('Errore di rete. Controlla la connessione.');
     }
     
     if (error.response?.status === 503) {
-      throw new Error('Il servizio mappa non è disponibile. Riprova più tardi.');
+      throw new Error('Servizio temporaneamente non disponibile.');
     }
     
     if (error.response?.status === 429) {
-      throw new Error('Troppe richieste. Riprova tra qualche secondo.');
+      throw new Error('Troppe richieste. Attendi un momento.');
     }
     
     if (error.response?.status >= 500) {
@@ -76,67 +123,120 @@ api.interceptors.response.use(
     }
     
     if (!error.response) {
-      throw new Error('Impossibile connettersi al servizio mappa.');
+      throw new Error('Impossibile connettersi al servizio.');
     }
 
     return Promise.reject(error);
   }
 );
 
-// Add request timing
-api.interceptors.request.use((config) => {
-  config.metadata = { startTime: new Date().getTime() };
-  return config;
-});
-
-api.interceptors.response.use(
-  (response) => {
-    response.config.metadata.endTime = new Date().getTime();
-    return response;
-  },
-  (error) => {
-    if (error.config) {
-      error.config.metadata = error.config.metadata || {};
-      error.config.metadata.endTime = new Date().getTime();
-    }
-    return Promise.reject(error);
-  }
-);
-
-// Places API functions
+// ULTRA-FAST Places API
 export const placesAPI = {
-  // Get nearby Italian venues (cafes/restaurants only)
-  async getNearbyPlaces(latitude, longitude, options = {}) {
+  // ⚡ Get ALL nearby places (both cafes AND restaurants) in one call
+  async getAllNearbyPlaces(latitude, longitude, options = {}) {
     try {
-      const params = {
-        latitude,
-        longitude,
-        radius: options.radius || 1500,
-        type: options.type || 'cafe', // Only 'cafe' or 'restaurant' allowed
-        limit: options.limit || 20
-      };
-
-      // Validate type to ensure no pub requests
-      if (!['cafe', 'restaurant'].includes(params.type)) {
-        console.warn(`Invalid place type "${params.type}", defaulting to cafe`);
-        params.type = 'cafe';
+      const radius = options.radius || 1500;
+      const limit = options.limit || 50; // Get more results in one call
+      
+      // Check cache first
+      const cacheKey = ultraFastCache.generateKey(latitude, longitude, radius);
+      const cached = ultraFastCache.get(cacheKey);
+      
+      if (cached) {
+        console.log('⚡ RETURNING CACHED RESULTS:', cached.totalPlaces);
+        return cached;
       }
 
-      const response = await api.get('/api/v1/places/nearby', { params });
+      console.log('⚡ FETCHING ALL PLACES FROM API...');
       
-      return {
+      // Make parallel requests for cafes AND restaurants
+      const [cafeResponse, restaurantResponse] = await Promise.all([
+        api.get('/api/v1/places/nearby', {
+          params: {
+            latitude,
+            longitude,
+            radius,
+            type: 'cafe',
+            limit: Math.ceil(limit / 2)
+          }
+        }),
+        api.get('/api/v1/places/nearby', {
+          params: {
+            latitude,
+            longitude,
+            radius,
+            type: 'restaurant', 
+            limit: Math.ceil(limit / 2)
+          }
+        })
+      ]);
+
+      // Combine results
+      const cafePlaces = cafeResponse.data.data?.places || [];
+      const restaurantPlaces = restaurantResponse.data.data?.places || [];
+      
+      const combinedResults = {
         success: true,
-        places: response.data.data?.places || [],
-        count: response.data.data?.count || 0,
-        userLocation: response.data.data?.userLocation
+        allPlaces: [...cafePlaces, ...restaurantPlaces],
+        cafePlaces: cafePlaces,
+        restaurantPlaces: restaurantPlaces,
+        totalPlaces: cafePlaces.length + restaurantPlaces.length,
+        userLocation: {
+          latitude,
+          longitude
+        }
       };
+
+      // Cache the combined results
+      ultraFastCache.set(cacheKey, combinedResults);
+      
+      console.log('⚡ ALL PLACES FETCHED:', {
+        cafes: cafePlaces.length,
+        restaurants: restaurantPlaces.length,
+        total: combinedResults.totalPlaces
+      });
+
+      return combinedResults;
+      
     } catch (error) {
-      console.error('Failed to fetch nearby Italian venues:', error);
+      console.error('❌ Failed to fetch all places:', error);
       throw error;
     }
   },
 
-  // Search Italian venues by text
+  // ⚡ DEPRECATED - Use getAllNearbyPlaces instead for better performance  
+  async getNearbyPlaces(latitude, longitude, options = {}) {
+    // For backward compatibility, use the new method
+    const results = await this.getAllNearbyPlaces(latitude, longitude, options);
+    
+    const requestedType = options.type || 'cafe';
+    
+    if (requestedType === 'cafe') {
+      return {
+        success: true,
+        places: results.cafePlaces,
+        count: results.cafePlaces.length,
+        userLocation: results.userLocation
+      };
+    } else if (requestedType === 'restaurant') {
+      return {
+        success: true,
+        places: results.restaurantPlaces,
+        count: results.restaurantPlaces.length,
+        userLocation: results.userLocation
+      };
+    }
+    
+    // Return all if type not specified
+    return {
+      success: true,
+      places: results.allPlaces,
+      count: results.totalPlaces,
+      userLocation: results.userLocation
+    };
+  },
+
+  // Search places by text (optimized)
   async searchPlaces(query, options = {}) {
     try {
       const params = {
@@ -151,22 +251,44 @@ export const placesAPI = {
         params[key] === undefined && delete params[key]
       );
 
+      // Simple cache for text searches
+      const textCacheKey = `search:${query}:${params.latitude}:${params.longitude}`;
+      const cached = ultraFastCache.get(textCacheKey);
+      
+      if (cached) {
+        return cached;
+      }
+
+      console.log('⚡ SEARCHING PLACES:', query);
+
       const response = await api.get('/api/v1/places/search', { params });
       
-      return {
+      const result = {
         success: true,
         places: response.data.data?.places || [],
         count: response.data.data?.count || 0
       };
+
+      ultraFastCache.set(textCacheKey, result);
+      
+      return result;
+      
     } catch (error) {
-      console.error('Failed to search Italian venues:', error);
+      console.error('❌ Failed to search places:', error);
       throw error;
     }
   },
 
-  // Get detailed place information
+  // Get detailed place information (with cache)
   async getPlaceDetails(placeId, userLocation = null) {
     try {
+      const detailsCacheKey = `details:${placeId}`;
+      const cached = ultraFastCache.get(detailsCacheKey);
+      
+      if (cached) {
+        return cached;
+      }
+
       const params = {};
       if (userLocation) {
         params.latitude = userLocation.latitude;
@@ -175,218 +297,81 @@ export const placesAPI = {
 
       const response = await api.get(`/api/v1/places/${placeId}`, { params });
       
-      return {
+      const result = {
         success: true,
         place: response.data.data
       };
+
+      ultraFastCache.set(detailsCacheKey, result);
+      
+      return result;
+      
     } catch (error) {
-      console.error('Failed to fetch place details:', error);
+      console.error('❌ Failed to fetch place details:', error);
       throw error;
     }
   },
 
-  // Get popular Italian venues by type (no pub support)
-  async getPopularPlaces(type = 'cafe', options = {}) {
-    try {
-      // Validate type to ensure no pub requests
-      const validType = ['cafe', 'restaurant'].includes(type) ? type : 'cafe';
-      
-      const params = {
-        limit: options.limit || 10,
-        minRating: options.minRating || 4.0,
-        latitude: options.latitude,
-        longitude: options.longitude
-      };
-
-      // Remove undefined values
-      Object.keys(params).forEach(key => 
-        params[key] === undefined && delete params[key]
-      );
-
-      const response = await api.get(`/api/v1/places/popular/${validType}`, { params });
-      
-      return {
-        success: true,
-        places: response.data.data?.places || [],
-        count: response.data.data?.count || 0
-      };
-    } catch (error) {
-      console.error('Failed to fetch popular Italian venues:', error);
-      throw error;
-    }
+  // Clear cache manually
+  clearCache() {
+    ultraFastCache.clear();
   },
 
-  // Batch search multiple locations
-  async batchSearch(locations) {
-    try {
-      // Validate all location types
-      const validatedLocations = locations.map(location => ({
-        ...location,
-        type: ['cafe', 'restaurant'].includes(location.type) ? location.type : 'cafe'
-      }));
-
-      const response = await api.post('/api/v1/places/batch-search', {
-        locations: validatedLocations
-      });
-      
-      return {
-        success: true,
-        results: response.data.data?.results || [],
-        summary: response.data.data?.summary
-      };
-    } catch (error) {
-      console.error('Failed to perform batch search:', error);
-      throw error;
-    }
-  },
-
-  // Get places within geographic bounds
-  async getPlacesWithinBounds(bounds, options = {}) {
-    try {
-      // Validate type
-      const validType = ['cafe', 'restaurant'].includes(options.type) ? options.type : 'cafe';
-      
-      const params = {
-        northLat: bounds.north,
-        southLat: bounds.south,
-        eastLng: bounds.east,
-        westLng: bounds.west,
-        type: validType,
-        limit: options.limit || 50
-      };
-
-      const response = await api.get('/api/v1/places/within-bounds', { params });
-      
-      return {
-        success: true,
-        places: response.data.data?.places || [],
-        count: response.data.data?.count || 0,
-        bounds: response.data.data?.bounds
-      };
-    } catch (error) {
-      console.error('Failed to fetch places within bounds:', error);
-      throw error;
-    }
-  },
-
-  // Get place photos
-  async getPlacePhotos(placeId, size = 'medium') {
-    try {
-      const response = await api.get(`/api/v1/places/photos/${placeId}`, {
-        params: { size }
-      });
-      
-      return {
-        success: true,
-        photos: response.data.data?.photos || [],
-        count: response.data.data?.count || 0,
-        availableSizes: response.data.data?.availableSizes || []
-      };
-    } catch (error) {
-      console.error('Failed to fetch place photos:', error);
-      throw error;
-    }
+  // Get cache stats
+  getCacheStats() {
+    return {
+      size: ultraFastCache.cache.size,
+      maxSize: ultraFastCache.maxSize,
+      maxAge: ultraFastCache.maxAge
+    };
   }
 };
 
-// Enhanced Health check functions
+// Enhanced Health check with fast timeout
 export const healthAPI = {
-  // Main health check with comprehensive testing
   async checkHealth() {
     try {
-      console.log('🏥 Starting comprehensive health check...');
+      console.log('⚡ Fast health check...');
       const startTime = Date.now();
       
-      // Test basic connectivity first
       const response = await api.get('/health', {
-        timeout: 10000, // 10 second timeout for health check
-        validateStatus: (status) => status < 500 // Accept any status below 500
+        timeout: 5000 // Faster timeout for health checks
       });
       
       const duration = Date.now() - startTime;
-      console.log(`🏥 Health check completed in ${duration}ms`);
-      
       const healthData = response.data;
       
-      // Determine if the service is actually healthy
       const isHealthy = response.status === 200 && 
                        (healthData.status === 'OK' || 
                         healthData.status === 'healthy' || 
-                        healthData.status === 'DEGRADED'); // Accept degraded as working
+                        healthData.status === 'DEGRADED');
       
       return {
         success: isHealthy,
         status: healthData.status || 'unknown',
         services: healthData.services || {},
         timestamp: healthData.timestamp || new Date().toISOString(),
-        uptime: healthData.uptime || 0,
-        version: healthData.version || 'unknown',
         responseTime: duration,
-        rawResponse: healthData
+        ready: isHealthy
       };
     } catch (error) {
-      console.error('🏥 Health check failed:', error);
+      console.error('⚡ Fast health check failed:', error);
       
-      // Distinguish between different types of failures
-      let errorType = 'unknown';
-      let errorMessage = error.message;
-      
-      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-        errorType = 'timeout';
-        errorMessage = 'Health check timeout - service may be starting up';
-      } else if (error.code === 'ECONNREFUSED') {
-        errorType = 'connection_refused';
-        errorMessage = 'Connection refused - service may be down';
-      } else if (error.code === 'NETWORK_ERROR') {
-        errorType = 'network_error';
-        errorMessage = 'Network error - check internet connection';
-      } else if (error.response?.status >= 500) {
-        errorType = 'server_error';
-        errorMessage = `Server error: ${error.response.status}`;
-      }
-      
-      return {
-        success: false,
-        error: errorMessage,
-        errorType: errorType,
-        timestamp: new Date().toISOString(),
-        responseTime: null,
-        status: 'unhealthy'
-      };
-    }
-  },
-
-  // Places service specific health check
-  async checkPlacesService() {
-    try {
-      console.log('🏥 Checking places service health...');
-      const response = await api.get('/api/v1/places/health', {
-        timeout: 8000
-      });
-      
-      return {
-        success: true,
-        status: response.data.status || 'healthy',
-        services: response.data.services || {},
-        timestamp: response.data.timestamp || new Date().toISOString()
-      };
-    } catch (error) {
-      console.error('🏥 Places service health check failed:', error);
       return {
         success: false,
         error: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        responseTime: null,
+        status: 'unhealthy',
+        ready: false
       };
     }
   },
 
-  // Quick ping test
   async quickPing() {
     try {
       const startTime = Date.now();
-      const response = await api.get('/', {
-        timeout: 5000
-      });
+      const response = await api.get('/', { timeout: 3000 });
       const duration = Date.now() - startTime;
       
       return {
@@ -401,43 +386,12 @@ export const healthAPI = {
         responseTime: null
       };
     }
-  },
-
-  // Wait for service to be ready
-  async waitForReady(maxAttempts = 10, delayMs = 2000) {
-    console.log(`🏥 Waiting for service to be ready (max ${maxAttempts} attempts)...`);
-    
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        console.log(`🏥 Health check attempt ${attempt}/${maxAttempts}`);
-        const health = await this.checkHealth();
-        
-        if (health.success) {
-          console.log(`✅ Service is ready after ${attempt} attempts`);
-          return health;
-        }
-        
-        if (attempt < maxAttempts) {
-          console.log(`⏳ Service not ready, waiting ${delayMs}ms before retry...`);
-          await new Promise(resolve => setTimeout(resolve, delayMs));
-          delayMs = Math.min(delayMs * 1.2, 8000); // Progressive delay with max 8s
-        }
-      } catch (error) {
-        console.error(`❌ Health check attempt ${attempt} failed:`, error.message);
-        
-        if (attempt < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, delayMs));
-        }
-      }
-    }
-    
-    throw new Error(`Service failed to become ready after ${maxAttempts} attempts`);
   }
 };
 
-// Utility functions
+// Ultra-fast utility functions
 export const apiUtils = {
-  // Format place data for display
+  // Format place data optimized
   formatPlace(place) {
     return {
       id: place.id,
@@ -461,9 +415,9 @@ export const apiUtils = {
     };
   },
 
-  // Calculate distance between two points (Haversine formula)
+  // Fast distance calculation (Haversine)
   calculateDistance(lat1, lng1, lat2, lng2) {
-    const R = 6371e3; // Earth's radius in meters
+    const R = 6371e3;
     const φ1 = lat1 * Math.PI / 180;
     const φ2 = lat2 * Math.PI / 180;
     const Δφ = (lat2 - lat1) * Math.PI / 180;
@@ -474,10 +428,10 @@ export const apiUtils = {
               Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-    return R * c; // Distance in meters
+    return R * c;
   },
 
-  // Format distance for display
+  // Fast distance formatting
   formatDistance(distanceInMeters) {
     if (!distanceInMeters || distanceInMeters < 0) return null;
     
@@ -489,93 +443,27 @@ export const apiUtils = {
     }
   },
 
-  // Get Italian venue type emoji (no pub support)
+  // Get venue type emoji (optimized)
   getTypeEmoji(type) {
-    const typeEmojis = {
-      cafe: '☕',        // Italian cafeterias/bars
-      restaurant: '🍽️', // Restaurants
-      bakery: '🥐',     // Bakeries
-      default: '📍'     // Default
-    };
-    
-    return typeEmojis[type] || typeEmojis.default;
+    switch (type) {
+      case 'restaurant': return '🍽️';
+      case 'cafe': return '☕';
+      default: return '📍';
+    }
   },
 
-  // Get rating stars
-  getRatingStars(rating) {
-    if (!rating) return '';
-    
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 >= 0.5;
-    const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
-    
-    return '★'.repeat(fullStars) + 
-           (hasHalfStar ? '☆' : '') + 
-           '☆'.repeat(emptyStars);
+  // Validate venue type (strict filtering)
+  isValidVenueType(type) {
+    return ['cafe', 'restaurant'].includes(type);
   },
 
-  // Get Italian venue display name (no pub support)
+  // Get Italian venue display name
   getItalianVenueDisplayName(type) {
     switch (type) {
       case 'cafe': return 'Bar/Caffetteria';
       case 'restaurant': return 'Ristorante';
       default: return 'Locale';
     }
-  },
-
-  // Validate Italian venue type (no pub support)
-  isValidItalianVenueType(type) {
-    return ['cafe', 'restaurant'].includes(type);
-  },
-
-  // Get Italian venue features
-  getItalianVenueFeatures(place) {
-    const features = [];
-    const nameLower = (place.name || '').toLowerCase();
-    
-    if (nameLower.includes('wifi') || nameLower.includes('internet')) {
-      features.push('📶 WiFi');
-    }
-    if (nameLower.includes('terrazza') || nameLower.includes('giardino')) {
-      features.push('🌿 Esterno');
-    }
-    if (nameLower.includes('colazione') || nameLower.includes('breakfast')) {
-      features.push('🌅 Colazione');
-    }
-    if (nameLower.includes('aperitivo')) {
-      features.push('🍸 Aperitivo');
-    }
-    if (nameLower.includes('pizza')) {
-      features.push('🍕 Pizza');
-    }
-    if (nameLower.includes('gelato') || nameLower.includes('gelateria')) {
-      features.push('🍦 Gelato');
-    }
-    if (nameLower.includes('musica') || nameLower.includes('live')) {
-      features.push('🎵 Musica');
-    }
-    
-    return features;
-  },
-
-  // Format opening hours for Italian context
-  formatItalianOpeningHours(openingHours) {
-    if (!openingHours || !openingHours.weekdayText) {
-      return null;
-    }
-
-    return openingHours.weekdayText.map(text => {
-      return text
-        .replace(/Monday/g, 'Lunedì')
-        .replace(/Tuesday/g, 'Martedì')
-        .replace(/Wednesday/g, 'Mercoledì')
-        .replace(/Thursday/g, 'Giovedì')
-        .replace(/Friday/g, 'Venerdì')
-        .replace(/Saturday/g, 'Sabato')
-        .replace(/Sunday/g, 'Domenica')
-        .replace(/Closed/g, 'Chiuso')
-        .replace(/Open 24 hours/g, 'Aperto 24 ore');
-    });
   }
 };
 
