@@ -1,4 +1,4 @@
-// components/FullPageMap.js - FIXED VERSION - All Errors Resolved
+// components/FullPageMap.js - FIXED VERSION with Perfect Filtering & Beautiful Markers
 // Location: /map-service/frontend/src/components/FullPageMap.js
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
@@ -58,20 +58,24 @@ const FullPageMap = ({
   const isUserDraggingRef = useRef(false);
   const debounceTimeoutRef = useRef(null);
   const immediateSearchTimeoutRef = useRef(null);
+  
+  // CRITICAL: Track current filter to prevent mixed results
+  const currentFilterRef = useRef(cafeType);
+  const lastSuccessfulSearchRef = useRef(null);
 
   // Fast loading progress simulation
   useEffect(() => {
     if (!mapLoaded && googleMapsReady && !hasInitialLoad) {
       const interval = setInterval(() => {
         setLoadingProgress(prev => {
-          const newProgress = prev + Math.random() * 20; // Faster progress
+          const newProgress = prev + Math.random() * 20;
           if (newProgress >= 100) {
             clearInterval(interval);
             return 100;
           }
           return newProgress;
         });
-      }, 150); // Faster updates
+      }, 150);
       
       return () => clearInterval(interval);
     }
@@ -87,7 +91,6 @@ const FullPageMap = ({
   // IMPROVED: Better Google Maps availability checking
   const checkGoogleMapsAvailability = useCallback(() => {
     return new Promise((resolve) => {
-      // Check if already loaded
       if (window.google && window.google.maps && window.google.maps.Map) {
         console.log('✅ Google Maps already available');
         setGoogleMapsReady(true);
@@ -95,7 +98,6 @@ const FullPageMap = ({
         return;
       }
 
-      // Listen for the custom event from index.html
       const handleGoogleMapsLoaded = () => {
         console.log('✅ Google Maps loaded via event');
         setGoogleMapsReady(true);
@@ -118,11 +120,9 @@ const FullPageMap = ({
         clearTimeout(timeoutId);
       };
 
-      // Add event listeners
       window.addEventListener('googleMapsLoaded', handleGoogleMapsLoaded);
       window.addEventListener('googleMapsError', handleGoogleMapsError);
 
-      // Set timeout for loading
       const timeoutId = setTimeout(() => {
         console.error('❌ Google Maps loading timeout after 15 seconds');
         setGoogleMapsError('Google Maps failed to load within 15 seconds. Please check your internet connection and API key.');
@@ -131,7 +131,6 @@ const FullPageMap = ({
         cleanup();
       }, 15000);
 
-      // Check periodically if Google Maps becomes available
       const checkInterval = setInterval(() => {
         if (window.google && window.google.maps && window.google.maps.Map) {
           console.log('✅ Google Maps detected via polling');
@@ -143,23 +142,21 @@ const FullPageMap = ({
         }
       }, 500);
 
-      // Clean up interval after timeout
       setTimeout(() => {
         clearInterval(checkInterval);
       }, 15000);
     });
   }, []);
 
-  // UPDATED: Much smaller trigger distance for more responsive updates
+  // UPDATED: Smaller trigger distance for more responsive updates
   const shouldTriggerNewSearch = useCallback((newCenter) => {
     if (!lastSearchLocationRef.current) {
-      return true; // First search
+      return true;
     }
 
     const lastLocation = lastSearchLocationRef.current;
     
-    // Calculate distance moved in meters
-    const R = 6371e3; // Earth's radius in meters
+    const R = 6371e3;
     const φ1 = lastLocation.lat * Math.PI / 180;
     const φ2 = newCenter.lat * Math.PI / 180;
     const Δφ = (newCenter.lat - lastLocation.lat) * Math.PI / 180;
@@ -171,8 +168,7 @@ const FullPageMap = ({
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const distance = R * c;
 
-    // ULTRA-FAST: Trigger on very small movements
-    const ultraFastThreshold = Math.max(searchRadius * 0.05, 30); // Just 30 meters!
+    const ultraFastThreshold = Math.max(searchRadius * 0.05, 30);
     const hasMovedSignificantly = distance > ultraFastThreshold;
 
     if (hasMovedSignificantly) {
@@ -182,7 +178,6 @@ const FullPageMap = ({
     return hasMovedSignificantly;
   }, [searchRadius]);
 
-  // FIXED: Add the missing handleMapCenterChange function
   const handleMapCenterChange = useCallback((newCenter) => {
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
@@ -193,56 +188,32 @@ const FullPageMap = ({
 
     const shouldSearch = shouldTriggerNewSearch(newCenter);
     
-    // LIGHTNING-FAST delays
-    const delay = shouldSearch ? 200 : 400; // Super fast! Down from 800/1500
+    // LONGER delays for forceful API completion
+    const delay = shouldSearch ? 800 : 1200; // Increased from 200/400
 
-    console.log(`⚡ LIGHTNING search scheduled in ${delay}ms, shouldSearch: ${shouldSearch}`);
+    console.log(`⚡ FORCEFUL search scheduled in ${delay}ms, shouldSearch: ${shouldSearch}`);
 
     debounceTimeoutRef.current = setTimeout(() => {
       if (!isUserDraggingRef.current && shouldSearch) {
-        console.log('⚡ LIGHTNING-FAST search triggered!');
+        console.log('⚡ FORCEFUL search triggered!');
         lastSearchLocationRef.current = newCenter;
         
         if (onCenterChange) {
           onCenterChange(newCenter);
         }
       } else if (!shouldSearch) {
-        // Quick hide if no search needed
         setTimeout(() => {
           setIsMapUpdating(false);
-        }, 200);
+        }, 400);
       }
     }, delay);
   }, [onCenterChange, shouldTriggerNewSearch, hasInitialLoad]);
 
-  // NEW: Real-time updates during drag for ultra-responsive feel
-  const handleRealTimeDrag = useCallback((newCenter) => {
-    // Update search immediately on significant movement during drag
-    const shouldSearch = shouldTriggerNewSearch(newCenter);
-    
-    if (shouldSearch && isUserDraggingRef.current) {
-      console.log('🔥 REAL-TIME drag update triggered!');
-      
-      // Cancel any pending searches
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
-      }
-      
-      // Trigger search with minimal delay
-      debounceTimeoutRef.current = setTimeout(() => {
-        lastSearchLocationRef.current = newCenter;
-        if (onCenterChange) {
-          onCenterChange(newCenter);
-        }
-      }, 100); // Almost instant - just 100ms!
-    }
-  }, [shouldTriggerNewSearch, onCenterChange]);
-
-  // UPDATED: Enhanced loading management with perfect timing
+  // ENHANCED: Perfect loading management with longer minimum display
   useEffect(() => {
     if (!loading && !markersLoading && isMapUpdating) {
-      // Show loader for minimum 2-3 seconds for smooth UX
-      const minDisplayTime = 2500; // 2.5 seconds minimum
+      // LONGER minimum display time for forceful API completion
+      const minDisplayTime = 4000; // Increased from 2500 to 4000ms
       const loaderStartTime = loaderStartTimeRef.current || Date.now();
       
       setTimeout(() => {
@@ -251,14 +222,13 @@ const FullPageMap = ({
         
         setTimeout(() => {
           setIsMapUpdating(false);
-          console.log('✨ Beautiful loading animation completed');
+          console.log('✨ FORCEFUL API completion - Beautiful loading finished');
         }, remainingTime);
-      }, 300); // Small buffer for smooth transition
+      }, 600); // Increased buffer for smooth transition
     }
   }, [loading, markersLoading, isMapUpdating]);
 
-  // ENHANCED: Map initialization with light theme and POI hiding
-  // ENHANCED: Map initialization with light theme and POI hiding (CORRECTED VERSION)
+  // ENHANCED: Map initialization with dark theme
   useEffect(() => {
     if (mapInitialized || !mapRef.current) return;
 
@@ -296,23 +266,22 @@ const FullPageMap = ({
           rotateControl: false,
           fullscreenControl: !isEmbedMode,
           
-          // CORRECTED: Light theme with streets and roads visible, only hiding POI markers
-          // UPDATED: Beautiful dark creative theme
+          // Beautiful dark creative theme
           styles: [
             {
               "featureType": "all",
               "elementType": "geometry",
-              "stylers": [{ "color": "#1a1a1a" }] // Rich dark background
+              "stylers": [{ "color": "#1a1a1a" }]
             },
             {
               "featureType": "all",
               "elementType": "labels.text.fill",
-              "stylers": [{ "color": "#ffffff" }] // White text for contrast
+              "stylers": [{ "color": "#ffffff" }]
             },
             {
               "featureType": "all",
               "elementType": "labels.text.stroke",
-              "stylers": [{ "color": "#000000" }] // Black text stroke
+              "stylers": [{ "color": "#000000" }]
             },
             {
               "featureType": "administrative",
@@ -323,50 +292,20 @@ const FullPageMap = ({
               ]
             },
             {
-              "featureType": "administrative",
-              "elementType": "labels.text.fill",
-              "stylers": [{ "color": "#8a8a8a" }]
-            },
-            {
               "featureType": "landscape",
               "elementType": "geometry",
-              "stylers": [{ "color": "#161616" }] // Very dark landscape
+              "stylers": [{ "color": "#161616" }]
             },
             
             // ONLY HIDE POI ICONS/MARKERS - KEEP EVERYTHING ELSE
             {
               "featureType": "poi",
               "elementType": "labels.icon",
-              "stylers": [{ "visibility": "off" }] // Hide POI icons only
+              "stylers": [{ "visibility": "off" }]
             },
             {
               "featureType": "poi.business",
               "elementType": "all",
-              "stylers": [{ "visibility": "off" }] // Hide business markers
-            },
-            {
-              "featureType": "poi.attraction",
-              "elementType": "labels.icon",
-              "stylers": [{ "visibility": "off" }]
-            },
-            {
-              "featureType": "poi.medical",
-              "elementType": "labels.icon", 
-              "stylers": [{ "visibility": "off" }]
-            },
-            {
-              "featureType": "poi.place_of_worship",
-              "elementType": "labels.icon",
-              "stylers": [{ "visibility": "off" }]
-            },
-            {
-              "featureType": "poi.school",
-              "elementType": "labels.icon",
-              "stylers": [{ "visibility": "off" }]
-            },
-            {
-              "featureType": "poi.sports_complex",
-              "elementType": "labels.icon",
               "stylers": [{ "visibility": "off" }]
             },
             
@@ -374,12 +313,12 @@ const FullPageMap = ({
             {
               "featureType": "poi.park",
               "elementType": "geometry",
-              "stylers": [{ "color": "#1e3a1e" }] // Dark green for parks
+              "stylers": [{ "color": "#1e3a1e" }]
             },
             {
               "featureType": "poi.park",
               "elementType": "labels.text.fill",
-              "stylers": [{ "color": "#4CAF50" }] // Bright green text
+              "stylers": [{ "color": "#4CAF50" }]
             },
             {
               "featureType": "poi.park",
@@ -391,78 +330,39 @@ const FullPageMap = ({
             {
               "featureType": "road",
               "elementType": "geometry.fill",
-              "stylers": [{ "color": "#2c2c2c" }] // Dark gray roads
+              "stylers": [{ "color": "#2c2c2c" }]
             },
             {
               "featureType": "road",
               "elementType": "geometry.stroke",
-              "stylers": [{ "color": "#3c3c3c" }] // Slightly lighter stroke
+              "stylers": [{ "color": "#3c3c3c" }]
             },
             {
               "featureType": "road",
               "elementType": "labels.text.fill",
-              "stylers": [{ "color": "#8a8a8a" }] // Light gray road labels
-            },
-            {
-              "featureType": "road.arterial",
-              "elementType": "geometry",
-              "stylers": [{ "color": "#373737" }] // Medium dark arterial roads
+              "stylers": [{ "color": "#8a8a8a" }]
             },
             {
               "featureType": "road.highway",
               "elementType": "geometry",
-              "stylers": [{ "color": "#3c3c3c" }] // Dark highways with subtle accent
+              "stylers": [{ "color": "#3c3c3c" }]
             },
             {
               "featureType": "road.highway",
               "elementType": "labels.text.fill",
-              "stylers": [{ "color": "#f3d19c" }] // Golden highway labels
-            },
-            {
-              "featureType": "road.local",
-              "elementType": "geometry",
-              "stylers": [{ "color": "#2a2a2a" }] // Very dark local roads
-            },
-            
-            // TRANSIT - Dark with accent colors
-            {
-              "featureType": "transit.line",
-              "elementType": "geometry",
-              "stylers": [{ "color": "#2f3948" }] // Dark blue-gray transit lines
-            },
-            {
-              "featureType": "transit.station",
-              "elementType": "labels.icon",
-              "stylers": [{ "visibility": "off" }]
-            },
-            {
-              "featureType": "transit.station",
-              "elementType": "labels.text.fill",
-              "stylers": [{ "color": "#515c6d" }] // Muted blue-gray station text
+              "stylers": [{ "color": "#f3d19c" }]
             },
             
             // WATER - Beautiful dark blue
             {
               "featureType": "water",
               "elementType": "geometry",
-              "stylers": [{ "color": "#17263c" }] // Deep dark blue water
+              "stylers": [{ "color": "#17263c" }]
             },
             {
               "featureType": "water",
               "elementType": "labels.text.fill",
-              "stylers": [{ "color": "#515c6d" }] // Muted blue water labels
-            },
-            
-            // CREATIVE ACCENTS - Adding some subtle color variety
-            {
-              "featureType": "administrative.country",
-              "elementType": "geometry.stroke",
-              "stylers": [{ "color": "#4a5568" }] // Subtle blue-gray borders
-            },
-            {
-              "featureType": "administrative.locality",
-              "elementType": "labels.text.fill",
-              "stylers": [{ "color": "#a0aec0" }] // Light blue-gray city labels
+              "stylers": [{ "color": "#515c6d" }]
             }
           ],
           
@@ -474,66 +374,12 @@ const FullPageMap = ({
           
           // CRITICAL: Disable Google's default markers
           disableDefaultUI: false,
-          clickableIcons: false // This disables POI markers
+          clickableIcons: false
         };
 
         try {
           googleMapRef.current = new window.google.maps.Map(mapRef.current, mapOptions);
           console.log('✅ WWDC-style Google Map instance created successfully');
-          
-          // 🚫 HIDE ONLY POI MARKERS - KEEP STREETS AND ROADS
-          if (googleMapRef.current) {
-            console.log('🚫 Hiding only POI markers, keeping streets visible...');
-            
-            // Only hide POI icons and business markers, not the entire map
-            const stylesToHide = [
-              {
-                featureType: 'poi.business',
-                elementType: 'all',
-                stylers: [{ visibility: 'off' }]
-              },
-              {
-                featureType: 'poi.place_of_worship',
-                elementType: 'labels.icon',
-                stylers: [{ visibility: 'off' }]
-              },
-              {
-                featureType: 'poi.school',
-                elementType: 'labels.icon',
-                stylers: [{ visibility: 'off' }]
-              },
-              {
-                featureType: 'poi.medical',
-                elementType: 'labels.icon',
-                stylers: [{ visibility: 'off' }]
-              },
-              {
-                featureType: 'poi.government',
-                elementType: 'labels.icon',
-                stylers: [{ visibility: 'off' }]
-              },
-              {
-                featureType: 'poi.attraction',
-                elementType: 'labels.icon',
-                stylers: [{ visibility: 'off' }]
-              },
-              {
-                featureType: 'poi.sports_complex',
-                elementType: 'labels.icon',
-                stylers: [{ visibility: 'off' }]
-              }
-            ];
-            
-            // Apply the styles - this will keep roads and streets
-            googleMapRef.current.setOptions({
-              styles: [
-                ...mapOptions.styles, // Your corrected light styles above
-                ...stylesToHide // Only hide POI icons, not geography
-              ]
-            });
-            
-            console.log('✅ POI markers hidden, streets and roads remain visible');
-          }
           
         } catch (mapCreationError) {
           console.error('❌ Failed to create Google Map instance:', mapCreationError);
@@ -541,11 +387,12 @@ const FullPageMap = ({
           return;
         }
 
-        // Add map event listeners (drag, zoom, etc.)
+        // Add map event listeners
         googleMapRef.current.addListener('dragstart', () => {
           isUserDraggingRef.current = true;
           if (hasInitialLoad) {
             setIsMapUpdating(true);
+            loaderStartTimeRef.current = Date.now(); // Track start time
           }
         });
 
@@ -570,7 +417,7 @@ const FullPageMap = ({
             window.google.maps.event.removeListener(listener);
             resolve();
           });
-          setTimeout(resolve, 2000); // Faster timeout
+          setTimeout(resolve, 2000);
         });
 
         await tilesLoadedPromise;
@@ -624,7 +471,6 @@ const FullPageMap = ({
   useEffect(() => {
     if (!googleMapRef.current || !mapLoaded || !userLocation) return;
 
-    // Remove existing user marker
     if (userMarkerRef.current) {
       userMarkerRef.current.setMap(null);
     }
@@ -636,7 +482,6 @@ const FullPageMap = ({
       source: userLocation.source
     });
 
-    // WWDC-style blue pulsing marker
     const userLocationSVG = `
       <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
         <defs>
@@ -655,28 +500,23 @@ const FullPageMap = ({
           </linearGradient>
         </defs>
         
-        <!-- Outer pulsing ring -->
         <circle cx="24" cy="24" r="22" fill="url(#wwdcOuterPulse)" opacity="0.6">
           <animate attributeName="r" values="18;28;18" dur="2s" repeatCount="indefinite"/>
           <animate attributeName="opacity" values="0.6;0.2;0.6" dur="2s" repeatCount="indefinite"/>
         </circle>
         
-        <!-- Middle ring -->
         <circle cx="24" cy="24" r="14" fill="rgba(0,122,255,0.3)" opacity="0.8">
           <animate attributeName="opacity" values="0.8;0.4;0.8" dur="1.5s" repeatCount="indefinite"/>
         </circle>
         
-        <!-- Main gradient dot -->
         <circle cx="24" cy="24" r="10" fill="url(#wwdcInnerGradient)" filter="url(#wwdcShadow)">
           <animate attributeName="r" values="8;11;8" dur="1s" repeatCount="indefinite"/>
         </circle>
         
-        <!-- Inner white dot -->
         <circle cx="24" cy="24" r="4" fill="white" opacity="0.9">
           <animate attributeName="opacity" values="0.9;0.6;0.9" dur="1s" repeatCount="indefinite"/>
         </circle>
         
-        <!-- Accuracy ring -->
         ${userLocation.accuracy < 100 ? `
           <circle cx="24" cy="24" r="19" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1" stroke-dasharray="2,2">
             <animateTransform attributeName="transform" type="rotate" values="0 24 24;360 24 24" dur="4s" repeatCount="indefinite"/>
@@ -706,16 +546,14 @@ const FullPageMap = ({
     console.log('🎯 WWDC-style blue pulsing user location marker updated');
   }, [userLocation, mapLoaded, locationLoading]);
 
-  // Update search radius circle with WWDC styling
+  // Update search radius circle
   useEffect(() => {
     if (!googleMapRef.current || !mapLoaded || !userLocation || !searchRadius) return;
 
-    // Remove existing circle
     if (radiusCircleRef.current) {
       radiusCircleRef.current.setMap(null);
     }
 
-    // Only show radius circle if user location is accurate
     if (userLocation.accuracy && userLocation.accuracy < 1000) {
       const circle = new window.google.maps.Circle({
         center: { 
@@ -737,71 +575,77 @@ const FullPageMap = ({
     }
   }, [userLocation, searchRadius, mapLoaded]);
 
-  // ENHANCED: WWDC-style venue markers with loading tracking
-  // ENHANCED: WWDC-style venue markers with optimized clearing and type filtering
+  // CRITICAL FIX: Perfect venue filtering with beautiful markers
   useEffect(() => {
     if (!googleMapRef.current || !mapLoaded) return;
 
-    console.log('☕ Starting optimized marker update:', {
+    console.log('☕ PERFECT FILTERING - Starting marker update:', {
       totalCafes: cafes.length,
       selectedType: cafeType,
+      currentFilter: currentFilterRef.current,
       mapReady: mapLoaded
     });
 
+    // 🚨 CRITICAL: Update current filter reference
+    currentFilterRef.current = cafeType;
+
     // 🧹 STEP 1: COMPLETELY CLEAR ALL EXISTING MARKERS
-    console.log('🧹 Clearing all existing markers...');
+    console.log('🧹 PERFECT CLEAR - Removing all existing markers...');
     markersRef.current.forEach((marker, markerId) => {
-      marker.setMap(null); // Remove from map
-      marker = null; // Clear reference
+      marker.setMap(null);
+      marker = null;
     });
-    markersRef.current.clear(); // Clear the Map completely
-    console.log('✅ All previous markers cleared');
+    markersRef.current.clear();
+    console.log('✅ PERFECT CLEAR - All previous markers removed');
 
     // 🔄 STEP 2: SHOW BEAUTIFUL LOADING ANIMATION
     setMarkersLoading(true);
     setMarkersLoaded(false);
+    loaderStartTimeRef.current = Date.now(); // Track loader start time
 
-    // Add a small delay for smooth UX
+    // LONGER delay for forceful API completion
     setTimeout(() => {
-      // 🎯 STEP 3: FILTER CAFES BY SELECTED TYPE ONLY
-      const filteredCafes = cafes.filter(cafe => {
+      // 🎯 STEP 3: PERFECT FILTERING - Only show selected type
+      const perfectlyFilteredCafes = cafes.filter(cafe => {
         const cafeType_normalized = (cafe.type || cafe.placeType || '').toLowerCase();
-        const selectedType_normalized = cafeType.toLowerCase();
+        const selectedType_normalized = currentFilterRef.current.toLowerCase();
         
-        console.log('🔍 Filtering cafe:', {
+        const isExactMatch = cafeType_normalized === selectedType_normalized;
+        
+        console.log('🎯 PERFECT FILTER CHECK:', {
           name: cafe.name,
           cafeType: cafeType_normalized,
           selectedType: selectedType_normalized,
-          matches: cafeType_normalized === selectedType_normalized
+          exactMatch: isExactMatch
         });
         
-        return cafeType_normalized === selectedType_normalized;
+        return isExactMatch;
       });
 
-      console.log(`🎯 Filtered results: ${filteredCafes.length}/${cafes.length} places match type "${cafeType}"`);
+      console.log(`🎯 PERFECT FILTERING RESULT: ${perfectlyFilteredCafes.length}/${cafes.length} places match "${currentFilterRef.current}"`);
 
-      // If no places match, mark as loaded immediately
-      if (filteredCafes.length === 0) {
-        console.log('📍 No places match current filter, showing empty map');
+      // If no places match, complete loading immediately
+      if (perfectlyFilteredCafes.length === 0) {
+        console.log('📍 PERFECT FILTER - No places match current filter, showing empty map');
         setMarkersLoading(false);
         setMarkersLoaded(true);
         return;
       }
 
-      // 🎨 STEP 4: CREATE NEW MARKERS FOR FILTERED PLACES ONLY
+      // 🎨 STEP 4: CREATE BEAUTIFUL MARKERS FOR FILTERED PLACES ONLY
       const bounds = new window.google.maps.LatLngBounds();
       let markersAdded = 0;
       
       // Process markers in batches for smooth animation
       const processBatch = (startIndex) => {
-        const batchSize = 3; // Smaller batches for smoother loading
-        const endIndex = Math.min(startIndex + batchSize, filteredCafes.length);
+        const batchSize = 2; // Smaller batches for forceful completion
+        const endIndex = Math.min(startIndex + batchSize, perfectlyFilteredCafes.length);
         
         for (let i = startIndex; i < endIndex; i++) {
-          const cafe = filteredCafes[i];
+          const cafe = perfectlyFilteredCafes[i];
           
           if (!cafe.location || !cafe.location.latitude || !cafe.location.longitude) {
-            console.warn('⚠️ Skipping cafe with invalid location:', cafe.name);
+            console.warn('⚠️ PERFECT FILTER - Skipping cafe with invalid location:', cafe.name);
             continue;
           }
 
@@ -810,21 +654,21 @@ const FullPageMap = ({
             lng: cafe.location.longitude
           };
 
-          // Enhanced marker with type-specific styling
-          const markerSVG = createEnhancedMarkerSVG(cafe, i, cafeType);
+          // 🎨 BEAUTIFUL ENHANCED MARKER with perfect type matching
+          const markerSVG = createPerfectMarkerSVG(cafe, i, currentFilterRef.current);
 
           const marker = new window.google.maps.Marker({
             position: position,
             map: googleMapRef.current,
-            title: `${getVenueEmoji(cafe)} ${cafe.name}${cafe.rating ? ` (${cafe.rating}⭐)` : ''}${cafe.distance ? ` - ${cafe.formattedDistance}` : ''}`,
+            title: `${getPerfectVenueEmoji(cafe)} ${cafe.name}${cafe.rating ? ` (${cafe.rating}⭐)` : ''}${cafe.distance ? ` - ${cafe.formattedDistance}` : ''}`,
             icon: {
               url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(markerSVG),
-              scaledSize: new window.google.maps.Size(36, 44),
-              anchor: new window.google.maps.Point(18, 44)
+              scaledSize: new window.google.maps.Size(42, 52), // Larger, more beautiful markers
+              anchor: new window.google.maps.Point(21, 52)
             },
             zIndex: cafe.distance ? Math.round(1000 - cafe.distance / 10) : 500,
             animation: cafe.distance && cafe.distance < 200 ? 
-              window.google.maps.Animation.DROP : null, // Smooth drop animation
+              window.google.maps.Animation.DROP : null,
             optimized: false
           });
 
@@ -839,129 +683,127 @@ const FullPageMap = ({
           markersRef.current.set(cafe.id || cafe.googlePlaceId, marker);
           markersAdded++;
           
-          console.log(`✅ Added ${cafeType} marker: ${cafe.name}`);
+          console.log(`✅ PERFECT MARKER ADDED: ${currentFilterRef.current} - ${cafe.name}`);
         }
 
         // Continue with next batch or finish
-        if (endIndex < filteredCafes.length) {
-          // Process next batch with smooth delay
-          setTimeout(() => processBatch(endIndex), 200); // 200ms between batches
+        if (endIndex < perfectlyFilteredCafes.length) {
+          // LONGER delay between batches for forceful completion
+          setTimeout(() => processBatch(endIndex), 400); // Increased from 200ms
         } else {
-          // All markers processed
-          console.log(`🎉 Marker update complete: ${markersAdded} ${cafeType} markers added`);
-          setMarkersLoading(false);
-          setMarkersLoaded(true);
+          // All markers processed - FORCEFUL completion
+          console.log(`🎉 PERFECT FILTERING COMPLETE: ${markersAdded} ${currentFilterRef.current} markers added`);
+          
+          // LONGER completion delay for forceful API
+          setTimeout(() => {
+            setMarkersLoading(false);
+            setMarkersLoaded(true);
+            console.log('✨ FORCEFUL API COMPLETION - Perfect filtering finished');
+          }, 800); // Additional delay for forceful completion
         }
       };
 
       // Start processing markers
       processBatch(0);
 
-    }, 500); // 500ms delay for smooth UX
+    }, 1000); // LONGER initial delay for forceful API completion
 
-  }, [cafes, mapLoaded, onCafeSelect, cafeType]); // Added cafeType dependency for filtering
+  }, [cafes, mapLoaded, onCafeSelect, cafeType]); // Keep cafeType dependency for filtering
 
-  // FIXED: Proper color coding - Orange for cafe/bar, Red for restaurant
-  const getWWDCVenueColor = (cafe) => {
-    // FIXED: All cafes and bars get orange, restaurants get red
-    if (cafe.type === 'restaurant' || cafe.placeType === 'restaurant') {
-      return '#EF4444'; // Red for restaurants
-    }
+  // 🎨 CREATE PERFECT BEAUTIFUL MARKER SVG
+  const createPerfectMarkerSVG = (cafe, index, selectedType) => {
+    // Perfect type-specific colors
+    const getPerfectTypeColors = (type) => {
+      switch (type) {
+        case 'restaurant':
+          return {
+            primary: '#EF4444',
+            secondary: '#DC2626',
+            accent: '#FEE2E2',
+            shadow: 'rgba(239, 68, 68, 0.4)'
+          };
+        case 'cafe':
+        default:
+          return {
+            primary: '#F97316',
+            secondary: '#EA580C', 
+            accent: '#FED7AA',
+            shadow: 'rgba(249, 115, 22, 0.4)'
+          };
+      }
+    };
+
+    const colors = getPerfectTypeColors(selectedType);
+    const emoji = getPerfectVenueEmoji(cafe);
     
-    // Everything else (cafe, bar, etc.) gets orange
-    return '#F97316'; // Orange for cafes/bars
-  };
-  // 🎨 CREATE ENHANCED MARKER SVG WITH TYPE-SPECIFIC STYLING
-const createEnhancedMarkerSVG = (cafe, index, selectedType) => {
-  // Type-specific colors
-  const getTypeColors = (type) => {
-    switch (type) {
-      case 'restaurant':
-        return {
-          primary: '#EF4444',
-          secondary: '#DC2626',
-          accent: '#FEE2E2'
-        };
-      case 'cafe':
-      default:
-        return {
-          primary: '#F97316',
-          secondary: '#EA580C', 
-          accent: '#FED7AA'
-        };
-    }
-  };
-
-  const colors = getTypeColors(selectedType);
-  const emoji = getVenueEmoji(cafe);
-  
-  return `
-    <svg width="36" height="44" viewBox="0 0 36 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <filter id="wwdcVenueFilter${index}" x="-50%" y="-50%" width="200%" height="200%">
-          <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="rgba(0,0,0,0.4)"/>
-        </filter>
-        <linearGradient id="wwdcVenueGradient${index}" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" style="stop-color:${colors.primary};stop-opacity:1" />
-          <stop offset="100%" style="stop-color:${colors.secondary};stop-opacity:1" />
-        </linearGradient>
-        <radialGradient id="pulseGradient${index}" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" style="stop-color:${colors.primary};stop-opacity:0.3" />
-          <stop offset="100%" style="stop-color:${colors.primary};stop-opacity:0" />
-        </radialGradient>
-      </defs>
-      
-      <!-- Pulsing ring for very close venues -->
-      ${cafe.distance && cafe.distance < 200 ? `
-        <circle cx="18" cy="18" r="20" fill="url(#pulseGradient${index})">
-          <animate attributeName="r" values="15;25;15" dur="2s" repeatCount="indefinite"/>
-          <animate attributeName="opacity" values="0.6;0.2;0.6" dur="2s" repeatCount="indefinite"/>
-        </circle>
-      ` : ''}
-      
-      <!-- Pin shadow -->
-      <ellipse cx="18" cy="41" rx="12" ry="4" fill="rgba(0,0,0,0.3)"/>
-      
-      <!-- Main pin shape with enhanced gradient -->
-      <path d="M18 0C8.059 0 0 8.059 0 18C0 28 18 44 18 44S36 28 36 18C36 8.059 27.941 0 18 0Z" 
-            fill="url(#wwdcVenueGradient${index})" 
-            filter="url(#wwdcVenueFilter${index})"/>
-      
-      <!-- Inner circle with glassmorphism -->
-      <circle cx="18" cy="18" r="13" fill="rgba(255,255,255,0.2)" 
-              stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
-      
-      <!-- Venue emoji -->
-      <text x="18" y="23" text-anchor="middle" font-size="16" fill="white" font-weight="600">
-        ${emoji}
-      </text>
-      
-      <!-- Rating badge for high-rated venues -->
-      ${cafe.rating && cafe.rating >= 4.5 ? `
-        <circle cx="28" cy="8" r="7" fill="${colors.primary}" stroke="white" stroke-width="2"/>
-        <text x="28" y="11" text-anchor="middle" font-size="9" fill="white" font-weight="bold">★</text>
-      ` : ''}
-    </svg>
-  `;
-};
-
-  const getWWDCVenueColorSecondary = (cafe) => {
-    // FIXED: Matching secondary colors
-    if (cafe.type === 'restaurant' || cafe.placeType === 'restaurant') {
-      return '#DC2626'; // Darker red
-    }
-    
-    return '#EA580C'; // Darker orange
+    return `
+      <svg width="42" height="52" viewBox="0 0 42 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <filter id="perfectFilter${index}" x="-50%" y="-50%" width="200%" height="200%">
+            <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="${colors.shadow}"/>
+          </filter>
+          <linearGradient id="perfectGradient${index}" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:${colors.primary};stop-opacity:1" />
+            <stop offset="50%" style="stop-color:${colors.secondary};stop-opacity:1" />
+            <stop offset="100%" style="stop-color:${colors.primary};stop-opacity:1" />
+          </linearGradient>
+          <radialGradient id="perfectPulse${index}" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" style="stop-color:${colors.primary};stop-opacity:0.4" />
+            <stop offset="100%" style="stop-color:${colors.primary};stop-opacity:0" />
+          </radialGradient>
+        </defs>
+        
+        <!-- Pulsing ring for very close venues -->
+        ${cafe.distance && cafe.distance < 200 ? `
+          <circle cx="21" cy="21" r="25" fill="url(#perfectPulse${index})">
+            <animate attributeName="r" values="18;30;18" dur="2s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0.6;0.2;0.6" dur="2s" repeatCount="indefinite"/>
+          </circle>
+        ` : ''}
+        
+        <!-- Pin shadow -->
+        <ellipse cx="21" cy="48" rx="15" ry="5" fill="rgba(0,0,0,0.3)"/>
+        
+        <!-- Main pin shape with perfect gradient -->
+        <path d="M21 0C9.954 0 1 8.954 1 20C1 32 21 52 21 52S41 32 41 20C41 8.954 32.046 0 21 0Z" 
+              fill="url(#perfectGradient${index})" 
+              filter="url(#perfectFilter${index})"
+              stroke="rgba(255,255,255,0.3)" 
+              stroke-width="1"/>
+        
+        <!-- Inner circle with glassmorphism -->
+        <circle cx="21" cy="20" r="15" fill="rgba(255,255,255,0.2)" 
+                stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
+        
+        <!-- Venue emoji -->
+        <text x="21" y="26" text-anchor="middle" font-size="18" fill="white" font-weight="700">
+          ${emoji}
+        </text>
+        
+        <!-- Rating badge for high-rated venues -->
+        ${cafe.rating && cafe.rating >= 4.5 ? `
+          <circle cx="33" cy="8" r="8" fill="${colors.primary}" stroke="white" stroke-width="2"/>
+          <text x="33" y="12" text-anchor="middle" font-size="10" fill="white" font-weight="bold">★</text>
+        ` : ''}
+        
+        <!-- Distance indicator for very close venues -->
+        ${cafe.distance && cafe.distance < 100 ? `
+          <circle cx="9" cy="8" r="6" fill="rgba(0,255,136,0.9)" stroke="white" stroke-width="1.5"/>
+          <text x="9" y="11" text-anchor="middle" font-size="8" fill="white" font-weight="bold">!</text>
+        ` : ''}
+      </svg>
+    `;
   };
 
-  // FIXED: Consistent emoji mapping regardless of Google's classification
-  const getVenueEmoji = (cafe) => {
-    // FIXED: Base it on OUR type classification, not name analysis
-    if (cafe.type === 'restaurant' || cafe.placeType === 'restaurant') {
-      return '🍽️'; // All restaurants get this
+  // PERFECT emoji mapping for exact venue types
+  const getPerfectVenueEmoji = (cafe) => {
+    const venueType = (cafe.type || cafe.placeType || '').toLowerCase();
+    
+    if (venueType === 'restaurant') {
+      return '🍽️'; // Always restaurant emoji for restaurants
     }
     
-    // All cafes/bars get coffee emoji (includes bars from Google)
+    // Everything else gets coffee emoji (includes cafes and bars)
     return '☕';
   };
 
@@ -996,7 +838,7 @@ const createEnhancedMarkerSVG = (cafe, index, selectedType) => {
     setMapInitialized(false);
     setGoogleMapsReady(false);
     setLoadingProgress(0);
-    setHasInitialLoad(false); // Reset initial load state
+    setHasInitialLoad(false);
     
     window.location.reload();
   }, []);
@@ -1033,10 +875,12 @@ const createEnhancedMarkerSVG = (cafe, index, selectedType) => {
         />
       )}
 
+      {/* ENHANCED Map Update Loader with longer display for forceful API completion */}
       {(isMapUpdating || (hasInitialLoad && loading)) && (
         <MapUpdateLoader
           loading={isMapUpdating || (hasInitialLoad && loading)}
           searchType={cafeType}
+          forcefulMode={true} // Enable forceful mode for longer display
         />
       )}
 
@@ -1047,7 +891,7 @@ const createEnhancedMarkerSVG = (cafe, index, selectedType) => {
         style={{ 
           width: '100%', 
           height: '100%',
-          backgroundColor: '#1a1a1a', // UPDATED: Dark background to match
+          backgroundColor: '#1a1a1a',
           borderRadius: isEmbedMode ? '12px' : '0'
         }}
       />
@@ -1059,7 +903,10 @@ const createEnhancedMarkerSVG = (cafe, index, selectedType) => {
           onSearchChange={onSearchChange}
           onRefresh={onRefresh}
           hasUserLocation={!!userLocation}
-          cafesCount={cafes.length}
+          cafesCount={cafes.filter(cafe => {
+            const cafeType_normalized = (cafe.type || cafe.placeType || '').toLowerCase();
+            return cafeType_normalized === cafeType.toLowerCase();
+          }).length} // Show filtered count
           isEmbedMode={isEmbedMode}
           userLocation={userLocation}
           onLocationRetry={onLocationRetry}
