@@ -272,24 +272,38 @@ async function initializeServices() {
   }
 
   // 3. Initialize Google Places Service (NON-CRITICAL but important)
+  // 3. Initialize Google Places Service with Comprehensive Search
   try {
-    console.log('🗺️ Initializing Google Places Service...');
+    console.log('🗺️ Initializing Google Places Service with comprehensive search...');
     const googlePlacesService = require('./services/googlePlacesService');
     const placesInitialized = await googlePlacesService.initialize();
     
     if (placesInitialized) {
-      console.log('✅ Google Places Service initialized successfully');
+      console.log('✅ Google Places Service initialized successfully with comprehensive search');
+      console.log('🔍 Comprehensive search features enabled:');
+      console.log('   - Multiple search strategies (primary, secondary, text, establishment)');
+      console.log('   - Enhanced Italian venue detection');
+      console.log('   - Maximum venue coverage');
+      
       serviceStatus.googlePlaces.status = 'healthy';
       serviceStatus.googlePlaces.initializedAt = new Date().toISOString();
       serviceStatus.googlePlaces.error = null;
+      serviceStatus.googlePlaces.features = [
+        'comprehensive_search',
+        'multi_strategy_detection',
+        'italian_venue_optimization',
+        'maximum_coverage'
+      ];
       results.googlePlaces = true;
     } else {
       throw new Error('Google Places Service initialization returned false');
     }
   } catch (placesError) {
     console.warn('⚠️ Google Places Service initialization failed (degraded mode):', placesError.message);
+    console.log('📱 Comprehensive search unavailable, falling back to basic mode');
     serviceStatus.googlePlaces.status = 'degraded';
     serviceStatus.googlePlaces.error = placesError.message;
+    serviceStatus.googlePlaces.fallbackMode = 'basic_search';
     console.log('📱 App will continue with limited places functionality');
     // Continue even if Google Places fails
   }
