@@ -62,6 +62,7 @@ const FullPageMap = ({
   // CRITICAL: Track current filter to prevent mixed results
   const currentFilterRef = useRef(cafeType);
   const lastSuccessfulSearchRef = useRef(null);
+  const activeMarkersRef = useRef(new Set()); // Track currently displayed markers
 
   // Fast loading progress simulation
   useEffect(() => {
@@ -189,7 +190,7 @@ const FullPageMap = ({
     const shouldSearch = shouldTriggerNewSearch(newCenter);
     
     // LONGER delays for forceful API completion
-    const delay = shouldSearch ? 800 : 1200; // Increased from 200/400
+    const delay = shouldSearch ? 1200 : 1800; // Increased delays for forceful API
 
     console.log(`⚡ FORCEFUL search scheduled in ${delay}ms, shouldSearch: ${shouldSearch}`);
 
@@ -213,7 +214,7 @@ const FullPageMap = ({
   useEffect(() => {
     if (!loading && !markersLoading && isMapUpdating) {
       // LONGER minimum display time for forceful API completion
-      const minDisplayTime = 4000; // Increased from 2500 to 4000ms
+      const minDisplayTime = 6000; // Increased to 6 seconds for forceful completion
       const loaderStartTime = loaderStartTimeRef.current || Date.now();
       
       setTimeout(() => {
@@ -224,7 +225,7 @@ const FullPageMap = ({
           setIsMapUpdating(false);
           console.log('✨ FORCEFUL API completion - Beautiful loading finished');
         }, remainingTime);
-      }, 600); // Increased buffer for smooth transition
+      }, 800); // Increased buffer for smooth transition
     }
   }, [loading, markersLoading, isMapUpdating]);
 
@@ -575,7 +576,7 @@ const FullPageMap = ({
     }
   }, [userLocation, searchRadius, mapLoaded]);
 
-  // CRITICAL FIX: Perfect venue filtering with beautiful markers
+  // CRITICAL FIX: Perfect venue filtering with beautiful markers - COMPLETELY REWRITTEN
   useEffect(() => {
     if (!googleMapRef.current || !mapLoaded) return;
 
@@ -586,66 +587,78 @@ const FullPageMap = ({
       mapReady: mapLoaded
     });
 
-    // 🚨 CRITICAL: Update current filter reference
+    // 🚨 CRITICAL: Update current filter reference IMMEDIATELY
     currentFilterRef.current = cafeType;
 
-    // 🧹 STEP 1: COMPLETELY CLEAR ALL EXISTING MARKERS
-    console.log('🧹 PERFECT CLEAR - Removing all existing markers...');
+    // 🧹 STEP 1: COMPLETELY CLEAR ALL EXISTING MARKERS - AGGRESSIVE CLEARING
+    console.log('🧹 AGGRESSIVE CLEAR - Removing all existing markers...');
     markersRef.current.forEach((marker, markerId) => {
-      marker.setMap(null);
-      marker = null;
+      try {
+        marker.setMap(null);
+        if (marker.removeListener) {
+          marker.removeListener();
+        }
+      } catch (e) {
+        console.warn('Error removing marker:', e);
+      }
     });
     markersRef.current.clear();
-    console.log('✅ PERFECT CLEAR - All previous markers removed');
+    activeMarkersRef.current.clear();
+    console.log('✅ AGGRESSIVE CLEAR - All previous markers destroyed');
 
-    // 🔄 STEP 2: SHOW BEAUTIFUL LOADING ANIMATION
+    // 🔄 STEP 2: SHOW BEAUTIFUL LOADING ANIMATION FOR LONGER
     setMarkersLoading(true);
     setMarkersLoaded(false);
-    loaderStartTimeRef.current = Date.now(); // Track loader start time
+    loaderStartTimeRef.current = Date.now();
 
-    // LONGER delay for forceful API completion
+    // MUCH LONGER delay for ultra-forceful API completion
     setTimeout(() => {
-      // 🎯 STEP 3: PERFECT FILTERING - Only show selected type
+      // 🎯 STEP 3: PERFECT FILTERING - ULTRA STRICT TYPE MATCHING
+      console.log(`🎯 ULTRA-STRICT FILTERING for type: "${currentFilterRef.current}"`);
+      
       const perfectlyFilteredCafes = cafes.filter(cafe => {
-        const cafeType_normalized = (cafe.type || cafe.placeType || '').toLowerCase();
-        const selectedType_normalized = currentFilterRef.current.toLowerCase();
+        const cafeType_raw = cafe.type || cafe.placeType || '';
+        const cafeType_normalized = cafeType_raw.toLowerCase().trim();
+        const selectedType_normalized = currentFilterRef.current.toLowerCase().trim();
         
+        // ULTRA-STRICT EXACT MATCHING ONLY
         const isExactMatch = cafeType_normalized === selectedType_normalized;
         
-        console.log('🎯 PERFECT FILTER CHECK:', {
+        console.log('🎯 ULTRA-STRICT FILTER:', {
           name: cafe.name,
           cafeType: cafeType_normalized,
           selectedType: selectedType_normalized,
-          exactMatch: isExactMatch
+          exactMatch: isExactMatch,
+          ACCEPTED: isExactMatch ? '✅' : '❌'
         });
         
         return isExactMatch;
       });
 
-      console.log(`🎯 PERFECT FILTERING RESULT: ${perfectlyFilteredCafes.length}/${cafes.length} places match "${currentFilterRef.current}"`);
+      console.log(`🎯 ULTRA-STRICT FILTERING RESULT: ${perfectlyFilteredCafes.length}/${cafes.length} places exactly match "${currentFilterRef.current}"`);
 
       // If no places match, complete loading immediately
       if (perfectlyFilteredCafes.length === 0) {
-        console.log('📍 PERFECT FILTER - No places match current filter, showing empty map');
+        console.log('📍 NO EXACT MATCHES - Showing empty map');
         setMarkersLoading(false);
         setMarkersLoaded(true);
         return;
       }
 
-      // 🎨 STEP 4: CREATE BEAUTIFUL MARKERS FOR FILTERED PLACES ONLY
-      const bounds = new window.google.maps.LatLngBounds();
+      // 🎨 STEP 4: CREATE ULTRA-BEAUTIFUL MARKERS FOR EXACT MATCHES ONLY
+      console.log('🎨 CREATING ULTRA-BEAUTIFUL MARKERS...');
       let markersAdded = 0;
       
-      // Process markers in batches for smooth animation
+      // Process markers in smaller batches for ultra-smooth animation
       const processBatch = (startIndex) => {
-        const batchSize = 2; // Smaller batches for forceful completion
+        const batchSize = 1; // ONE marker at a time for smoothest animation
         const endIndex = Math.min(startIndex + batchSize, perfectlyFilteredCafes.length);
         
         for (let i = startIndex; i < endIndex; i++) {
           const cafe = perfectlyFilteredCafes[i];
           
           if (!cafe.location || !cafe.location.latitude || !cafe.location.longitude) {
-            console.warn('⚠️ PERFECT FILTER - Skipping cafe with invalid location:', cafe.name);
+            console.warn('⚠️ SKIPPING - Invalid location:', cafe.name);
             continue;
           }
 
@@ -654,22 +667,26 @@ const FullPageMap = ({
             lng: cafe.location.longitude
           };
 
-          // 🎨 BEAUTIFUL ENHANCED MARKER with perfect type matching
-          const markerSVG = createPerfectMarkerSVG(cafe, i, currentFilterRef.current);
+          // 🎨 ULTRA-BEAUTIFUL ENHANCED MARKER
+          const markerSVG = createUltraBeautifulMarker(cafe, i, currentFilterRef.current);
+
+          console.log(`🎨 CREATING ULTRA-BEAUTIFUL MARKER ${i + 1}/${perfectlyFilteredCafes.length}: ${cafe.name} (${currentFilterRef.current})`);
 
           const marker = new window.google.maps.Marker({
             position: position,
             map: googleMapRef.current,
-            title: `${getPerfectVenueEmoji(cafe)} ${cafe.name}${cafe.rating ? ` (${cafe.rating}⭐)` : ''}${cafe.distance ? ` - ${cafe.formattedDistance}` : ''}`,
+            title: `${getUltraBeautifulEmoji(cafe)} ${cafe.name}${cafe.rating ? ` (${cafe.rating}⭐)` : ''}${cafe.distance ? ` - ${cafe.formattedDistance}` : ''}`,
             icon: {
               url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(markerSVG),
-              scaledSize: new window.google.maps.Size(42, 52), // Larger, more beautiful markers
-              anchor: new window.google.maps.Point(21, 52)
+              scaledSize: new window.google.maps.Size(50, 62), // Larger, more beautiful markers
+              anchor: new window.google.maps.Point(25, 62),
+              optimized: false // Force high quality rendering
             },
-            zIndex: cafe.distance ? Math.round(1000 - cafe.distance / 10) : 500,
+            zIndex: cafe.distance ? Math.round(2000 - cafe.distance / 10) : 1000,
             animation: cafe.distance && cafe.distance < 200 ? 
-              window.google.maps.Animation.DROP : null,
-            optimized: false
+              window.google.maps.Animation.DROP : 
+              window.google.maps.Animation.BOUNCE,
+            optimized: false // Force beautiful rendering
           });
 
           // Add click listener
@@ -679,48 +696,51 @@ const FullPageMap = ({
             }
           });
 
-          bounds.extend(position);
-          markersRef.current.set(cafe.id || cafe.googlePlaceId, marker);
+          // Track marker for type consistency
+          const markerId = cafe.id || cafe.googlePlaceId;
+          markersRef.current.set(markerId, marker);
+          activeMarkersRef.current.add(`${markerId}:${currentFilterRef.current}`);
           markersAdded++;
           
-          console.log(`✅ PERFECT MARKER ADDED: ${currentFilterRef.current} - ${cafe.name}`);
+          console.log(`✅ ULTRA-BEAUTIFUL MARKER ADDED: ${currentFilterRef.current} - ${cafe.name}`);
         }
 
         // Continue with next batch or finish
         if (endIndex < perfectlyFilteredCafes.length) {
-          // LONGER delay between batches for forceful completion
-          setTimeout(() => processBatch(endIndex), 400); // Increased from 200ms
+          // LONGER delay between batches for ultra-forceful completion
+          setTimeout(() => processBatch(endIndex), 600); // Smooth one-by-one rendering
         } else {
-          // All markers processed - FORCEFUL completion
-          console.log(`🎉 PERFECT FILTERING COMPLETE: ${markersAdded} ${currentFilterRef.current} markers added`);
+          // All markers processed - ULTRA-FORCEFUL completion
+          console.log(`🎉 ULTRA-STRICT FILTERING COMPLETE: ${markersAdded} ${currentFilterRef.current} markers added`);
           
-          // LONGER completion delay for forceful API
+          // ULTRA-LONG completion delay for maximum quality
           setTimeout(() => {
             setMarkersLoading(false);
             setMarkersLoaded(true);
-            console.log('✨ FORCEFUL API COMPLETION - Perfect filtering finished');
-          }, 800); // Additional delay for forceful completion
+            console.log('✨ ULTRA-FORCEFUL API COMPLETION - Perfect filtering finished');
+          }, 1200); // Ultra-long delay for forceful completion
         }
       };
 
       // Start processing markers
       processBatch(0);
 
-    }, 1000); // LONGER initial delay for forceful API completion
+    }, 1500); // ULTRA-LONG initial delay for maximum forceful API completion
 
   }, [cafes, mapLoaded, onCafeSelect, cafeType]); // Keep cafeType dependency for filtering
 
-  // 🎨 CREATE PERFECT BEAUTIFUL MARKER SVG
-  const createPerfectMarkerSVG = (cafe, index, selectedType) => {
-    // Perfect type-specific colors
-    const getPerfectTypeColors = (type) => {
+  // 🎨 CREATE ULTRA-BEAUTIFUL MARKER SVG
+  const createUltraBeautifulMarker = (cafe, index, selectedType) => {
+    // Ultra-beautiful type-specific colors
+    const getUltraBeautifulColors = (type) => {
       switch (type) {
         case 'restaurant':
           return {
             primary: '#EF4444',
             secondary: '#DC2626',
             accent: '#FEE2E2',
-            shadow: 'rgba(239, 68, 68, 0.4)'
+            glow: '#FF6B6B',
+            shadow: 'rgba(239, 68, 68, 0.5)'
           };
         case 'cafe':
         default:
@@ -728,75 +748,89 @@ const FullPageMap = ({
             primary: '#F97316',
             secondary: '#EA580C', 
             accent: '#FED7AA',
-            shadow: 'rgba(249, 115, 22, 0.4)'
+            glow: '#FFB347',
+            shadow: 'rgba(249, 115, 22, 0.5)'
           };
       }
     };
 
-    const colors = getPerfectTypeColors(selectedType);
-    const emoji = getPerfectVenueEmoji(cafe);
+    const colors = getUltraBeautifulColors(selectedType);
+    const emoji = getUltraBeautifulEmoji(cafe);
     
     return `
-      <svg width="42" height="52" viewBox="0 0 42 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg width="50" height="62" viewBox="0 0 50 62" fill="none" xmlns="http://www.w3.org/2000/svg">
         <defs>
-          <filter id="perfectFilter${index}" x="-50%" y="-50%" width="200%" height="200%">
-            <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="${colors.shadow}"/>
+          <filter id="ultraFilter${index}" x="-50%" y="-50%" width="200%" height="200%">
+            <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="${colors.shadow}"/>
+            <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
           </filter>
-          <linearGradient id="perfectGradient${index}" x1="0%" y1="0%" x2="100%" y2="100%">
+          <linearGradient id="ultraGradient${index}" x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" style="stop-color:${colors.primary};stop-opacity:1" />
-            <stop offset="50%" style="stop-color:${colors.secondary};stop-opacity:1" />
+            <stop offset="30%" style="stop-color:${colors.glow};stop-opacity:1" />
+            <stop offset="70%" style="stop-color:${colors.secondary};stop-opacity:1" />
             <stop offset="100%" style="stop-color:${colors.primary};stop-opacity:1" />
           </linearGradient>
-          <radialGradient id="perfectPulse${index}" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" style="stop-color:${colors.primary};stop-opacity:0.4" />
+          <radialGradient id="ultraPulse${index}" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" style="stop-color:${colors.primary};stop-opacity:0.6" />
             <stop offset="100%" style="stop-color:${colors.primary};stop-opacity:0" />
           </radialGradient>
+          <linearGradient id="ultraInner${index}" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:rgba(255,255,255,0.4);stop-opacity:1" />
+            <stop offset="50%" style="stop-color:rgba(255,255,255,0.1);stop-opacity:1" />
+            <stop offset="100%" style="stop-color:rgba(255,255,255,0.3);stop-opacity:1" />
+          </linearGradient>
         </defs>
         
-        <!-- Pulsing ring for very close venues -->
+        <!-- Ultra-beautiful pulsing ring for very close venues -->
         ${cafe.distance && cafe.distance < 200 ? `
-          <circle cx="21" cy="21" r="25" fill="url(#perfectPulse${index})">
-            <animate attributeName="r" values="18;30;18" dur="2s" repeatCount="indefinite"/>
-            <animate attributeName="opacity" values="0.6;0.2;0.6" dur="2s" repeatCount="indefinite"/>
+          <circle cx="25" cy="25" r="30" fill="url(#ultraPulse${index})">
+            <animate attributeName="r" values="20;35;20" dur="2s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0.8;0.2;0.8" dur="2s" repeatCount="indefinite"/>
           </circle>
         ` : ''}
         
-        <!-- Pin shadow -->
-        <ellipse cx="21" cy="48" rx="15" ry="5" fill="rgba(0,0,0,0.3)"/>
+        <!-- Ultra-soft pin shadow -->
+        <ellipse cx="25" cy="58" rx="18" ry="6" fill="rgba(0,0,0,0.2)" opacity="0.7"/>
         
-        <!-- Main pin shape with perfect gradient -->
-        <path d="M21 0C9.954 0 1 8.954 1 20C1 32 21 52 21 52S41 32 41 20C41 8.954 32.046 0 21 0Z" 
-              fill="url(#perfectGradient${index})" 
-              filter="url(#perfectFilter${index})"
-              stroke="rgba(255,255,255,0.3)" 
-              stroke-width="1"/>
+        <!-- Main ultra-beautiful pin shape -->
+        <path d="M25 2C13.954 2 5 10.954 5 22C5 36 25 60 25 60S45 36 45 22C45 10.954 36.046 2 25 2Z" 
+              fill="url(#ultraGradient${index})" 
+              filter="url(#ultraFilter${index})"
+              stroke="rgba(255,255,255,0.4)" 
+              stroke-width="2"/>
         
-        <!-- Inner circle with glassmorphism -->
-        <circle cx="21" cy="20" r="15" fill="rgba(255,255,255,0.2)" 
-                stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
+        <!-- Ultra-beautiful inner glassmorphism circle -->
+        <circle cx="25" cy="22" r="16" fill="url(#ultraInner${index})" 
+                stroke="rgba(255,255,255,0.6)" stroke-width="2"/>
         
-        <!-- Venue emoji -->
-        <text x="21" y="26" text-anchor="middle" font-size="18" fill="white" font-weight="700">
+        <!-- Ultra-sharp emoji -->
+        <text x="25" y="28" text-anchor="middle" font-size="20" fill="white" 
+              font-weight="900" style="text-shadow: 0 2px 4px rgba(0,0,0,0.3);">
           ${emoji}
         </text>
         
-        <!-- Rating badge for high-rated venues -->
+        <!-- Ultra-beautiful rating badge for high-rated venues -->
         ${cafe.rating && cafe.rating >= 4.5 ? `
-          <circle cx="33" cy="8" r="8" fill="${colors.primary}" stroke="white" stroke-width="2"/>
-          <text x="33" y="12" text-anchor="middle" font-size="10" fill="white" font-weight="bold">★</text>
+          <circle cx="38" cy="9" r="9" fill="${colors.primary}" stroke="white" stroke-width="2" filter="url(#ultraFilter${index})"/>
+          <text x="38" y="13" text-anchor="middle" font-size="11" fill="white" font-weight="bold">★</text>
         ` : ''}
         
-        <!-- Distance indicator for very close venues -->
+        <!-- Ultra-beautiful distance indicator for very close venues -->
         ${cafe.distance && cafe.distance < 100 ? `
-          <circle cx="9" cy="8" r="6" fill="rgba(0,255,136,0.9)" stroke="white" stroke-width="1.5"/>
-          <text x="9" y="11" text-anchor="middle" font-size="8" fill="white" font-weight="bold">!</text>
+          <circle cx="12" cy="9" r="7" fill="rgba(0,255,136,0.95)" stroke="white" stroke-width="2"/>
+          <text x="12" y="13" text-anchor="middle" font-size="9" fill="white" font-weight="bold">!</text>
         ` : ''}
+        
+        <!-- Ultra-beautiful quality indicator -->
+        <circle cx="25" cy="22" r="2" fill="rgba(255,255,255,0.9)" opacity="0.8">
+          <animate attributeName="opacity" values="0.8;0.4;0.8" dur="1.5s" repeatCount="indefinite"/>
+        </circle>
       </svg>
     `;
   };
 
-  // PERFECT emoji mapping for exact venue types
-  const getPerfectVenueEmoji = (cafe) => {
+  // ULTRA-BEAUTIFUL emoji mapping for exact venue types
+  const getUltraBeautifulEmoji = (cafe) => {
     const venueType = (cafe.type || cafe.placeType || '').toLowerCase();
     
     if (venueType === 'restaurant') {
@@ -827,6 +861,7 @@ const FullPageMap = ({
         marker.setMap(null);
       });
       markersRef.current.clear();
+      activeMarkersRef.current.clear();
     };
   }, []);
 
@@ -875,12 +910,12 @@ const FullPageMap = ({
         />
       )}
 
-      {/* ENHANCED Map Update Loader with longer display for forceful API completion */}
+      {/* ENHANCED Map Update Loader with ultra-long display for forceful API completion */}
       {(isMapUpdating || (hasInitialLoad && loading)) && (
         <MapUpdateLoader
           loading={isMapUpdating || (hasInitialLoad && loading)}
           searchType={cafeType}
-          forcefulMode={true} // Enable forceful mode for longer display
+          forcefulMode={true} // Enable ultra-forceful mode for maximum display time
         />
       )}
 
@@ -906,7 +941,7 @@ const FullPageMap = ({
           cafesCount={cafes.filter(cafe => {
             const cafeType_normalized = (cafe.type || cafe.placeType || '').toLowerCase();
             return cafeType_normalized === cafeType.toLowerCase();
-          }).length} // Show filtered count
+          }).length} // Show ultra-strict filtered count
           isEmbedMode={isEmbedMode}
           userLocation={userLocation}
           onLocationRetry={onLocationRetry}
