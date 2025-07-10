@@ -4,6 +4,7 @@
 import { useQuery } from 'react-query';
 import { useRef, useCallback } from 'react';
 import { placesAPI, apiUtils } from '../services/apiService';
+import React, { useState, useEffect } from 'react';
 
 // UPDATED: Ultra-fast hook with perfect type filtering for dark map
 export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {

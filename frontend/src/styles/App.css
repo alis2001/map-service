@@ -1882,3 +1882,1588 @@ html, body, #root {
     box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
   }
 }
+
+/* ===== WWDC 2024 CAFE POPUP STYLES ===== */
+
+/* Popup Overlay with Dynamic Blur */
+.popup-overlay.wwdc-style {
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  animation: wwdcOverlayFadeIn 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.popup-overlay.wwdc-style.visible {
+  opacity: 1;
+}
+
+@keyframes wwdcOverlayFadeIn {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+  }
+  to {
+    opacity: 1;
+    backdrop-filter: blur(20px);
+  }
+}
+
+/* Main Popup Card with WWDC Magic */
+.cafe-popup.wwdc-popup {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 24px;
+  max-width: 520px;
+  width: 100%;
+  max-height: 90vh;
+  overflow: hidden;
+  box-shadow: 
+    0 20px 40px rgba(0, 0, 0, 0.15),
+    0 8px 24px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  transform: translateY(30px) scale(0.9);
+  transition: all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  position: relative;
+  overflow: hidden;
+}
+
+.cafe-popup.wwdc-popup.visible {
+  transform: translateY(0) scale(1);
+}
+
+/* WWDC Header with Animated Background */
+.popup-header.wwdc-header {
+  position: relative;
+  padding: 24px;
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.9) 0%, 
+    rgba(248, 250, 252, 0.95) 50%,
+    rgba(241, 245, 249, 0.9) 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  overflow: hidden;
+}
+
+.popup-header.wwdc-header.restaurant {
+  background: linear-gradient(135deg,
+    rgba(239, 68, 68, 0.08) 0%,
+    rgba(255, 255, 255, 0.95) 30%,
+    rgba(248, 250, 252, 0.98) 100%);
+}
+
+.popup-header.wwdc-header.cafe {
+  background: linear-gradient(135deg,
+    rgba(249, 115, 22, 0.08) 0%,
+    rgba(255, 255, 255, 0.95) 30%,
+    rgba(248, 250, 252, 0.98) 100%);
+}
+
+/* Animated Background Particles */
+.header-background-animation {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.header-background-animation::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle at center,
+    rgba(102, 126, 234, 0.03) 0%,
+    transparent 70%);
+  animation: wwdcRotate 20s linear infinite;
+}
+
+.header-background-animation::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle at center,
+    rgba(240, 147, 251, 0.02) 0%,
+    transparent 70%);
+  animation: wwdcRotate 25s linear infinite reverse;
+}
+
+@keyframes wwdcRotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Header Content */
+.header-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  position: relative;
+  z-index: 2;
+}
+
+/* Venue Icon with Glow Effect */
+.venue-icon-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.venue-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 
+    0 8px 20px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.venue-icon.restaurant {
+  background: linear-gradient(135deg, 
+    rgba(239, 68, 68, 0.1) 0%, 
+    rgba(255, 255, 255, 0.9) 100%);
+}
+
+.venue-icon.cafe {
+  background: linear-gradient(135deg, 
+    rgba(249, 115, 22, 0.1) 0%, 
+    rgba(255, 255, 255, 0.9) 100%);
+}
+
+.icon-emoji {
+  font-size: 28px;
+  position: relative;
+  z-index: 2;
+  animation: wwdcIconFloat 3s ease-in-out infinite;
+}
+
+@keyframes wwdcIconFloat {
+  0%, 100% { transform: translateY(0px) scale(1); }
+  50% { transform: translateY(-2px) scale(1.05); }
+}
+
+.icon-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 80px;
+  height: 80px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle at center,
+    rgba(102, 126, 234, 0.2) 0%,
+    transparent 70%);
+  animation: wwdcGlowPulse 4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes wwdcGlowPulse {
+  0%, 100% { 
+    opacity: 0.3;
+    transform: translate(-50%, -50%) scale(0.8);
+  }
+  50% { 
+    opacity: 0.6;
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+}
+
+/* Header Text */
+.header-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.venue-name {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1F2937;
+  margin: 0 0 6px 0;
+  line-height: 1.3;
+  background: linear-gradient(135deg, #1F2937 0%, #374151 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.venue-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #6B7280;
+  flex-wrap: wrap;
+}
+
+.venue-type {
+  font-weight: 600;
+  color: #4F46E5;
+}
+
+.venue-distance {
+  color: #059669;
+  font-weight: 600;
+}
+
+.walking-time {
+  color: #DC2626;
+  font-weight: 500;
+}
+
+.meta-separator {
+  opacity: 0.5;
+  margin: 0 2px;
+}
+
+/* Close Button with WWDC Style */
+.close-button.wwdc-close {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.05);
+  color: #6B7280;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+}
+
+.close-button.wwdc-close:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: #374151;
+  transform: scale(1.1);
+}
+
+.close-icon {
+  position: relative;
+  z-index: 2;
+}
+
+.close-ripple {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: all 0.3s ease;
+}
+
+.close-button.wwdc-close:active .close-ripple {
+  width: 40px;
+  height: 40px;
+}
+
+/* Dynamic Status Bar with Real-time Updates */
+.status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.status-bar.open {
+  background: linear-gradient(90deg,
+    rgba(16, 185, 129, 0.05) 0%,
+    rgba(255, 255, 255, 0.9) 50%,
+    rgba(16, 185, 129, 0.05) 100%);
+}
+
+.status-bar.closed {
+  background: linear-gradient(90deg,
+    rgba(239, 68, 68, 0.05) 0%,
+    rgba(255, 255, 255, 0.9) 50%,
+    rgba(239, 68, 68, 0.05) 100%);
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  position: relative;
+  animation: wwdcStatusPulse 2s ease-in-out infinite;
+}
+
+@keyframes wwdcStatusPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 0 0 currentColor;
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.1);
+    box-shadow: 0 0 0 4px transparent;
+  }
+}
+
+.status-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.next-change {
+  font-size: 12px;
+  color: #6B7280;
+  font-weight: 500;
+}
+
+.live-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #EF4444;
+  animation: wwdcLivePulse 1s ease-in-out infinite;
+}
+
+.live-dot.pulsing {
+  animation: wwdcLivePulse 0.8s ease-in-out infinite;
+}
+
+@keyframes wwdcLivePulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.3);
+  }
+}
+
+.live-text {
+  color: #EF4444;
+  font-weight: 700;
+}
+
+/* Stats Section with WWDC Cards */
+.stats-section {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  padding: 20px 24px;
+  background: rgba(255, 255, 255, 0.6);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.stat-card {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 16px;
+  padding: 16px 12px;
+  text-align: center;
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 
+    0 12px 28px rgba(0, 0, 0, 0.12),
+    0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.6), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
+}
+
+.stat-card:hover::before {
+  transform: translateX(100%);
+}
+
+.stat-icon {
+  font-size: 24px;
+  margin-bottom: 8px;
+  animation: wwdcStatFloat 4s ease-in-out infinite;
+}
+
+@keyframes wwdcStatFloat {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-2px); }
+}
+
+.stat-content {
+  position: relative;
+  z-index: 2;
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1F2937;
+  margin-bottom: 4px;
+  background: linear-gradient(135deg, #1F2937 0%, #4F46E5 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #6B7280;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stat-subtitle {
+  font-size: 11px;
+  color: #9CA3AF;
+  margin-top: 2px;
+}
+
+/* Specialized stat cards */
+.rating-card:hover {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.1), rgba(255, 255, 255, 0.9));
+}
+
+.price-card:hover {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(255, 255, 255, 0.9));
+}
+
+.status-card:hover {
+  background: linear-gradient(135deg, rgba(79, 70, 229, 0.1), rgba(255, 255, 255, 0.9));
+}
+
+/* ===== WWDC TAB NAVIGATION ===== */
+
+.popup-tabs.wwdc-tabs {
+  display: flex;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.popup-tabs.wwdc-tabs::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    rgba(102, 126, 234, 0.3) 50%, 
+    transparent 100%);
+}
+
+.tab-button {
+  flex: 1;
+  padding: 16px 12px;
+  border: none;
+  background: transparent;
+  color: #6B7280;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  border-bottom: 3px solid transparent;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.tab-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(102, 126, 234, 0.05);
+  transform: translateY(100%);
+  transition: transform 0.3s ease;
+}
+
+.tab-button:hover {
+  color: #374151;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.tab-button:hover::before {
+  transform: translateY(0);
+}
+
+.tab-button.active {
+  color: #4F46E5;
+  background: rgba(79, 70, 229, 0.08);
+  border-bottom-color: #4F46E5;
+  box-shadow: inset 0 -3px 0 #4F46E5;
+}
+
+.tab-button.active::before {
+  transform: translateY(0);
+  background: rgba(79, 70, 229, 0.1);
+}
+
+.tab-icon {
+  font-size: 16px;
+  position: relative;
+  z-index: 2;
+  transition: transform 0.3s ease;
+}
+
+.tab-button:hover .tab-icon,
+.tab-button.active .tab-icon {
+  transform: scale(1.1);
+}
+
+.tab-text {
+  position: relative;
+  z-index: 2;
+  font-size: 12px;
+}
+
+/* ===== WWDC CONTENT SECTIONS ===== */
+
+.popup-content.wwdc-content {
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.95);
+  
+  /* Custom scrollbar */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(102, 126, 234, 0.3) transparent;
+}
+
+.popup-content.wwdc-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.popup-content.wwdc-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.popup-content.wwdc-content::-webkit-scrollbar-thumb {
+  background: rgba(102, 126, 234, 0.3);
+  border-radius: 3px;
+}
+
+.popup-content.wwdc-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(102, 126, 234, 0.5);
+}
+
+.content-section {
+  padding: 24px;
+  animation: wwdcContentSlideIn 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+@keyframes wwdcContentSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ===== INFO SECTION ===== */
+
+.info-section .info-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.info-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 16px;
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  position: relative;
+  overflow: hidden;
+}
+
+.info-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, 
+    transparent, 
+    rgba(255, 255, 255, 0.4), 
+    transparent);
+  transition: left 0.6s ease;
+}
+
+.info-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 8px 25px rgba(0, 0, 0, 0.1),
+    0 4px 12px rgba(0, 0, 0, 0.05);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.info-card:hover::before {
+  left: 100%;
+}
+
+.info-card.clickable {
+  cursor: pointer;
+}
+
+.info-card.clickable:hover {
+  background: rgba(79, 70, 229, 0.05);
+  border-color: rgba(79, 70, 229, 0.2);
+}
+
+.card-icon {
+  font-size: 20px;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(102, 126, 234, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
+}
+
+.card-content {
+  flex: 1;
+  position: relative;
+  z-index: 2;
+}
+
+.card-label {
+  font-size: 12px;
+  color: #6B7280;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.card-value {
+  font-size: 15px;
+  color: #1F2937;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.phone-link {
+  color: #4F46E5;
+  text-decoration: none;
+}
+
+.phone-link:hover {
+  text-decoration: underline;
+}
+
+.website-link {
+  color: #059669;
+  text-decoration: none;
+}
+
+.website-link:hover {
+  text-decoration: underline;
+}
+
+.card-arrow {
+  font-size: 16px;
+  color: #9CA3AF;
+  transition: all 0.3s ease;
+  position: relative;
+  z-index: 2;
+}
+
+.info-card.clickable:hover .card-arrow {
+  color: #4F46E5;
+  transform: translateX(4px);
+}
+
+/* Tips Section */
+.tips-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.tips-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1F2937;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tips-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tip-card {
+  padding: 12px 16px;
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.2);
+  border-radius: 12px;
+  border-left: 4px solid #F59E0B;
+}
+
+.tip-text {
+  font-size: 13px;
+  color: #92400E;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+/* ===== HOURS SECTION ===== */
+
+.hours-section {
+  position: relative;
+}
+
+.live-status-card {
+  padding: 20px;
+  border-radius: 16px;
+  margin-bottom: 20px;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  position: relative;
+  overflow: hidden;
+}
+
+.live-status-card.open {
+  background: linear-gradient(135deg, 
+    rgba(16, 185, 129, 0.08) 0%, 
+    rgba(255, 255, 255, 0.9) 100%);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.live-status-card.closed {
+  background: linear-gradient(135deg, 
+    rgba(239, 68, 68, 0.08) 0%, 
+    rgba(255, 255, 255, 0.9) 100%);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.status-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.status-icon-large {
+  font-size: 32px;
+  animation: wwdcStatusBounce 2s ease-in-out infinite;
+}
+
+@keyframes wwdcStatusBounce {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.status-info {
+  flex: 1;
+}
+
+.status-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1F2937;
+  margin: 0 0 4px 0;
+}
+
+.status-subtitle {
+  font-size: 14px;
+  color: #6B7280;
+  margin: 0;
+}
+
+.live-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.loading-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px 20px;
+  color: #6B7280;
+}
+
+.loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(79, 70, 229, 0.1);
+  border-top: 2px solid #4F46E5;
+  border-radius: 50%;
+  animation: wwdcSpinner 1s linear infinite;
+}
+
+@keyframes wwdcSpinner {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.hours-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hours-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.hours-card:hover {
+  background: rgba(255, 255, 255, 0.8);
+  transform: translateX(4px);
+}
+
+.hours-card.today {
+  background: rgba(79, 70, 229, 0.08);
+  border-color: rgba(79, 70, 229, 0.2);
+  box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.1);
+}
+
+.day-name {
+  font-weight: 600;
+  color: #374151;
+  position: relative;
+}
+
+.today-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: #4F46E5;
+  color: white;
+  font-size: 8px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.day-hours {
+  color: #6B7280;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+/* ===== PHOTOS SECTION ===== */
+
+.photos-section {
+  position: relative;
+}
+
+.photos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  animation: wwdcPhotosGridIn 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+@keyframes wwdcPhotosGridIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.photo-card {
+  aspect-ratio: 1;
+  border-radius: 16px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  position: relative;
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.photo-card:hover {
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 
+    0 20px 40px rgba(0, 0, 0, 0.15),
+    0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.photo-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.photo-card:hover .photo-image {
+  transform: scale(1.1);
+  filter: brightness(1.1) contrast(1.05);
+}
+
+.photo-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    45deg,
+    rgba(0, 0, 0, 0.1) 0%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.1) 100%
+  );
+  opacity: 0;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 8px;
+}
+
+.photo-card:hover .photo-overlay {
+  opacity: 1;
+}
+
+.photo-index {
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+}
+
+.no-photos {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: #9CA3AF;
+  text-align: center;
+}
+
+.no-photos-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  opacity: 0.6;
+}
+
+.no-photos-text {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+/* ===== REVIEWS SECTION ===== */
+
+.reviews-section {
+  position: relative;
+}
+
+.reviews-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: wwdcReviewsSlideIn 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+@keyframes wwdcReviewsSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.review-card {
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 16px;
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  position: relative;
+  overflow: hidden;
+}
+
+.review-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: linear-gradient(180deg, #4F46E5, #7C3AED);
+  transform: scaleY(0);
+  transition: transform 0.3s ease;
+}
+
+.review-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.review-card:hover::before {
+  transform: scaleY(1);
+}
+
+.review-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.reviewer-info {
+  flex: 1;
+}
+
+.reviewer-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1F2937;
+  margin-bottom: 2px;
+}
+
+.review-time {
+  font-size: 12px;
+  color: #9CA3AF;
+  font-weight: 500;
+}
+
+.review-rating {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rating-stars {
+  color: #F59E0B;
+  font-size: 14px;
+  letter-spacing: 1px;
+}
+
+.rating-number {
+  font-size: 13px;
+  font-weight: 600;
+  color: #6B7280;
+}
+
+.review-text {
+  font-size: 14px;
+  color: #4B5563;
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+/* ===== WWDC ACTION BUTTONS ===== */
+
+.popup-actions.wwdc-actions {
+  display: flex;
+  gap: 12px;
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(255, 255, 255, 0.3);
+  position: relative;
+}
+
+.popup-actions.wwdc-actions::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    rgba(102, 126, 234, 0.3) 50%, 
+    transparent 100%);
+}
+
+.action-btn {
+  flex: 1;
+  padding: 14px 20px;
+  border: none;
+  border-radius: 16px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(10px);
+  text-decoration: none;
+  user-select: none;
+}
+
+.action-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, 
+    transparent, 
+    rgba(255, 255, 255, 0.2), 
+    transparent);
+  transition: left 0.6s ease;
+}
+
+.action-btn:hover::before {
+  left: 100%;
+}
+
+/* Primary Action Button */
+.action-btn.primary-action {
+  background: linear-gradient(135deg, #4F46E5, #7C3AED);
+  color: white;
+  box-shadow: 
+    0 8px 20px rgba(79, 70, 229, 0.3),
+    0 4px 12px rgba(79, 70, 229, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.action-btn.primary-action:hover {
+  transform: translateY(-3px);
+  box-shadow: 
+    0 12px 30px rgba(79, 70, 229, 0.4),
+    0 6px 16px rgba(79, 70, 229, 0.3);
+  background: linear-gradient(135deg, #4338CA, #6D28D9);
+}
+
+.action-btn.primary-action:active {
+  transform: translateY(-1px);
+  box-shadow: 
+    0 6px 20px rgba(79, 70, 229, 0.3),
+    0 2px 8px rgba(79, 70, 229, 0.2);
+}
+
+/* Cafe-specific primary button */
+.popup-actions.wwdc-actions.cafe .action-btn.primary-action {
+  background: linear-gradient(135deg, #F97316, #EA580C);
+  box-shadow: 
+    0 8px 20px rgba(249, 115, 22, 0.3),
+    0 4px 12px rgba(249, 115, 22, 0.2);
+}
+
+.popup-actions.wwdc-actions.cafe .action-btn.primary-action:hover {
+  background: linear-gradient(135deg, #EA580C, #DC2626);
+  box-shadow: 
+    0 12px 30px rgba(249, 115, 22, 0.4),
+    0 6px 16px rgba(249, 115, 22, 0.3);
+}
+
+/* Restaurant-specific primary button */
+.popup-actions.wwdc-actions.restaurant .action-btn.primary-action {
+  background: linear-gradient(135deg, #EF4444, #DC2626);
+  box-shadow: 
+    0 8px 20px rgba(239, 68, 68, 0.3),
+    0 4px 12px rgba(239, 68, 68, 0.2);
+}
+
+.popup-actions.wwdc-actions.restaurant .action-btn.primary-action:hover {
+  background: linear-gradient(135deg, #DC2626, #B91C1C);
+  box-shadow: 
+    0 12px 30px rgba(239, 68, 68, 0.4),
+    0 6px 16px rgba(239, 68, 68, 0.3);
+}
+
+/* Secondary Action Buttons */
+.action-btn.secondary-action {
+  background: rgba(255, 255, 255, 0.8);
+  color: #374151;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.action-btn.secondary-action:hover {
+  background: rgba(255, 255, 255, 0.95);
+  color: #1F2937;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+.action-btn.secondary-action:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* Button Icons and Text */
+.btn-icon {
+  font-size: 18px;
+  position: relative;
+  z-index: 2;
+  transition: transform 0.3s ease;
+}
+
+.action-btn:hover .btn-icon {
+  transform: scale(1.1);
+}
+
+.btn-text {
+  position: relative;
+  z-index: 2;
+  font-weight: 700;
+}
+
+/* Button Shine Effect */
+.btn-shine {
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, 
+    transparent, 
+    rgba(255, 255, 255, 0.3), 
+    transparent);
+  transition: left 0.8s ease;
+}
+
+.action-btn.primary-action:hover .btn-shine {
+  left: 100%;
+}
+
+/* ===== MOBILE RESPONSIVE ENHANCEMENTS ===== */
+
+@media (max-width: 768px) {
+  .cafe-popup.wwdc-popup {
+    margin: 12px;
+    max-height: 85vh;
+  }
+  
+  .popup-header.wwdc-header {
+    padding: 20px 16px;
+  }
+  
+  .venue-icon {
+    width: 48px;
+    height: 48px;
+  }
+  
+  .icon-emoji {
+    font-size: 24px;
+  }
+  
+  .venue-name {
+    font-size: 20px;
+  }
+  
+  .stats-section {
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 8px;
+    padding: 16px 20px;
+  }
+  
+  .stat-card {
+    padding: 12px 8px;
+  }
+  
+  .content-section {
+    padding: 20px 16px;
+  }
+  
+  .popup-actions.wwdc-actions {
+    flex-direction: column;
+    padding: 20px 16px;
+    gap: 10px;
+  }
+  
+  .action-btn {
+    padding: 12px 16px;
+    font-size: 14px;
+  }
+  
+  .photos-grid {
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 8px;
+  }
+  
+  .hours-card {
+    padding: 10px 12px;
+  }
+  
+  .review-card {
+    padding: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .cafe-popup.wwdc-popup {
+    margin: 8px;
+    max-height: 90vh;
+  }
+  
+  .popup-header.wwdc-header {
+    padding: 16px 12px;
+  }
+  
+  .header-content {
+    gap: 12px;
+  }
+  
+  .venue-icon {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .icon-emoji {
+    font-size: 20px;
+  }
+  
+  .venue-name {
+    font-size: 18px;
+  }
+  
+  .venue-meta {
+    font-size: 13px;
+  }
+  
+  .stats-section {
+    grid-template-columns: repeat(3, 1fr);
+    padding: 12px 16px;
+  }
+  
+  .content-section {
+    padding: 16px 12px;
+  }
+  
+  .popup-actions.wwdc-actions {
+    padding: 16px 12px;
+  }
+  
+  .tab-button {
+    padding: 12px 8px;
+    font-size: 13px;
+  }
+  
+  .tab-icon {
+    font-size: 14px;
+  }
+  
+  .tab-text {
+    font-size: 11px;
+  }
+}
+
+/* ===== ACCESSIBILITY ENHANCEMENTS ===== */
+
+@media (prefers-reduced-motion: reduce) {
+  .cafe-popup.wwdc-popup,
+  .popup-overlay.wwdc-style,
+  .content-section,
+  .photo-card,
+  .action-btn,
+  .info-card,
+  .review-card,
+  .hours-card {
+    animation: none;
+    transition: none;
+  }
+  
+  .icon-emoji,
+  .status-icon-large,
+  .loading-spinner,
+  .status-dot,
+  .live-dot {
+    animation: none;
+  }
+}
+
+@media (prefers-contrast: high) {
+  .cafe-popup.wwdc-popup {
+    border: 2px solid #000;
+    background: #fff;
+  }
+  
+  .action-btn.primary-action {
+    border: 2px solid;
+  }
+  
+  .info-card,
+  .review-card,
+  .hours-card {
+    border: 1px solid #000;
+  }
+}
+
+/* ===== FOCUS STATES FOR ACCESSIBILITY ===== */
+
+.action-btn:focus,
+.tab-button:focus,
+.close-button:focus {
+  outline: 2px solid #4F46E5;
+  outline-offset: 2px;
+}
+
+.info-card.clickable:focus {
+  outline: 2px solid #4F46E5;
+  outline-offset: 2px;
+  border-radius: 16px;
+}
+
+/* ===== FINAL WWDC ENHANCEMENTS ===== */
+
+/* Popup entrance animation */
+.popup-overlay.wwdc-style.visible .cafe-popup.wwdc-popup {
+  animation: wwdcPopupEntrance 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes wwdcPopupEntrance {
+  0% {
+    opacity: 0;
+    transform: translateY(50px) scale(0.8) rotateX(10deg);
+  }
+  60% {
+    opacity: 0.8;
+    transform: translateY(-10px) scale(1.02) rotateX(-2deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotateX(0deg);
+  }
+}
+
+/* Enhanced loading states */
+.loading-state {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  border-radius: 16px;
+  margin: 20px 0;
+}
+
+/* Success animations */
+.wwdc-success {
+  animation: wwdcSuccessPulse 0.6s ease-out;
+}
+
+@keyframes wwdcSuccessPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+/* Micro-interactions */
+.stat-card:active {
+  transform: scale(0.98);
+}
+
+.photo-card:active {
+  transform: scale(0.95);
+}
+
+.review-card:active {
+  transform: translateY(1px);
+}
