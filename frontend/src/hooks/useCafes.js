@@ -4,7 +4,6 @@
 import { useQuery } from 'react-query';
 import { useRef, useCallback } from 'react';
 import { placesAPI, apiUtils } from '../services/apiService';
-import React, { useState, useEffect } from 'react';
 
 // UPDATED: Ultra-fast hook with perfect type filtering for dark map
 export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
@@ -473,30 +472,18 @@ export const usePlaceSearch = (query, userLocation = null) => {
 };
 
 // UPDATED: Hook for place details with dark map enhancements
-// ENHANCED: Hook for place details with real-time status updates
 export const usePlaceDetails = (placeId, userLocation = null) => {
-  const [currentTime, setCurrentTime] = useState(new Date());
-
-  // Update time every minute for real-time status
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 60000); // Update every minute
-
-    return () => clearInterval(timer);
-  }, []);
-
   const {
     data: place,
     isLoading: loading,
     error,
     refetch
   } = useQuery(
-    ['placeDetails', placeId, Math.floor(currentTime.getTime() / 300000)], // Refetch every 5 minutes
+    ['placeDetails', placeId],
     async () => {
       if (!placeId) return null;
 
-      console.log('📍 Fetching enhanced place details:', placeId);
+      console.log('📍 Fetching place details for dark map:', placeId);
 
       const result = await placesAPI.getPlaceDetails(placeId, userLocation);
       
@@ -506,34 +493,6 @@ export const usePlaceDetails = (placeId, userLocation = null) => {
 
       const formatted = apiUtils.formatPlace(result.place);
       
-      // ENHANCED: Add all the enhanced data from backend
-      formatted.emoji = result.place.emoji || '📍';
-      formatted.displayType = result.place.displayType || 'Locale';
-      formatted.walkingTime = result.place.walkingTime;
-      formatted.italianTips = result.place.italianTips || [];
-      
-      // ENHANCED: Dynamic status with real-time updates
-      formatted.dynamicStatus = result.place.dynamicStatus || {
-        isOpen: null,
-        status: 'Orari non disponibili',
-        statusColor: '#6B7280'
-      };
-      
-      // ENHANCED: Format opening hours for Italian display
-      if (result.place.openingHours) {
-        formatted.openingHours = {
-          ...result.place.openingHours,
-          weekdayTextItalian: formatItalianWeekdays(result.place.openingHours.weekdayText)
-        };
-      }
-
-      // ENHANCED: Enhanced reviews with time formatting
-      formatted.reviews = result.place.reviews?.map(review => ({
-        ...review,
-        timeAgo: review.timeAgo || formatTimeAgo(review.time),
-        ratingStars: '★'.repeat(review.rating) + '☆'.repeat(5 - review.rating)
-      })) || [];
-
       if (userLocation && formatted.location) {
         const distance = apiUtils.calculateDistance(
           userLocation.latitude,
@@ -545,14 +504,23 @@ export const usePlaceDetails = (placeId, userLocation = null) => {
         formatted.formattedDistance = apiUtils.formatDistance(distance);
       }
 
+      // DARK MAP: Enhanced formatting
+      formatted.emoji = formatted.type === 'restaurant' ? '🍽️' : '☕';
+      formatted.displayType = formatted.type === 'restaurant' ? 'Ristorante' : 'Bar/Caffetteria';
+      formatted.darkMapReady = true;
+      
+      if (formatted.rating) {
+        formatted.ratingStars = '★'.repeat(Math.floor(formatted.rating)) + 
+                               '☆'.repeat(5 - Math.floor(formatted.rating));
+      }
+
       return formatted;
     },
     {
       enabled: !!placeId,
-      staleTime: 2 * 60 * 1000,    // 2 minutes stale time
-      cacheTime: 10 * 60 * 1000,   // 10 minutes cache
+      staleTime: 10 * 60 * 1000,
+      cacheTime: 30 * 60 * 1000,
       refetchOnWindowFocus: false,
-      refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes for live status
       retry: 2
     }
   );
@@ -562,39 +530,6 @@ export const usePlaceDetails = (placeId, userLocation = null) => {
     loading,
     error,
     refetch,
-    hasPlace: !!place,
-    currentTime // Export current time for components
+    hasPlace: !!place
   };
-};
-
-// ADDED: Helper function for Italian weekday formatting
-const formatItalianWeekdays = (weekdayText) => {
-  if (!weekdayText || !Array.isArray(weekdayText)) return [];
-  
-  return weekdayText.map(day => {
-    return day
-      .replace(/Monday/g, 'Lunedì')
-      .replace(/Tuesday/g, 'Martedì')
-      .replace(/Wednesday/g, 'Mercoledì')
-      .replace(/Thursday/g, 'Giovedì')
-      .replace(/Friday/g, 'Venerdì')
-      .replace(/Saturday/g, 'Sabato')
-      .replace(/Sunday/g, 'Domenica')
-      .replace(/Closed/g, 'Chiuso')
-      .replace(/Open 24 hours/g, 'Aperto 24 ore');
-  });
-};
-
-const formatTimeAgo = (timestamp) => {
-  if (!timestamp) return null;
-  
-  const now = Date.now() / 1000;
-  const diffSeconds = now - timestamp;
-  
-  if (diffSeconds < 60) return 'Adesso';
-  if (diffSeconds < 3600) return `${Math.floor(diffSeconds / 60)} minuti fa`;
-  if (diffSeconds < 86400) return `${Math.floor(diffSeconds / 3600)} ore fa`;
-  if (diffSeconds < 2592000) return `${Math.floor(diffSeconds / 86400)} giorni fa`;
-  
-  return 'Molto tempo fa';
 };
