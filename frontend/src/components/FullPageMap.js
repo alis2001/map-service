@@ -1,4 +1,4 @@
-// components/FullPageMap.js - UPDATED VERSION with Two Loading Systems
+// components/FullPageMap.js - FIXED VERSION - All Errors Resolved
 // Location: /map-service/frontend/src/components/FullPageMap.js
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
@@ -34,7 +34,6 @@ const FullPageMap = ({
   const markersRef = useRef(new Map());
   const userMarkerRef = useRef(null);
   const radiusCircleRef = useRef(null);
-  // REMOVED: userLocationButtonRef
   
   const [mapLoaded, setMapLoaded] = useState(false);
   const [mapError, setMapError] = useState(null);
@@ -73,14 +72,6 @@ const FullPageMap = ({
     }
   }, [mapLoaded, googleMapsReady, hasInitialLoad]);
 
-  useEffect(() => {
-    if (mapLoaded && googleMapsReady && !hasInitialLoad) {
-      setHasInitialLoad(true);
-      console.log('✅ Initial map load completed');
-    }
-  }, [mapLoaded, googleMapsReady, hasInitialLoad]);
-
-  // UPDATED: Mark initial load as complete
   useEffect(() => {
     if (mapLoaded && googleMapsReady && !hasInitialLoad) {
       setHasInitialLoad(true);
@@ -155,7 +146,6 @@ const FullPageMap = ({
   }, []);
 
   // UPDATED: Much smaller trigger distance for more responsive updates
-  // UPDATED: ULTRA-FAST trigger distance - almost any movement triggers update
   const shouldTriggerNewSearch = useCallback((newCenter) => {
     if (!lastSearchLocationRef.current) {
       return true; // First search
@@ -187,8 +177,8 @@ const FullPageMap = ({
     return hasMovedSignificantly;
   }, [searchRadius]);
 
-  // UPDATED: LIGHTNING-FAST response - almost instant
-  const debouncedCenterChange = useCallback((newCenter) => {
+  // FIXED: Add the missing handleMapCenterChange function
+  const handleMapCenterChange = useCallback((newCenter) => {
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
     }
@@ -219,6 +209,7 @@ const FullPageMap = ({
       }
     }, delay);
   }, [onCenterChange, shouldTriggerNewSearch, hasInitialLoad]);
+
   // NEW: Real-time updates during drag for ultra-responsive feel
   const handleRealTimeDrag = useCallback((newCenter) => {
     // Update search immediately on significant movement during drag
@@ -242,7 +233,6 @@ const FullPageMap = ({
     }
   }, [shouldTriggerNewSearch, onCenterChange]);
 
-  // UPDATED: Minimum display time for loader + smoother hide
   // UPDATED: Shorter minimum display time for faster feel
   useEffect(() => {
     if (!loading && !markersLoading && isMapUpdating) {
@@ -444,8 +434,6 @@ const FullPageMap = ({
 
         await tilesLoadedPromise;
 
-        // REMOVED: createWWDCLocationButton() call
-
         console.log('✅ WWDC-style Google Map loaded successfully');
         
         setMapLoaded(true);
@@ -464,7 +452,7 @@ const FullPageMap = ({
     };
 
     initMap();
-  }, [mapInitialized]);
+  }, [mapInitialized, center.lat, center.lng, zoom, isEmbedMode, checkGoogleMapsAvailability, handleMapCenterChange, hasInitialLoad, selectedCafe, onClosePopup]);
 
   // Update map center only for external changes
   useEffect(() => {
@@ -573,17 +561,6 @@ const FullPageMap = ({
     });
 
     userMarkerRef.current = userMarker;
-    
-    // Update location button state
-    if (userLocationButtonRef.current) {
-      if (locationLoading) {
-        userLocationButtonRef.current.classList.add('loading');
-        userLocationButtonRef.current.classList.remove('has-location');
-      } else {
-        userLocationButtonRef.current.classList.remove('loading');
-        userLocationButtonRef.current.classList.add('has-location');
-      }
-    }
 
     console.log('🎯 WWDC-style blue pulsing user location marker updated');
   }, [userLocation, mapLoaded, locationLoading]);
@@ -754,7 +731,6 @@ const FullPageMap = ({
 
   }, [cafes, mapLoaded, onCafeSelect, cafeType]); // Added cafeType dependency
 
-  // FIXED: Proper color coding - Orange for cafe/bar, Red for restaurant
   // FIXED: Proper color coding - Orange for cafe/bar, Red for restaurant
   const getWWDCVenueColor = (cafe) => {
     // FIXED: All cafes and bars get orange, restaurants get red

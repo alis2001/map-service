@@ -1,4 +1,4 @@
-// App.js - FULLY AUTOMATIC LOCATION & FAST LOADING
+// App.js - FULLY AUTOMATIC LOCATION & FAST LOADING - CLEAN UI
 // Location: /map-service/frontend/src/App.js
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -274,79 +274,7 @@ function MapApp() {
         locationCapability={locationCapability}
       />
 
-      {/* Simplified Status Indicator (No Location Controls) */}
-      {!isEmbedMode && (
-        <div style={{
-          position: 'fixed',
-          bottom: '16px',
-          left: '16px',
-          background: 'rgba(255, 255, 255, 0.9)',
-          backdropFilter: 'blur(10px)',
-          padding: '8px 12px',
-          borderRadius: '20px',
-          fontSize: '12px',
-          color: '#6B7280',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-          zIndex: 1000
-        }}>
-          <div style={{
-            width: '8px',
-            height: '8px',
-            borderRadius: '50%',
-            background: 
-              !backendReady ? '#EF4444' :
-              hasLocation && userLocation?.source === 'gps' ? '#10B981' :
-              hasLocation && userLocation?.source === 'browser' ? '#8B5CF6' :
-              hasLocation && userLocation?.source === 'cache' ? '#F59E0B' : '#6B7280'
-          }} />
-          <span>
-            {!backendReady ? '🔴 Offline' :
-            hasLocation && userLocation?.source === 'gps' ? '📍 GPS' :
-            hasLocation && userLocation?.source === 'browser' ? '🌐 Rete' :
-            hasLocation && userLocation?.source === 'cache' ? '💾 Cache' :
-            isDetecting ? '🔄 Ricerca...' :
-            '📍 Predefinita'}
-            {userLocation?.accuracy && userLocation.accuracy < 100 && (
-              <span style={{ color: '#10B981', fontWeight: '600', marginLeft: '4px' }}>
-                ±{Math.round(userLocation.accuracy)}m
-              </span>
-            )}
-          </span>
-        </div>
-      )}
-
-      {/* Debug Info (Development Only) */}
-      {process.env.NODE_ENV === 'development' && (
-        <div style={{
-          position: 'fixed',
-          top: '16px',
-          left: '16px',
-          background: 'rgba(0, 0, 0, 0.8)',
-          color: 'white',
-          padding: '8px',
-          borderRadius: '8px',
-          fontSize: '10px',
-          fontFamily: 'monospace',
-          zIndex: 1001,
-          maxWidth: '200px'
-        }}>
-          <div>Detecting: {isDetecting ? 'Yes' : 'No'}</div>
-          <div>Method: {detectionMethod}</div>
-          <div>Capability: {locationCapability}</div>
-          <div>Source: {sourceText}</div>
-          <div>Quality: {qualityText}</div>
-          {userLocation && (
-            <>
-              <div>Lat: {userLocation.latitude.toFixed(6)}</div>
-              <div>Lng: {userLocation.longitude.toFixed(6)}</div>
-              <div>Acc: {Math.round(userLocation.accuracy || 0)}m</div>
-            </>
-          )}
-        </div>
-      )}
+      {/* All debug boxes completely removed */}
     </div>
   );
 }
