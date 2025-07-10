@@ -667,6 +667,7 @@ const FullPageMap = ({
   };
 
   // 🚀 INSTANT MARKER RENDERING with Enhanced Dark Map Markers
+  // 🚀 INSTANT MARKER RENDERING with Enhanced Dark Map Markers
   useEffect(() => {
     if (!googleMapRef.current || !mapLoaded) return;
 
@@ -686,11 +687,19 @@ const FullPageMap = ({
     markersRef.current.clear();
     activeMarkersRef.current.clear();
 
-    // INSTANT FILTER - Perfect type matching
+    // IMPROVED FILTERING - Check both type and placeType fields
     const perfectlyFilteredCafes = cafes.filter(cafe => {
       const cafeType_raw = cafe.type || cafe.placeType || '';
       const cafeType_normalized = cafeType_raw.toLowerCase().trim();
       const selectedType_normalized = currentFilterRef.current.toLowerCase().trim();
+      
+      console.log('🔍 FILTERING PLACE:', {
+        name: cafe.name,
+        rawType: cafeType_raw,
+        normalizedType: cafeType_normalized,
+        selectedType: selectedType_normalized,
+        matches: cafeType_normalized === selectedType_normalized
+      });
       
       return cafeType_normalized === selectedType_normalized;
     });
@@ -705,6 +714,7 @@ const FullPageMap = ({
     // 🎨 ENHANCED DARK MAP MARKER CREATION
     perfectlyFilteredCafes.forEach((cafe, index) => {
       if (!cafe.location || !cafe.location.latitude || !cafe.location.longitude) {
+        console.warn('⚠️ Skipping place with missing coordinates:', cafe.name);
         return;
       }
 

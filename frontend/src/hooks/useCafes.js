@@ -65,8 +65,13 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
         });
 
         // ENHANCED: Process all places with dark map optimizations
+        // ENHANCED: Process all places with dark map optimizations
         const enhancedCafes = (result.cafePlaces || []).map(place => {
           const formatted = apiUtils.formatPlace(place);
+          
+          // ENSURE proper type assignment
+          formatted.type = 'cafe';
+          formatted.placeType = 'cafe';
           
           if (latitude && longitude && formatted.location) {
             const distance = apiUtils.calculateDistance(
@@ -86,11 +91,11 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
           formatted.markerSize = getMarkerSize(formatted.distance);
           formatted.isVeryClose = formatted.distance && formatted.distance < 200;
           formatted.walkingTime = getWalkingTime(formatted.distance);
-          formatted.darkMapReady = true; // Flag for dark map compatibility
+          formatted.darkMapReady = true;
           
           if (formatted.rating) {
             formatted.ratingStars = '★'.repeat(Math.floor(formatted.rating)) + 
-                                   '☆'.repeat(5 - Math.floor(formatted.rating));
+                                  '☆'.repeat(5 - Math.floor(formatted.rating));
             formatted.ratingText = `${formatted.rating}/5`;
           }
 
@@ -99,6 +104,10 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
 
         const enhancedRestaurants = (result.restaurantPlaces || []).map(place => {
           const formatted = apiUtils.formatPlace(place);
+          
+          // ENSURE proper type assignment
+          formatted.type = 'restaurant';
+          formatted.placeType = 'restaurant';
           
           if (latitude && longitude && formatted.location) {
             const distance = apiUtils.calculateDistance(
@@ -118,11 +127,11 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
           formatted.markerSize = getMarkerSize(formatted.distance);
           formatted.isVeryClose = formatted.distance && formatted.distance < 200;
           formatted.walkingTime = getWalkingTime(formatted.distance);
-          formatted.darkMapReady = true; // Flag for dark map compatibility
+          formatted.darkMapReady = true;
           
           if (formatted.rating) {
             formatted.ratingStars = '★'.repeat(Math.floor(formatted.rating)) + 
-                                   '☆'.repeat(5 - Math.floor(formatted.rating));
+                                  '☆'.repeat(5 - Math.floor(formatted.rating));
             formatted.ratingText = `${formatted.rating}/5`;
           }
 
@@ -284,6 +293,13 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
   // EXTRACT DATA based on requested type for instant filtering
   const getFilteredPlaces = () => {
     if (!data) return [];
+    
+    console.log('🎯 FILTERING PLACES:', {
+      requestedType: type,
+      totalPlaces: data.places?.length || 0,
+      cafePlaces: data.cafePlaces?.length || 0,
+      restaurantPlaces: data.restaurantPlaces?.length || 0
+    });
     
     switch (type) {
       case 'cafe':

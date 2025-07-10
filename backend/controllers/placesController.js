@@ -198,6 +198,7 @@ class PlacesController {
 
   // FIXED: Get detailed information about a specific place - NOW PROPERLY IMPLEMENTED
   // ENHANCED: Get detailed information about a specific place with real-time status
+  // ENHANCED: Get detailed information about a specific place with better error handling
   getPlaceDetails = asyncHandler(async (req, res) => {
     const { placeId } = req.params;
     const { latitude, longitude } = req.query;
@@ -220,61 +221,88 @@ class PlacesController {
         };
       }
 
-      console.log('📍 Getting enhanced place details with real-time status:', {
+      console.log('📍 Getting place details with error handling:', {
         placeId,
         userLocation: userLocation ? 'provided' : 'not provided'
       });
 
-      // ENHANCED: Use the new enhanced place details function
-      const { getEnhancedPlaceDetails } = require('../config/googlePlaces');
-      const place = await getEnhancedPlaceDetails(placeId, userLocation);
+      try {
+        // Try to get place details from Google Places API
+        const place = await googlePlacesService.getPlaceById(placeId, {
+          includeReviews: true,
+          userLocation
+        });
 
-      if (!place) {
-        return errorResponse(res, 'Place not found', 404, 'PLACE_NOT_FOUND');
+        if (!place) {
+          return errorResponse(res, 'Place not found', 404, 'PLACE_NOT_FOUND');
+        }
+
+        // Enhanced place data formatting
+        const enhancedPlace = {
+          ...place,
+          emoji: getItalianVenueEmoji(place),
+          displayType: getItalianVenueDisplayType(place.types || place.type),
+          
+          // Add walking information
+          walkingTime: userLocation && place.distance ? 
+            calculateWalkingTime(place.distance) : null,
+          
+          // Add contextual tips
+          italianTips: getItalianVenueTips(place),
+          
+          // Format reviews for Italian context
+          reviews: place.reviews ? place.reviews.map(review => ({
+            ...review,
+            timeAgo: formatTimeAgo(review.time)
+          })) : []
+        };
+
+        logger.info('Place details retrieved successfully', {
+          placeId,
+          placeName: place.name,
+          userLocation: userLocation ? 'provided' : 'not provided'
+        });
+
+        return successResponse(res, enhancedPlace, 'Place details retrieved successfully');
+
+      } catch (apiError) {
+        // Handle specific API errors gracefully
+        console.warn('⚠️ Google Places API error for place details:', apiError.message);
+        
+        // Try to get basic place info from database as fallback
+        try {
+          const fallbackPlace = await prisma.place.findUnique({
+            where: { googlePlaceId: placeId }
+          });
+
+          if (fallbackPlace) {
+            console.log('📦 Using cached place data as fallback');
+            
+            const basicPlace = {
+              ...fallbackPlace,
+              emoji: getItalianVenueEmoji(fallbackPlace),
+              displayType: getItalianVenueDisplayType(fallbackPlace.placeType),
+              source: 'cache',
+              reviews: [],
+              photos: fallbackPlace.photos || [],
+              photoUrls: { thumbnail: [], medium: [], large: [] }
+            };
+
+            return successResponse(res, basicPlace, 'Place details retrieved from cache');
+          }
+        } catch (dbError) {
+          console.warn('⚠️ Database fallback also failed:', dbError.message);
+        }
+
+        // If all else fails, return a minimal error response
+        return errorResponse(res, 'Place details temporarily unavailable', 503, 'SERVICE_UNAVAILABLE');
       }
 
-      // ENHANCED: Add Italian venue context
-      const enhancedPlace = {
-        ...place,
-        emoji: getItalianVenueEmoji(place),
-        displayType: getItalianVenueDisplayType(place.types),
-        
-        // ENHANCED: Add walking information
-        walkingTime: userLocation && place.distance ? 
-          calculateWalkingTime(place.distance) : null,
-        
-        // ENHANCED: Add contextual tips
-        italianTips: getItalianVenueTips(place),
-        
-        // ENHANCED: Format reviews for Italian context
-        reviews: place.reviews ? place.reviews.map(review => ({
-          ...review,
-          timeAgo: formatTimeAgo(review.time)
-        })) : []
-      };
-
-      logger.info('Enhanced place details retrieved', {
-        placeId,
-        placeName: place.name,
-        isOpen: place.dynamicStatus?.isOpen,
-        userLocation: userLocation ? 'provided' : 'not provided'
-      });
-
-      return successResponse(res, enhancedPlace, 'Place details retrieved successfully');
-
     } catch (error) {
-      logger.error('Failed to get enhanced place details', {
+      logger.error('Failed to get place details', {
         placeId,
         error: error.message
       });
-
-      if (error.message.includes('Google Places API')) {
-        return errorResponse(res, 'Places service temporarily unavailable', 503, 'SERVICE_UNAVAILABLE');
-      }
-
-      if (error.message.includes('not found')) {
-        return errorResponse(res, 'Place not found', 404, 'PLACE_NOT_FOUND');
-      }
 
       return errorResponse(res, 'Failed to get place details', 500, 'PLACE_DETAILS_ERROR');
     }

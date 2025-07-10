@@ -9,7 +9,16 @@ const { cache } = require('./redis');
 const googleMapsClient = new Client({});
 
 // FIXED: Get API key directly from environment
-const getApiKey = () => process.env.GOOGLE_PLACES_API_KEY;
+// FIXED: Get API key directly from environment
+const getApiKey = () => {
+  const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+  if (!apiKey) {
+    console.error('❌ GOOGLE_PLACES_API_KEY not found in environment variables');
+    return null;
+  }
+  console.log('✅ Google Places API key loaded:', apiKey ? `${apiKey.substring(0, 8)}...` : 'MISSING');
+  return apiKey;
+};
 
 // FIXED: Configuration with environment variable access
 const getConfig = () => ({
@@ -102,6 +111,7 @@ async function makeRateLimitedRequest(requestFunction) {
 }
 
 // FIXED: Validate API key on startup
+// FIXED: Validate API key on startup
 const validateApiKey = async () => {
   const apiKey = getApiKey();
   
@@ -111,11 +121,12 @@ const validateApiKey = async () => {
   }
   
   try {
+    console.log('🔑 Validating Google Places API key...');
     // Test API key with a simple request
     const response = await makeRateLimitedRequest(async () => {
       return await googleMapsClient.placesNearby({
         params: {
-          key: apiKey, // ✅ FIXED
+          key: apiKey,
           location: { lat: 45.0703, lng: 7.6869 }, // Turin coordinates
           radius: 100,
           type: 'cafe'
@@ -125,12 +136,14 @@ const validateApiKey = async () => {
     
     if (response.status === 200) {
       logger.info('Google Places API key validated successfully');
+      console.log('✅ Google Places API key is valid');
       return true;
     } else {
       logger.error('Google Places API key validation failed', {
         status: response.status,
         statusText: response.statusText
       });
+      console.error('❌ Google Places API key validation failed');
       return false;
     }
   } catch (error) {
@@ -138,6 +151,7 @@ const validateApiKey = async () => {
       error: error.message,
       code: error.code
     });
+    console.error('❌ Google Places API key validation error:', error.message);
     return false;
   }
 };
