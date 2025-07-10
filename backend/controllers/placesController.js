@@ -196,8 +196,6 @@ class PlacesController {
     }
   });
 
-  // FIXED: Get detailed information about a specific place - NOW PROPERLY IMPLEMENTED
-  // ENHANCED: Get detailed information about a specific place with real-time status
   getPlaceDetails = asyncHandler(async (req, res) => {
     const { placeId } = req.params;
     const { latitude, longitude } = req.query;
@@ -220,50 +218,49 @@ class PlacesController {
         };
       }
 
-      console.log('📍 Getting enhanced place details with real-time status:', {
+      console.log('📍 Getting place details:', {
         placeId,
         userLocation: userLocation ? 'provided' : 'not provided'
       });
 
-      // ENHANCED: Use the new enhanced place details function
-      const { getEnhancedPlaceDetails } = require('../config/googlePlaces');
-      const place = await getEnhancedPlaceDetails(placeId, userLocation);
+      // FIXED: Use the correct Google Places service method
+      const place = await googlePlacesService.getPlaceById(placeId, {
+        userLocation,
+        includeReviews: true
+      });
 
       if (!place) {
         return errorResponse(res, 'Place not found', 404, 'PLACE_NOT_FOUND');
       }
 
-      // ENHANCED: Add Italian venue context
+      // Add Italian venue context
       const enhancedPlace = {
         ...place,
-        emoji: getItalianVenueEmoji(place),
-        displayType: getItalianVenueDisplayType(place.types),
         
-        // ENHANCED: Add walking information
+        // Add walking information
         walkingTime: userLocation && place.distance ? 
           calculateWalkingTime(place.distance) : null,
         
-        // ENHANCED: Add contextual tips
+        // Add contextual tips
         italianTips: getItalianVenueTips(place),
         
-        // ENHANCED: Format reviews for Italian context
+        // Format reviews for Italian context
         reviews: place.reviews ? place.reviews.map(review => ({
           ...review,
           timeAgo: formatTimeAgo(review.time)
         })) : []
       };
 
-      logger.info('Enhanced place details retrieved', {
+      logger.info('Place details retrieved', {
         placeId,
         placeName: place.name,
-        isOpen: place.dynamicStatus?.isOpen,
         userLocation: userLocation ? 'provided' : 'not provided'
       });
 
       return successResponse(res, enhancedPlace, 'Place details retrieved successfully');
 
     } catch (error) {
-      logger.error('Failed to get enhanced place details', {
+      logger.error('Failed to get place details', {
         placeId,
         error: error.message
       });

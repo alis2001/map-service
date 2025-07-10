@@ -583,6 +583,7 @@ class GooglePlacesService {
         }
       }
 
+      // First check if place exists in database
       let place = await prisma.place.findUnique({
         where: { googlePlaceId: placeId }
       });
@@ -590,6 +591,7 @@ class GooglePlacesService {
       if (place) {
         console.log('💾 FOUND PLACE IN DATABASE, ENHANCING WITH GOOGLE DATA');
         
+        // Only fetch from Google if API key is valid
         if (this.apiKeyValid) {
           try {
             console.log('🌐 FETCHING FRESH GOOGLE PLACE DETAILS...');
@@ -603,47 +605,83 @@ class GooglePlacesService {
               hasReviews: !!(googleDetails.reviews && googleDetails.reviews.length > 0)
             });
 
+            // Generate photo URLs
             const photoUrls = this.generatePhotoUrls(googleDetails.photos);
+            
+            // Format opening hours
             const formattedHours = this.formatOpeningHours(googleDetails.openingHours);
 
+            // Merge database place with Google details
             const enhancedPlace = {
               ...place,
-              ...googleDetails,
+              // Keep database values as primary
               id: place.id,
               googlePlaceId: place.googlePlaceId,
-              lastUpdated: place.lastUpdated,
+              name: place.name,
+              address: place.address,
+              latitude: place.latitude,
+              longitude: place.longitude,
+              placeType: place.placeType,
+              
+              // Enhance with Google data
+              rating: googleDetails.rating || place.rating,
+              priceLevel: googleDetails.priceLevel || place.priceLevel,
+              phoneNumber: googleDetails.phoneNumber || place.phoneNumber,
+              website: googleDetails.website || place.website,
+              businessStatus: googleDetails.businessStatus || place.businessStatus,
+              
+              // Add enhanced data
               photoUrls: photoUrls,
               openingHours: formattedHours,
               photos: googleDetails.photos || place.photos || [],
-              phoneNumber: googleDetails.phoneNumber || place.phoneNumber,
-              website: googleDetails.website || place.website,
-              reviews: includeReviews ? (googleDetails.reviews || []) : []
+              reviews: includeReviews ? (googleDetails.reviews || []) : [],
+              types: googleDetails.types || place.types || [],
+              
+              // Metadata
+              lastUpdated: place.lastUpdated,
+              createdAt: place.createdAt
             };
 
-            await prisma.place.update({
-              where: { id: place.id },
-              data: {
-                rating: enhancedPlace.rating || place.rating,
-                phoneNumber: enhancedPlace.phoneNumber || place.phoneNumber,
-                website: enhancedPlace.website || place.website,
-                openingHours: formattedHours || place.openingHours,
-                photos: enhancedPlace.photos || place.photos,
-                lastUpdated: new Date()
-              }
-            });
+            // Update database with fresh Google data
+            try {
+              await prisma.place.update({
+                where: { id: place.id },
+                data: {
+                  rating: enhancedPlace.rating,
+                  phoneNumber: enhancedPlace.phoneNumber,
+                  website: enhancedPlace.website,
+                  openingHours: formattedHours,
+                  photos: enhancedPlace.photos,
+                  businessStatus: enhancedPlace.businessStatus,
+                  lastUpdated: new Date()
+                }
+              });
+              console.log('💾 Updated database with fresh Google data');
+            } catch (updateError) {
+              console.warn('⚠️ Failed to update database:', updateError.message);
+            }
 
             place = enhancedPlace;
             
           } catch (googleError) {
             console.warn('⚠️ Failed to fetch Google details:', googleError.message);
+            
+            // Use database data with basic formatting
             place.photoUrls = this.generatePhotoUrls([]);
             place.openingHours = this.formatOpeningHours(place.openingHours);
+            place.photos = place.photos || [];
+            place.reviews = [];
           }
         } else {
+          // API key invalid, use database data only
+          console.log('⚠️ Google API unavailable, using database data only');
           place.photoUrls = this.generatePhotoUrls([]);
           place.openingHours = this.formatOpeningHours(place.openingHours);
+          place.photos = place.photos || [];
+          place.reviews = [];
         }
       } else {
+        // Place not in database, fetch from Google
         if (!this.apiKeyValid) {
           throw new Error('Place not found and Google Places API unavailable');
         }
@@ -656,28 +694,44 @@ class GooglePlacesService {
           throw new Error('Place not found');
         }
 
+        // Format Google place data
         googlePlace.photoUrls = this.generatePhotoUrls(googlePlace.photos);
         googlePlace.openingHours = this.formatOpeningHours(googlePlace.openingHours);
 
+        // Detect venue type
         const detectedType = this.detectItalianVenueType(googlePlace);
-        place = await this.saveOrUpdatePlace(googlePlace, detectedType);
         
-        place.photoUrls = googlePlace.photoUrls;
-        place.openingHours = googlePlace.openingHours;
-        place.photos = googlePlace.photos || [];
-        place.reviews = includeReviews ? (googlePlace.reviews || []) : [];
+        // Save to database
+        try {
+          place = await this.saveOrUpdatePlace(googlePlace, detectedType);
+          
+          // Add enhanced data to the saved place
+          place.photoUrls = googlePlace.photoUrls;
+          place.openingHours = googlePlace.openingHours;
+          place.photos = googlePlace.photos || [];
+          place.reviews = includeReviews ? (googlePlace.reviews || []) : [];
+          place.types = googlePlace.types || [];
+        } catch (saveError) {
+          console.warn('⚠️ Failed to save place to database:', saveError.message);
+          place = googlePlace;
+        }
       }
 
+      // Format the final response
       const formatted = formatPlace(place, userLocation);
       
-      formatted.emoji = this.getItalianVenueEmoji(formatted.placeType, formatted.name);
-      formatted.displayType = this.getItalianVenueDisplayType(formatted.placeType);
+      // Add Italian venue context
+      formatted.emoji = this.getItalianVenueEmoji(formatted.placeType || formatted.type, formatted.name);
+      formatted.displayType = this.getItalianVenueDisplayType(formatted.placeType || formatted.type);
 
+      // Ensure we have the enhanced data
       formatted.photoUrls = place.photoUrls || this.generatePhotoUrls([]);
       formatted.openingHours = place.openingHours;
       formatted.photos = place.photos || [];
       formatted.reviews = place.reviews || [];
+      formatted.types = place.types || [];
 
+      // Calculate distance if user location provided
       if (userLocation && formatted.location) {
         const distance = calculateDistance(
           userLocation.latitude,
@@ -689,6 +743,7 @@ class GooglePlacesService {
         formatted.formattedDistance = formatDistance(distance);
       }
 
+      // Cache the result
       if (SERVICE_CONFIG.cacheEnabled) {
         await redisService.cachePlaceDetails(placeId, formatted);
       }
@@ -697,7 +752,8 @@ class GooglePlacesService {
         placeId,
         name: formatted.name,
         hasPhotos: !!(formatted.photoUrls && Object.keys(formatted.photoUrls).some(size => formatted.photoUrls[size].length > 0)),
-        hasHours: !!formatted.openingHours
+        hasHours: !!formatted.openingHours,
+        hasReviews: !!(formatted.reviews && formatted.reviews.length > 0)
       });
 
       return formatted;
