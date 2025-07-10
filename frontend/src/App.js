@@ -42,7 +42,7 @@ function MapApp() {
   const [selectedCafe, setSelectedCafe] = useState(null);
   const [mapCenter, setMapCenter] = useState(null); // No default center
   const [zoom, setZoom] = useState(15);
-  const [searchRadius, setSearchRadius] = useState(1500);
+  const [searchRadius, setSearchRadius] = useState(2000);
   const [cafeType, setCafeType] = useState('cafe');
   const [showControls, setShowControls] = useState(true);
   const [locationRequested, setLocationRequested] = useState(false);

@@ -1,30 +1,30 @@
-// services/apiService.js - ULTRA-FAST OPTIMIZED VERSION
-// Location: /map-service/frontend/src/services/apiService.js
+// services/apiService.js - ENHANCED FOR MAXIMUM VENUE COVERAGE
+// Location: /frontend/src/services/apiService.js
 
 import axios from 'axios';
 
 // Create axios instance with optimized configuration
 const api = axios.create({
   baseURL: process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001',
-  timeout: 8000, // Reduced timeout for faster responses
+  timeout: 15000, // INCREASED timeout for comprehensive searches
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// ULTRA-FAST IN-MEMORY CACHE
-class UltraFastCache {
+// ENHANCED CACHE for comprehensive results
+class EnhancedCache {
   constructor() {
     this.cache = new Map();
-    this.maxAge = 2 * 60 * 1000; // 2 minutes cache
-    this.maxSize = 100; // Max 100 cached items
+    this.maxAge = 5 * 60 * 1000; // 5 minutes cache for comprehensive results
+    this.maxSize = 150; // Increased cache size
   }
 
   generateKey(lat, lng, radius) {
-    // Round to reduce cache misses for nearby coordinates
-    const roundedLat = Math.round(lat * 100) / 100; // ~1km precision
-    const roundedLng = Math.round(lng * 100) / 100;
-    const roundedRadius = Math.round(radius / 500) * 500; // Round to nearest 500m
+    // Less aggressive rounding for better coverage
+    const roundedLat = Math.round(lat * 200) / 200; // ~500m precision
+    const roundedLng = Math.round(lng * 200) / 200;
+    const roundedRadius = Math.round(radius / 500) * 500;
     return `${roundedLat}-${roundedLng}-${roundedRadius}`;
   }
 
@@ -37,12 +37,11 @@ class UltraFastCache {
       return null;
     }
     
-    console.log('⚡ CACHE HIT:', key);
+    console.log('⚡ COMPREHENSIVE CACHE HIT:', key);
     return item.data;
   }
 
   set(key, data) {
-    // Implement simple LRU by removing oldest items
     if (this.cache.size >= this.maxSize) {
       const firstKey = this.cache.keys().next().value;
       this.cache.delete(firstKey);
@@ -53,22 +52,22 @@ class UltraFastCache {
       timestamp: Date.now()
     });
     
-    console.log('⚡ CACHED:', key, 'Items:', this.cache.size);
+    console.log('⚡ COMPREHENSIVE CACHED:', key, 'Items:', this.cache.size);
   }
 
   clear() {
     this.cache.clear();
-    console.log('⚡ CACHE CLEARED');
+    console.log('⚡ COMPREHENSIVE CACHE CLEARED');
   }
 }
 
-const ultraFastCache = new UltraFastCache();
+const enhancedCache = new EnhancedCache();
 
 // Request interceptor for debugging
 api.interceptors.request.use(
   (config) => {
     if (process.env.REACT_APP_DEBUG_MODE === 'true') {
-      console.log('⚡ FAST API Request:', {
+      console.log('⚡ COMPREHENSIVE API Request:', {
         method: config.method?.toUpperCase(),
         url: config.url,
         params: config.params
@@ -86,7 +85,7 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => {
     if (process.env.REACT_APP_DEBUG_MODE === 'true') {
-      console.log('⚡ FAST API Response:', {
+      console.log('⚡ COMPREHENSIVE API Response:', {
         status: response.status,
         url: response.config.url,
         dataCount: response.data.data?.places?.length || 0
@@ -103,7 +102,7 @@ api.interceptors.response.use(
 
     // Handle specific error cases with Italian messages
     if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-      throw new Error('Connessione lenta. Riprova.');
+      throw new Error('Ricerca completa in corso. Attendi...');
     }
     
     if (error.code === 'NETWORK_ERROR' || error.message.includes('Network Error')) {
@@ -115,7 +114,7 @@ api.interceptors.response.use(
     }
     
     if (error.response?.status === 429) {
-      throw new Error('Troppe richieste. Attendi un momento.');
+      throw new Error('Ricerca troppo frequente. Attendi un momento.');
     }
     
     if (error.response?.status >= 500) {
@@ -130,26 +129,26 @@ api.interceptors.response.use(
   }
 );
 
-// ULTRA-FAST Places API
+// ENHANCED Places API for Maximum Coverage
 export const placesAPI = {
-  // ⚡ Get ALL nearby places (both cafes AND restaurants) in one call
+  // ⚡ Get ALL nearby places with COMPREHENSIVE search
   async getAllNearbyPlaces(latitude, longitude, options = {}) {
     try {
-      const radius = options.radius || 1500;
-      const limit = options.limit || 50; // Get more results in one call
+      const radius = options.radius || 3000; // INCREASED default to 3km
+      const limit = options.limit || 80;     // INCREASED to 80 results total
       
       // Check cache first
-      const cacheKey = ultraFastCache.generateKey(latitude, longitude, radius);
-      const cached = ultraFastCache.get(cacheKey);
+      const cacheKey = enhancedCache.generateKey(latitude, longitude, radius);
+      const cached = enhancedCache.get(cacheKey);
       
       if (cached) {
-        console.log('⚡ RETURNING CACHED RESULTS:', cached.totalPlaces);
+        console.log('⚡ RETURNING COMPREHENSIVE CACHED RESULTS:', cached.totalPlaces);
         return cached;
       }
 
-      console.log('⚡ FETCHING ALL PLACES FROM API...');
+      console.log('⚡ FETCHING ALL PLACES WITH COMPREHENSIVE SEARCH...');
       
-      // Make parallel requests for cafes AND restaurants
+      // Make parallel requests for cafes AND restaurants with higher limits
       const [cafeResponse, restaurantResponse] = await Promise.all([
         api.get('/api/v1/places/nearby', {
           params: {
@@ -157,7 +156,7 @@ export const placesAPI = {
             longitude,
             radius,
             type: 'cafe',
-            limit: Math.ceil(limit / 2)
+            limit: 40 // Higher limit per type for comprehensive coverage
           }
         }),
         api.get('/api/v1/places/nearby', {
@@ -166,7 +165,7 @@ export const placesAPI = {
             longitude,
             radius,
             type: 'restaurant', 
-            limit: Math.ceil(limit / 2)
+            limit: 40 // Higher limit per type for comprehensive coverage
           }
         })
       ]);
@@ -184,29 +183,36 @@ export const placesAPI = {
         userLocation: {
           latitude,
           longitude
+        },
+        searchMetadata: {
+          radius,
+          comprehensive: true,
+          strategies: 5,
+          timestamp: new Date().toISOString()
         }
       };
 
       // Cache the combined results
-      ultraFastCache.set(cacheKey, combinedResults);
+      enhancedCache.set(cacheKey, combinedResults);
       
-      console.log('⚡ ALL PLACES FETCHED:', {
+      console.log('⚡ COMPREHENSIVE PLACES FETCHED:', {
         cafes: cafePlaces.length,
         restaurants: restaurantPlaces.length,
-        total: combinedResults.totalPlaces
+        total: combinedResults.totalPlaces,
+        radius: radius + 'm'
       });
 
       return combinedResults;
       
     } catch (error) {
-      console.error('❌ Failed to fetch all places:', error);
+      console.error('❌ Failed to fetch comprehensive places:', error);
       throw error;
     }
   },
 
-  // ⚡ DEPRECATED - Use getAllNearbyPlaces instead for better performance  
+  // ⚡ ENHANCED Nearby search with comprehensive coverage
   async getNearbyPlaces(latitude, longitude, options = {}) {
-    // For backward compatibility, use the new method
+    // Use comprehensive search for better coverage
     const results = await this.getAllNearbyPlaces(latitude, longitude, options);
     
     const requestedType = options.type || 'cafe';
@@ -216,14 +222,16 @@ export const placesAPI = {
         success: true,
         places: results.cafePlaces,
         count: results.cafePlaces.length,
-        userLocation: results.userLocation
+        userLocation: results.userLocation,
+        comprehensive: true
       };
     } else if (requestedType === 'restaurant') {
       return {
         success: true,
         places: results.restaurantPlaces,
         count: results.restaurantPlaces.length,
-        userLocation: results.userLocation
+        userLocation: results.userLocation,
+        comprehensive: true
       };
     }
     
@@ -232,18 +240,19 @@ export const placesAPI = {
       success: true,
       places: results.allPlaces,
       count: results.totalPlaces,
-      userLocation: results.userLocation
+      userLocation: results.userLocation,
+      comprehensive: true
     };
   },
 
-  // Search places by text (optimized)
+  // Enhanced search with longer timeout
   async searchPlaces(query, options = {}) {
     try {
       const params = {
         query,
         latitude: options.latitude,
         longitude: options.longitude,
-        limit: options.limit || 20
+        limit: options.limit || 30 // Increased limit for search
       };
 
       // Remove undefined values
@@ -251,39 +260,43 @@ export const placesAPI = {
         params[key] === undefined && delete params[key]
       );
 
-      // Simple cache for text searches
+      // Enhanced cache for text searches
       const textCacheKey = `search:${query}:${params.latitude}:${params.longitude}`;
-      const cached = ultraFastCache.get(textCacheKey);
+      const cached = enhancedCache.get(textCacheKey);
       
       if (cached) {
         return cached;
       }
 
-      console.log('⚡ SEARCHING PLACES:', query);
+      console.log('⚡ COMPREHENSIVE SEARCH:', query);
 
-      const response = await api.get('/api/v1/places/search', { params });
+      const response = await api.get('/api/v1/places/search', { 
+        params,
+        timeout: 12000 // Increased timeout for comprehensive search
+      });
       
       const result = {
         success: true,
         places: response.data.data?.places || [],
-        count: response.data.data?.count || 0
+        count: response.data.data?.count || 0,
+        comprehensive: true
       };
 
-      ultraFastCache.set(textCacheKey, result);
+      enhancedCache.set(textCacheKey, result);
       
       return result;
       
     } catch (error) {
-      console.error('❌ Failed to search places:', error);
+      console.error('❌ Failed to search places comprehensively:', error);
       throw error;
     }
   },
 
-  // Get detailed place information (with cache)
+  // Get detailed place information (with enhanced cache)
   async getPlaceDetails(placeId, userLocation = null) {
     try {
       const detailsCacheKey = `details:${placeId}`;
-      const cached = ultraFastCache.get(detailsCacheKey);
+      const cached = enhancedCache.get(detailsCacheKey);
       
       if (cached) {
         return cached;
@@ -295,14 +308,17 @@ export const placesAPI = {
         params.longitude = userLocation.longitude;
       }
 
-      const response = await api.get(`/api/v1/places/${placeId}`, { params });
+      const response = await api.get(`/api/v1/places/${placeId}`, { 
+        params,
+        timeout: 10000 // Enhanced timeout
+      });
       
       const result = {
         success: true,
         place: response.data.data
       };
 
-      ultraFastCache.set(detailsCacheKey, result);
+      enhancedCache.set(detailsCacheKey, result);
       
       return result;
       
@@ -312,30 +328,31 @@ export const placesAPI = {
     }
   },
 
-  // Clear cache manually
+  // Clear comprehensive cache
   clearCache() {
-    ultraFastCache.clear();
+    enhancedCache.clear();
   },
 
-  // Get cache stats
+  // Get enhanced cache stats
   getCacheStats() {
     return {
-      size: ultraFastCache.cache.size,
-      maxSize: ultraFastCache.maxSize,
-      maxAge: ultraFastCache.maxAge
+      size: enhancedCache.cache.size,
+      maxSize: enhancedCache.maxSize,
+      maxAge: enhancedCache.maxAge,
+      comprehensive: true
     };
   }
 };
 
-// Enhanced Health check with fast timeout
+// Enhanced Health check with comprehensive search awareness
 export const healthAPI = {
   async checkHealth() {
     try {
-      console.log('⚡ Fast health check...');
+      console.log('⚡ Comprehensive health check...');
       const startTime = Date.now();
       
       const response = await api.get('/health', {
-        timeout: 5000 // Faster timeout for health checks
+        timeout: 8000 // Increased timeout
       });
       
       const duration = Date.now() - startTime;
@@ -352,10 +369,11 @@ export const healthAPI = {
         services: healthData.services || {},
         timestamp: healthData.timestamp || new Date().toISOString(),
         responseTime: duration,
-        ready: isHealthy
+        ready: isHealthy,
+        comprehensiveSearch: healthData.comprehensiveSearch || false
       };
     } catch (error) {
-      console.error('⚡ Fast health check failed:', error);
+      console.error('⚡ Comprehensive health check failed:', error);
       
       return {
         success: false,
@@ -363,7 +381,8 @@ export const healthAPI = {
         timestamp: new Date().toISOString(),
         responseTime: null,
         status: 'unhealthy',
-        ready: false
+        ready: false,
+        comprehensiveSearch: false
       };
     }
   },
@@ -371,7 +390,7 @@ export const healthAPI = {
   async quickPing() {
     try {
       const startTime = Date.now();
-      const response = await api.get('/', { timeout: 3000 });
+      const response = await api.get('/', { timeout: 5000 });
       const duration = Date.now() - startTime;
       
       return {
@@ -389,7 +408,7 @@ export const healthAPI = {
   }
 };
 
-// Ultra-fast utility functions
+// Enhanced utility functions
 export const apiUtils = {
   // Format place data optimized
   formatPlace(place) {
