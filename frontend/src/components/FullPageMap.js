@@ -57,6 +57,7 @@ const FullPageMap = ({
   const activeMarkersRef = useRef(new Set());
 
   // ⚡ INSTANT TRIGGER DISTANCE
+  // ⚡ UPDATED: Less aggressive triggering to avoid rate limits
   const shouldTriggerNewSearch = useCallback((newCenter) => {
     if (!lastSearchLocationRef.current) {
       return true;
@@ -76,11 +77,12 @@ const FullPageMap = ({
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const distance = R * c;
 
-    const instantTrigger = Math.max(searchRadius * 0.15, 200);
+    // UPDATED: Larger trigger distance to reduce API calls
+    const instantTrigger = Math.max(searchRadius * 0.4, 600); // Increased from 0.15 and 200
     const hasMovedSignificantly = distance > instantTrigger;
 
     if (hasMovedSignificantly) {
-      console.log(`⚡ INSTANT TRIGGER: Moved ${Math.round(distance)}m > ${Math.round(instantTrigger)}m`);
+      console.log(`⚡ SEARCH TRIGGER: Moved ${Math.round(distance)}m > ${Math.round(instantTrigger)}m`);
     }
 
     return hasMovedSignificantly;
@@ -554,20 +556,22 @@ const FullPageMap = ({
   }, [userLocation, searchRadius, mapLoaded, cafeType]);
 
   // 🎨 ENHANCED DARK MAP MARKER CREATION
+  // 🎨 ENHANCED DARK MAP MARKER CREATION - LARGER & BETTER COLORS
+  // 🎨 BEAUTIFUL CIRCULAR MARKERS - NO BACKGROUND
   const createEnhancedDarkMapMarker = (cafe, index, selectedType) => {
-    // Bright colors that pop on dark background
+    // Bright, vibrant colors for dark map
     const colors = selectedType === 'restaurant' ? 
       { 
-        primary: '#A55EEA',      // Bright purple
-        secondary: '#FD79A8',    // Bright pink
-        accent: '#FFD700',       // Gold
-        glow: '#A55EEA'
+        primary: '#FF6B6B',      // Bright coral red
+        secondary: '#FF4757',    // Deeper red
+        accent: '#FFD93D',       // Golden yellow
+        ring: '#FF8E8E'          // Light coral ring
       } :
       { 
-        primary: '#FF9F43',      // Bright orange
-        secondary: '#FF6B6B',    // Bright coral
-        accent: '#4ECDC4',       // Bright teal
-        glow: '#FF9F43'
+        primary: '#FFA726',      // Bright orange
+        secondary: '#FF8F00',    // Deep orange
+        accent: '#00D4FF',       // Bright cyan
+        ring: '#FFB74D'          // Light orange ring
       };
     
     const emoji = selectedType === 'restaurant' ? '🍽️' : '☕';
@@ -575,74 +579,88 @@ const FullPageMap = ({
     const isVeryClose = cafe.distance && cafe.distance < 150;
     const isHighRated = cafe.rating && cafe.rating >= 4.5;
     
-    // Dynamic size based on distance and rating
-    const baseSize = isVeryClose ? 36 : isClose ? 32 : 28;
+    // Larger sizes for better visibility
+    const baseSize = isVeryClose ? 48 : isClose ? 44 : 40;
+    const centerRadius = baseSize / 2 - 4;
     
     return `
       <svg width="${baseSize}" height="${baseSize}" viewBox="0 0 ${baseSize} ${baseSize}" fill="none" xmlns="http://www.w3.org/2000/svg">
         <defs>
-          <radialGradient id="darkMapGradient${index}" cx="50%" cy="30%" r="70%">
-            <stop offset="0%" style="stop-color:white;stop-opacity:1" />
-            <stop offset="40%" style="stop-color:${colors.primary};stop-opacity:1" />
-            <stop offset="100%" style="stop-color:${colors.secondary};stop-opacity:0.9" />
+          <radialGradient id="circleGradient${index}" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" style="stop-color:${colors.primary};stop-opacity:1" />
+            <stop offset="70%" style="stop-color:${colors.secondary};stop-opacity:1" />
+            <stop offset="100%" style="stop-color:${colors.primary};stop-opacity:0.8" />
           </radialGradient>
           
-          <filter id="darkMapGlow${index}">
+          <filter id="markerGlow${index}">
             <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
             <feMerge> 
               <feMergeNode in="coloredBlur"/>
               <feMergeNode in="SourceGraphic"/>
             </feMerge>
           </filter>
-          
-          <filter id="brightShadow${index}">
-            <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="${colors.glow}" flood-opacity="0.8"/>
-          </filter>
         </defs>
         
         ${isVeryClose ? `
-          <!-- Very close indicator - pulsing outer ring -->
-          <circle cx="${baseSize/2}" cy="${baseSize/2}" r="${baseSize/2 - 2}" 
+          <!-- Pulsing outer ring for very close places -->
+          <circle cx="${baseSize/2}" cy="${baseSize/2}" r="${centerRadius + 8}" 
                   fill="none" stroke="${colors.accent}" stroke-width="2" opacity="0.6">
-            <animate attributeName="r" values="${baseSize/2 - 6};${baseSize/2 + 2};${baseSize/2 - 6}" 
-                     dur="2s" repeatCount="indefinite"/>
-            <animate attributeName="opacity" values="0.6;0.2;0.6" dur="2s" repeatCount="indefinite"/>
+            <animate attributeName="r" values="${centerRadius + 4};${centerRadius + 12};${centerRadius + 4}" 
+                    dur="2s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0.6;0.1;0.6" dur="2s" repeatCount="indefinite"/>
           </circle>
         ` : ''}
         
         ${isClose ? `
-          <!-- Close indicator - gentle glow -->
-          <circle cx="${baseSize/2}" cy="${baseSize/2}" r="${baseSize/2 - 1}" 
-                  fill="${colors.glow}" opacity="0.3">
-            <animate attributeName="opacity" values="0.3;0.1;0.3" dur="3s" repeatCount="indefinite"/>
+          <!-- Subtle glow ring for close places -->
+          <circle cx="${baseSize/2}" cy="${baseSize/2}" r="${centerRadius + 6}" 
+                  fill="none" stroke="${colors.ring}" stroke-width="1.5" opacity="0.4">
+            <animate attributeName="opacity" values="0.4;0.1;0.4" dur="3s" repeatCount="indefinite"/>
           </circle>
         ` : ''}
         
-        <!-- Main marker circle with bright gradient -->
-        <circle cx="${baseSize/2}" cy="${baseSize/2}" r="${baseSize/2 - 4}" 
-                fill="url(#darkMapGradient${index})" 
-                filter="url(#brightShadow${index})"
-                stroke="white" stroke-width="2"/>
+        <!-- Main circular marker -->
+        <circle cx="${baseSize/2}" cy="${baseSize/2}" r="${centerRadius}" 
+                fill="url(#circleGradient${index})" 
+                stroke="white" 
+                stroke-width="3" 
+                filter="url(#markerGlow${index})"
+                style="drop-shadow(0 0 8px ${colors.secondary})"/>
         
-        <!-- Emoji icon -->
-        <text x="${baseSize/2}" y="${baseSize/2 + 4}" text-anchor="middle" 
-              font-size="${baseSize * 0.5}" fill="white" 
+        <!-- Emoji icon centered -->
+        <text x="${baseSize/2}" y="${baseSize/2 + 4}" 
+              text-anchor="middle" 
+              dominant-baseline="central"
+              font-size="${baseSize * 0.45}" 
+              fill="white" 
               style="text-shadow: 0 0 6px rgba(0,0,0,0.8); font-weight: bold;">
           ${emoji}
         </text>
         
         ${isHighRated ? `
-          <!-- High rating star indicator -->
-          <circle cx="${baseSize - 6}" cy="6" r="4" fill="${colors.accent}" 
-                  stroke="white" stroke-width="1"/>
-          <text x="${baseSize - 6}" y="9" text-anchor="middle" 
-                font-size="8" fill="white" font-weight="bold">★</text>
+          <!-- Star badge for high rating -->
+          <circle cx="${baseSize - 10}" cy="10" r="7" 
+                  fill="${colors.accent}" 
+                  stroke="white" 
+                  stroke-width="2"/>
+          <text x="${baseSize - 10}" y="14" 
+                text-anchor="middle" 
+                font-size="9" 
+                fill="white" 
+                font-weight="bold">★</text>
         ` : ''}
         
         ${isVeryClose ? `
-          <!-- Very close distance indicator -->
-          <circle cx="6" cy="6" r="3" fill="#26DE81" stroke="white" stroke-width="1"/>
-          <text x="6" y="8" text-anchor="middle" font-size="6" fill="white" font-weight="bold">!</text>
+          <!-- Exclamation badge for very close -->
+          <circle cx="10" cy="10" r="6" 
+                  fill="#26DE81" 
+                  stroke="white" 
+                  stroke-width="2"/>
+          <text x="10" y="14" 
+                text-anchor="middle" 
+                font-size="8" 
+                fill="white" 
+                font-weight="bold">!</text>
         ` : ''}
       </svg>
     `;
@@ -705,16 +723,16 @@ const FullPageMap = ({
         icon: {
           url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(markerSVG),
           scaledSize: new window.google.maps.Size(
-            cafe.distance && cafe.distance < 150 ? 36 : 
-            cafe.distance && cafe.distance < 300 ? 32 : 28, 
-            cafe.distance && cafe.distance < 150 ? 36 : 
-            cafe.distance && cafe.distance < 300 ? 32 : 28
+            cafe.distance && cafe.distance < 150 ? 48 : 
+            cafe.distance && cafe.distance < 300 ? 44 : 40, 
+            cafe.distance && cafe.distance < 150 ? 48 : 
+            cafe.distance && cafe.distance < 300 ? 44 : 40
           ),
           anchor: new window.google.maps.Point(
-            cafe.distance && cafe.distance < 150 ? 18 : 
-            cafe.distance && cafe.distance < 300 ? 16 : 14,
-            cafe.distance && cafe.distance < 150 ? 18 : 
-            cafe.distance && cafe.distance < 300 ? 16 : 14
+            cafe.distance && cafe.distance < 150 ? 24 : 
+            cafe.distance && cafe.distance < 300 ? 22 : 20,
+            cafe.distance && cafe.distance < 150 ? 24 : 
+            cafe.distance && cafe.distance < 300 ? 22 : 20
           ),
           optimized: false
         },
