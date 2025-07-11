@@ -1,4 +1,4 @@
-// components/MapControls.js - ENHANCED WITH LOCATION CONTROLS
+// components/MapControls.js - ENHANCED WITH LOCATION CONTROLS (UPDATED)
 // Location: /frontend/src/components/MapControls.js
 
 import React, { useState } from 'react';
@@ -13,6 +13,7 @@ const MapControls = ({
   isEmbedMode,
   userLocation,
   onLocationRetry,
+  onGoToLocation,
   onPreciseLocation,
   locationLoading,
   locationError,
@@ -32,12 +33,6 @@ const MapControls = ({
   const handleRadiusChange = (newRadius) => {
     if (onSearchChange) {
       onSearchChange({ radius: parseInt(newRadius) });
-    }
-  };
-
-  const handleRefresh = () => {
-    if (onRefresh) {
-      onRefresh();
     }
   };
 
@@ -131,18 +126,18 @@ const MapControls = ({
             )}
           </div>
           
-          {/* Location Actions - Only show when no location */}
-          {isLocationActionsExpanded && !hasUserLocation && (
+          {/* Location Actions - Show beautiful button */}
+          {(isLocationActionsExpanded && !hasUserLocation) || hasUserLocation ? (
             <div className="location-actions">
               <button
-                className="location-action-btn retry-btn"
-                onClick={handleLocationRetry}
+                className="location-action-btn location-primary-btn"
+                onClick={onGoToLocation || handleLocationRetry}
                 disabled={locationLoading}
-                title="Rileva nuovamente la posizione"
+                title="Vai alla tua posizione"
               >
-                <span className="btn-icon">🔄</span>
+                <span className="btn-icon">📍</span>
                 <span className="btn-text">
-                  {locationLoading ? 'Rilevamento...' : 'Rileva Posizione'}
+                  {locationLoading ? 'Rilevamento...' : 'Vai alla Mia Posizione'}
                 </span>
               </button>
               
@@ -155,7 +150,7 @@ const MapControls = ({
                 </div>
               )}
             </div>
-          )}
+          ) : null}
         </div>
         
         {/* Search Stats */}
@@ -231,22 +226,6 @@ const MapControls = ({
               />
             </div>
           </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="action-buttons">
-          {/* Refresh Button */}
-          <button
-            className="action-button refresh-button"
-            onClick={handleRefresh}
-            title="Aggiorna locali italiani nella zona"
-          >
-            <span className="button-icon">🔄</span>
-            <span className="button-text">Aggiorna Ricerca</span>
-            <span className="button-subtext">
-              {hasUserLocation ? 'Nella tua zona' : 'Richiede posizione'}
-            </span>
-          </button>
         </div>
 
         {/* Italian Quick Filters */}
@@ -348,32 +327,6 @@ const MapControls = ({
           color: #374151;
         }
 
-        .location-details {
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-          margin-bottom: 8px;
-          padding: 8px;
-          background: rgba(0, 0, 0, 0.02);
-          border-radius: 8px;
-        }
-
-        .location-info {
-          display: flex;
-          justify-content: space-between;
-          font-size: 12px;
-        }
-
-        .info-label {
-          color: #6B7280;
-          font-weight: 500;
-        }
-
-        .info-value {
-          color: #374151;
-          font-weight: 600;
-        }
-
         .location-actions {
           display: flex;
           flex-direction: column;
@@ -385,63 +338,111 @@ const MapControls = ({
           display: flex;
           align-items: center;
           gap: 8px;
-          padding: 8px 12px;
+          padding: 12px 16px;
           border: none;
-          border-radius: 8px;
-          font-size: 12px;
+          border-radius: 12px;
+          font-size: 14px;
           font-weight: 600;
           cursor: pointer;
           transition: all 0.3s ease;
+          position: relative;
+          overflow: hidden;
         }
 
-        .retry-btn {
-          background: linear-gradient(135deg, #F97316, #EA580C);
+        .location-primary-btn {
+          background: linear-gradient(135deg, #667eea, #764ba2);
           color: white;
+          box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
         }
 
-        .precise-btn {
-          background: linear-gradient(135deg, #10B981, #059669);
-          color: white;
+        .location-primary-btn:hover:not(:disabled) {
+          background: linear-gradient(135deg, #764ba2, #667eea);
+          transform: translateY(-2px);
+          box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
         }
 
-        .location-action-btn:hover:not(:disabled) {
-          transform: translateY(-1px);
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        .location-primary-btn:active:not(:disabled) {
+          transform: translateY(0);
+          box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        }
+
+        .location-action-btn::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: -100%;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+          transition: left 0.5s ease;
+        }
+
+        .location-action-btn:hover::before {
+          left: 100%;
         }
 
         .location-action-btn:disabled {
           opacity: 0.6;
           cursor: not-allowed;
           transform: none;
+          background: #9CA3AF;
+          box-shadow: none;
+        }
+
+        .location-action-btn:disabled::before {
+          display: none;
         }
 
         .btn-icon {
-          font-size: 14px;
+          font-size: 16px;
+          animation: ${locationLoading ? 'btnIconSpin 1s linear infinite' : 'none'};
+        }
+
+        @keyframes btnIconSpin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
         }
 
         .btn-text {
           flex: 1;
+          font-weight: 600;
         }
 
         .location-error {
           display: flex;
-          align-items: center;
+          align-items: flex-start;
           gap: 8px;
-          padding: 8px 12px;
+          padding: 10px 12px;
           background: rgba(239, 68, 68, 0.1);
           border: 1px solid rgba(239, 68, 68, 0.2);
           border-radius: 8px;
           font-size: 12px;
+          animation: errorPulse 2s infinite;
+        }
+
+        @keyframes errorPulse {
+          0%, 100% { 
+            border-color: rgba(239, 68, 68, 0.2);
+            background: rgba(239, 68, 68, 0.1);
+          }
+          50% { 
+            border-color: rgba(239, 68, 68, 0.3);
+            background: rgba(239, 68, 68, 0.15);
+          }
         }
 
         .error-icon {
           color: #EF4444;
+          font-size: 14px;
+          flex-shrink: 0;
+          margin-top: 1px;
         }
 
         .error-text {
           color: #DC2626;
           font-weight: 500;
           line-height: 1.3;
+          flex: 1;
         }
       `}</style>
     </div>

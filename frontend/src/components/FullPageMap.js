@@ -6,6 +6,7 @@ import LoadingScreen from './LoadingScreen';
 import MapUpdateLoader from './MapUpdateLoader';
 import CafePopup from './CafePopup';
 import MapControls from './MapControls';
+import MarkerHoverTooltip from './MarkerHoverTooltip';
 
 const FullPageMap = ({
   center,
@@ -24,6 +25,7 @@ const FullPageMap = ({
   isEmbedMode,
   onSearchChange,
   onRefresh,
+  onGoToUserLocation,
   locationLoading,
   locationError,
   detectionMethod,
@@ -53,6 +55,10 @@ const FullPageMap = ({
   
   // 🎬 ULTRA-SMOOTH INTERACTION STATES
   const [isMapInteracting, setIsMapInteracting] = useState(false);
+  const [hoveredCafe, setHoveredCafe] = useState(null);
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  const [showTooltip, setShowTooltip] = useState(false);
+  const hoverDelayRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [smoothTransition, setSmoothTransition] = useState(false);
@@ -90,6 +96,21 @@ const FullPageMap = ({
     
     return ratingScore + reviewScore; // 0-1 score
   };
+  // Add this utility function near the top of the component (after the imports)
+  const calculateDistance = (lat1, lng1, lat2, lng2) => {
+    const R = 6371e3; // Earth's radius in meters
+    const φ1 = lat1 * Math.PI/180;
+    const φ2 = lat2 * Math.PI/180;
+    const Δφ = (lat2-lat1) * Math.PI/180;
+    const Δλ = (lng2-lng1) * Math.PI/180;
+
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+    return R * c; // Distance in meters
+  };
 
   const getMarkerSizeFromPopularity = (popularityScore, currentZoom = 15) => {
     // Dynamic sizing based on zoom level
@@ -104,7 +125,112 @@ const FullPageMap = ({
     
     return Math.round(dynamicSize);
   };
+  // 🎯 ULTRA-SMOOTH LOCATION NAVIGATION
+  const handleGoToUserLocation = useCallback(() => {
+    if (!userLocation || !googleMapRef.current) {
+      console.log('❌ No user location or map available');
+      return;
+    }
 
+    console.log('🎯 Ultra-smooth navigation to user location:', userLocation);
+    
+    // Hide any tooltips and popups
+    setShowTooltip(false);
+    setHoveredCafe(null);
+    setHoveredMarker(null);
+    if (selectedCafe) {
+      onClosePopup();
+    }
+    
+    // Prevent any map interactions during animation
+    setIsMapInteracting(true);
+    setSmoothTransition(true);
+    
+    const currentCenter = googleMapRef.current.getCenter();
+    const currentZoom = googleMapRef.current.getZoom();
+    const targetPosition = {
+      lat: userLocation.latitude,
+      lng: userLocation.longitude
+    };
+    
+    // Calculate optimal zoom level for user location (good overview)
+    const targetZoom = Math.max(16, currentZoom);
+    
+    // Check if we need to move significantly
+    const needsMovement = currentCenter && (
+      Math.abs(currentCenter.lat() - targetPosition.lat) > 0.001 ||
+      Math.abs(currentCenter.lng() - targetPosition.lng) > 0.001
+    );
+    
+    console.log('🎬 USER LOCATION ANIMATION:', {
+      currentCenter: currentCenter ? { lat: currentCenter.lat(), lng: currentCenter.lng() } : null,
+      targetPosition,
+      currentZoom,
+      targetZoom,
+      needsMovement
+    });
+    
+    // 🎬 FLAWLESS USER LOCATION ANIMATION SEQUENCE
+    if (needsMovement) {
+      // Step 1: Smooth pan to user location first
+      googleMapRef.current.panTo(targetPosition);
+      
+      // Step 2: Wait for pan to complete, then smooth zoom
+      setTimeout(() => {
+        if (googleMapRef.current && Math.abs(currentZoom - targetZoom) > 0.5) {
+          googleMapRef.current.setZoom(targetZoom);
+        }
+      }, 400); // Slightly longer wait for smooth pan
+      
+      // Step 3: Update search location and trigger refresh after animations
+      setTimeout(() => {
+        // Update the search center to user location
+        lastSearchLocationRef.current = targetPosition;
+        onCenterChange({
+          lat: targetPosition.lat,
+          lng: targetPosition.lng
+        });
+        
+        // Clear existing markers for fresh search around user
+        console.log('🧹 Clearing markers for user location search');
+        markersRef.current.forEach((marker) => {
+          if (marker && marker.setMap) {
+            marker.setMap(null);
+          }
+        });
+        markersRef.current.clear();
+        activeMarkersRef.current.clear();
+        
+        // Trigger search for venues around user location
+        setTimeout(() => {
+          console.log('🔍 Searching venues around user location');
+          if (onRefresh) {
+            onRefresh();
+          }
+        }, 200);
+        
+        // End animation states
+        setIsMapInteracting(false);
+        setSmoothTransition(false);
+      }, 800); // Wait for both pan and zoom
+      
+    } else {
+      // If already at user location, just zoom smoothly
+      if (Math.abs(currentZoom - targetZoom) > 0.5) {
+        googleMapRef.current.setZoom(targetZoom);
+      }
+      
+      // Still trigger a refresh to find venues around user
+      setTimeout(() => {
+        if (onRefresh) {
+          onRefresh();
+        }
+        setIsMapInteracting(false);
+        setSmoothTransition(false);
+      }, 400);
+    }
+    
+  }, [userLocation, selectedCafe, onClosePopup, onCenterChange, onRefresh]);
   // Replace the createEnhancedDarkMapMarker function with this enhanced version:
   const createEnhancedDarkMapMarker = (cafe, index, currentType, isHovered = false) => {
     const rating = cafe.rating || 0;
@@ -335,74 +461,69 @@ const updateMarkerHoverState = useCallback((cafeId, isHovered) => {
   // ⚡ ULTRA-SENSITIVE TRIGGERING for responsive search
   const shouldTriggerNewSearch = useCallback((newCenter) => {
     if (!lastSearchLocationRef.current) {
+      console.log('🔍 SHOULD SEARCH: No previous search location');
       return true;
     }
-
-    const lastLocation = lastSearchLocationRef.current;
     
-    const R = 6371e3;
-    const φ1 = lastLocation.lat * Math.PI / 180;
-    const φ2 = newCenter.lat * Math.PI / 180;
-    const Δφ = (newCenter.lat - lastLocation.lat) * Math.PI / 180;
-    const Δλ = (newCenter.lng - lastLocation.lng) * Math.PI / 180;
+    const lastSearch = lastSearchLocationRef.current;
+    const distance = calculateDistance(
+      lastSearch.lat, lastSearch.lng,
+      newCenter.lat, newCenter.lng
+    );
+    
+    // More sensitive threshold - search if moved more than 150m
+    const threshold = 150;
+    const shouldSearch = distance > threshold;
+    
+    console.log('🔍 SHOULD SEARCH CHECK:', {
+      distance: Math.round(distance),
+      threshold,
+      shouldSearch,
+      lastSearch,
+      newCenter
+    });
+    
+    return shouldSearch;
+  }, []);
 
-    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-              Math.cos(φ1) * Math.cos(φ2) *
-              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const distance = R * c;
-
-    // 🚀 BALANCED THRESHOLDS - Fast updates but not excessive
-    // 🚀 ULTRA-SENSITIVE THRESHOLDS - Very responsive to small movements
-    let threshold;
-    if (zoomLevel >= 18) {
-      threshold = 25;    // Very zoomed in = extremely sensitive (25m)
-    } else if (zoomLevel >= 16) {
-      threshold = 50;    // Zoomed in = very sensitive (50m)
-    } else if (zoomLevel >= 14) {
-      threshold = 100;   // Medium zoom = sensitive (100m)
-    } else if (zoomLevel >= 12) {
-      threshold = 200;   // Zoomed out = moderately sensitive (200m)
-    } else {
-      threshold = 300;   // Very zoomed out = less sensitive but still responsive (300m)
-    }
-
-    console.log(`🔍 SENSITIVE: Distance ${Math.round(distance)}m | Threshold ${threshold}m | Zoom ${zoomLevel}`);
-
-    return distance > threshold;
-  }, [zoomLevel]);
-
-  // 🎯 INTELLIGENT SMOOTH SEARCH (moved up)
+  // 🎯 INTELLIGENT SMOOTH SEARCH (enhanced to always use current map center)
   const handleSmoothSearch = useCallback(() => {
     if (!googleMapRef.current || isDragging) return;
     
+    // ALWAYS get the current visible map center, not the stored center
     const currentCenter = googleMapRef.current.getCenter();
     const newCenter = {
       lat: currentCenter.lat(),
       lng: currentCenter.lng()
     };
     
-    if (shouldTriggerNewSearch(newCenter)) {
-      console.log('🔄 Triggering smooth search animation');
-      
-      // Smooth loading animation
-      setIsRefreshing(true);
-      setSmoothTransition(true);
-      
-      // Update map center for new search
-      lastSearchLocationRef.current = newCenter;
-      onCenterChange({
-        lat: newCenter.lat,
-        lng: newCenter.lng
-      });
-      
-      // End refresh animation smoothly
-      setTimeout(() => {
-        setIsRefreshing(false);
-        setSmoothTransition(false);
-      }, 1500);
+    console.log('🔄 Smooth search with current map center:', newCenter);
+    
+    // Update the search location to current map center
+    lastSearchLocationRef.current = newCenter;
+    
+    // Update parent component with the current map center
+    onCenterChange({
+      lat: newCenter.lat,
+      lng: newCenter.lng
+    });
+    
+    // Smooth loading animation
+    setIsRefreshing(true);
+    setSmoothTransition(true);
+    
+    // Trigger the actual refresh
+    if (onRefresh) {
+      onRefresh();
     }
-  }, [shouldTriggerNewSearch, onCenterChange, isDragging]);
+    
+    // End refresh animation smoothly
+    setTimeout(() => {
+      setIsRefreshing(false);
+      setSmoothTransition(false);
+    }, 1500);
+    
+  }, [onCenterChange, onRefresh, isDragging]);
 
   // 🎬 ULTRA-SMOOTH DRAG DETECTION
   const handleDragStart = useCallback(() => {
@@ -439,16 +560,16 @@ const updateMarkerHoverState = useCallback((cafeId, isHovered) => {
     setTimeout(() => {
       setIsDragging(false);
       isUserDraggingRef.current = false;
-    }, 50); // Faster response
+    }, 50);
     
     // End interaction smoothly
     setTimeout(() => {
       setIsMapInteracting(false);
       setSmoothTransition(true);
       setTimeout(() => setSmoothTransition(false), 200);
-    }, 100); // Faster transition
+    }, 100);
     
-    // 🚀 IMMEDIATE SENSITIVE SEARCH SCHEDULING
+    // 🚀 FORCE SEARCH FOR NEW MAP AREA
     const currentCenter = googleMapRef.current?.getCenter();
     if (currentCenter) {
       const newCenter = {
@@ -456,58 +577,158 @@ const updateMarkerHoverState = useCallback((cafeId, isHovered) => {
         lng: currentCenter.lng()
       };
       
-      // Always check for search with ultra-sensitive thresholds
-      if (shouldTriggerNewSearch(newCenter)) {
-        // With this:
-        let searchDelay;
-        if (zoomLevel >= 16) {
-          searchDelay = 400; // Very fast for zoomed in
-        } else if (zoomLevel >= 14) {
-          searchDelay = 600; // Fast for medium zoom
-        } else {
-          searchDelay = 800; // Still fast for zoomed out
-        }
-        
-        console.log(`🚀 IMMEDIATE search scheduled in ${searchDelay}ms (zoom: ${zoomLevel})`);
-        
-        smoothSearchTimeoutRef.current = setTimeout(() => {
-          handleSmoothSearch();
-        }, searchDelay);
-      }
-    }
-    
-  }, [handleSmoothSearch, shouldTriggerNewSearch, zoomLevel]);
-
-  // 🎯 ENHANCED MARKER CLICK with smooth animation
-  const handleSmoothMarkerClick = useCallback((cafe) => {
-    console.log('🎯 Smooth marker click:', cafe.name);
-    
-    // Clear any hover state
-    setHoveredMarker(null);
-    
-    // Immediate visual feedback
-    setSmoothTransition(true);
-    
-    // Smooth zoom and pan animation
-    if (googleMapRef.current) {
-      const targetZoom = Math.max(16, zoomLevel + 1);
+      // Calculate distance moved
+      const lastPosition = lastSearchLocationRef.current;
+      let significantMove = true;
       
-      googleMapRef.current.panTo({
-        lat: cafe.location.latitude,
-        lng: cafe.location.longitude
+      if (lastPosition) {
+        const distance = calculateDistance(
+          lastPosition.lat, lastPosition.lng,
+          newCenter.lat, newCenter.lng
+        );
+        significantMove = distance > 200; // 200 meters threshold
+      }
+      
+      console.log('🗺️ Drag ended - analyzing move:', {
+        newCenter,
+        lastPosition,
+        significantMove,
+        willSearch: true // Always search after drag
       });
       
-      // Smooth zoom sequence
-      setTimeout(() => {
-        googleMapRef.current.setZoom(targetZoom);
-      }, 200);
+      // ALWAYS trigger search after drag for new area
+      // Clear existing markers immediately for fresh start
+      console.log('🧹 Clearing old markers for new area search');
+      markersRef.current.forEach((marker) => {
+        if (marker && marker.setMap) {
+          marker.setMap(null);
+        }
+      });
+      markersRef.current.clear();
+      activeMarkersRef.current.clear();
+      
+      // Update the center immediately
+      lastSearchLocationRef.current = newCenter;
+      onCenterChange({
+        lat: newCenter.lat,
+        lng: newCenter.lng
+      });
+      
+      // Schedule search for new area
+      let searchDelay;
+      if (zoomLevel >= 16) {
+        searchDelay = 300; // Very fast for zoomed in
+      } else if (zoomLevel >= 14) {
+        searchDelay = 500; // Fast for medium zoom
+      } else {
+        searchDelay = 700; // Still fast for zoomed out
+      }
+      
+      console.log(`🚀 NEW AREA search scheduled in ${searchDelay}ms`);
+      
+      // Clear any existing search timeouts
+      if (smoothSearchTimeoutRef.current) {
+        clearTimeout(smoothSearchTimeoutRef.current);
+      }
+      if (debouncedSearchTimeoutRef.current) {
+        clearTimeout(debouncedSearchTimeoutRef.current);
+      }
+      
+      smoothSearchTimeoutRef.current = setTimeout(() => {
+        console.log('🔍 Executing NEW AREA search with current map center');
+        
+        // Get the EXACT current center of the visible map
+        const finalCenter = googleMapRef.current?.getCenter();
+        if (finalCenter) {
+          const exactCenter = {
+            lat: finalCenter.lat(),
+            lng: finalCenter.lng()
+          };
+          
+          console.log('📍 Forcing search at exact map center:', exactCenter);
+          
+          // Update the search location to EXACTLY what's visible
+          lastSearchLocationRef.current = exactCenter;
+          
+          // Force the parent to update its center to the exact map center
+          onCenterChange({
+            lat: exactCenter.lat,
+            lng: exactCenter.lng
+          });
+          
+          // Trigger the actual refresh with the correct coordinates
+          if (onRefresh) {
+            onRefresh();
+          }
+        }
+      }, searchDelay);
     }
+  }, [handleSmoothSearch, zoomLevel, onCenterChange]);
+
+  // 🎯 ULTRA-SMOOTH MARKER CLICK with perfect animation
+  const handleSmoothMarkerClick = useCallback((cafe) => {
+    console.log('🎯 Ultra-smooth marker click:', cafe.name);
     
-    // Show popup with smooth delay
-    setTimeout(() => {
-      onCafeSelect(cafe);
-      setSmoothTransition(false);
-    }, 400);
+    // Immediately hide tooltip and clear hover states
+    setShowTooltip(false);
+    setHoveredCafe(null);
+    setHoveredMarker(null);
+    
+    // Prevent any map interactions during animation
+    setIsMapInteracting(true);
+    setSmoothTransition(true);
+    
+    if (!googleMapRef.current) return;
+    
+    const currentCenter = googleMapRef.current.getCenter();
+    const currentZoom = googleMapRef.current.getZoom();
+    const targetPosition = {
+      lat: cafe.location.latitude,
+      lng: cafe.location.longitude
+    };
+    
+    // Calculate optimal zoom level (not too close, not too far)
+    const targetZoom = Math.min(Math.max(currentZoom + 1, 16), 18);
+    
+    // Check if we need to move significantly
+    const needsMovement = currentCenter && (
+      Math.abs(currentCenter.lat() - targetPosition.lat) > 0.001 ||
+      Math.abs(currentCenter.lng() - targetPosition.lng) > 0.001
+    );
+    
+    // 🎬 FLAWLESS ANIMATION SEQUENCE
+    if (needsMovement) {
+      // Step 1: Smooth pan first (no zoom change yet)
+      googleMapRef.current.panTo(targetPosition);
+      
+      // Step 2: Wait for pan to complete, then smooth zoom
+      setTimeout(() => {
+        if (googleMapRef.current && Math.abs(currentZoom - targetZoom) > 0.5) {
+          // Use smooth zoom transition
+          googleMapRef.current.setZoom(targetZoom);
+        }
+      }, 300); // Wait for pan animation
+      
+      // Step 3: Show popup after all animations complete
+      setTimeout(() => {
+        setIsMapInteracting(false);
+        setSmoothTransition(false);
+        onCafeSelect(cafe);
+      }, 600); // Wait for both pan and zoom
+      
+    } else {
+      // If no movement needed, just zoom smoothly
+      if (Math.abs(currentZoom - targetZoom) > 0.5) {
+        googleMapRef.current.setZoom(targetZoom);
+      }
+      
+      // Show popup quickly since no movement
+      setTimeout(() => {
+        setIsMapInteracting(false);
+        setSmoothTransition(false);
+        onCafeSelect(cafe);
+      }, 300);
+    }
     
   }, [onCafeSelect, zoomLevel]);
 
@@ -581,27 +802,53 @@ const updateMarkerHoverState = useCallback((cafeId, isHovered) => {
     
   }, [isDragging, handleSmoothSearch]);
 
-  // 🎯 STABLE MARKER HOVER HANDLING (separate from marker creation)
+  // 🎯 ENHANCED MARKER HOVER HANDLING with Beautiful Tooltip
+  // 🎯 ENHANCED MARKER HOVER HANDLING with Beautiful Tooltip
   const handleMarkerHover = useCallback((cafe, isEntering) => {
     // Skip hover effects during interactions to prevent flickering
     if (isDragging || isMapInteracting || isZoomingIn || isZoomingOut) {
       return;
     }
     
+    // Clear any existing timeout
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
+    }
+    if (hoverDelayRef.current) {
+      clearTimeout(hoverDelayRef.current);
     }
     
     if (isEntering) {
       setHoveredMarker(cafe.id || cafe.googlePlaceId);
-      console.log('🖱️ Stable hover:', cafe.name);
+      console.log('🖱️ Beautiful hover:', cafe.name);
+      
+      // Show tooltip with slight delay for smooth UX
+      hoverDelayRef.current = setTimeout(() => {
+        setHoveredCafe(cafe);
+        setShowTooltip(true);
+      }, 200); // Reduced delay since it's at top of page
+      
     } else {
-      // Delayed hover removal for smoother UX
+      // Hide tooltip immediately on mouse leave
+      setShowTooltip(false);
+      setHoveredCafe(null);
+      
+      // Delayed hover marker removal for smoother UX
       hoverTimeoutRef.current = setTimeout(() => {
         setHoveredMarker(null);
       }, 150);
     }
   }, [isDragging, isMapInteracting, isZoomingIn, isZoomingOut]);
+
+  // ✨ NEW: Handle mouse move for tooltip positioning
+  const handleMouseMove = useCallback((mouseEvent) => {
+    if (showTooltip && hoveredCafe) {
+      setTooltipPosition({
+        x: mouseEvent.clientX,
+        y: mouseEvent.clientY
+      });
+    }
+  }, [showTooltip, hoveredCafe]);
 
   // Check Google Maps availability with complete API check
   const checkGoogleMapsAvailability = useCallback(() => {
@@ -666,6 +913,9 @@ const updateMarkerHoverState = useCallback((cafeId, isHovered) => {
       window.removeEventListener('googleMapsLoaded', handleGoogleMapsLoad);
       clearInterval(pollInterval);
       clearTimeout(timeout);
+      if (mapRef.current) {
+        mapRef.current.removeEventListener('mousemove', handleMouseMove);
+      }
     };
   }, [checkGoogleMapsAvailability, googleMapsReady]);
 
@@ -698,6 +948,26 @@ const updateMarkerHoverState = useCallback((cafeId, isHovered) => {
           center: { lat: center.lat, lng: center.lng },
           zoom: zoom || 15,
           mapTypeId: window.google.maps.MapTypeId.ROADMAP,
+          
+          // 🎬 ULTRA-SMOOTH ANIMATION OPTIONS
+          gestureHandling: 'greedy',
+          clickableIcons: false,
+          disableDefaultUI: false,
+          zoomControl: true,
+          mapTypeControl: false,
+          scaleControl: false,
+          streetViewControl: false,
+          rotateControl: false,
+          fullscreenControl: false,
+          
+          // Animation settings for smooth transitions
+          animation: window.google.maps.Animation.DROP,
+          optimized: true,
+          
+          // Smooth zoom and pan settings
+          zoomControlOptions: {
+            position: window.google.maps.ControlPosition.RIGHT_BOTTOM
+          },
           
           // 🎨 DARK MAP STYLING
           styles: [
@@ -760,26 +1030,37 @@ const updateMarkerHoverState = useCallback((cafeId, isHovered) => {
             if (!isDragging && !isUserDraggingRef.current) {
               console.log('📍 SENSITIVE center change detected');
               
-              // Ultra-fast center change response
-              const currentCenter = googleMapRef.current?.getCenter();
-              if (currentCenter) {
-                const newCenter = {
-                  lat: currentCenter.lat(),
-                  lng: currentCenter.lng()
+              // Get the CURRENT visible map center
+              const currentMapCenter = googleMapRef.current?.getCenter();
+              if (currentMapCenter) {
+                const actualCenter = {
+                  lat: currentMapCenter.lat(),
+                  lng: currentMapCenter.lng()
                 };
                 
-                // Check if we should trigger search immediately
-                if (shouldTriggerNewSearch(newCenter)) {
-                  console.log('🚀 CENTER CHANGE triggering immediate search');
+                // Check if we should trigger search based on actual map center
+                if (shouldTriggerNewSearch(actualCenter)) {
+                  console.log('🚀 CENTER CHANGE triggering search at visible center:', actualCenter);
+                  
+                  // Update search location to actual visible center
+                  lastSearchLocationRef.current = actualCenter;
+                  
+                  // Update parent with actual center
+                  onCenterChange({
+                    lat: actualCenter.lat,
+                    lng: actualCenter.lng
+                  });
                   
                   // Clear existing timeouts
                   if (smoothSearchTimeoutRef.current) {
                     clearTimeout(smoothSearchTimeoutRef.current);
                   }
                   
-                  // Ultra-fast search on center change
+                  // Trigger refresh with actual center
                   smoothSearchTimeoutRef.current = setTimeout(() => {
-                    handleSmoothSearch();
+                    if (onRefresh) {
+                      onRefresh();
+                    }
                   }, zoomLevel >= 16 ? 300 : 600);
                 }
               }
@@ -808,6 +1089,9 @@ const updateMarkerHoverState = useCallback((cafeId, isHovered) => {
             handleSmoothPopupClose();
           }
         });
+        if (mapRef.current) {
+          mapRef.current.addEventListener('mousemove', handleMouseMove);
+        }
 
         lastSearchLocationRef.current = { lat: center.lat, lng: center.lng };
 
@@ -1020,22 +1304,25 @@ const updateMarkerHoverState = useCallback((cafeId, isHovered) => {
         visible: true
       });
 
-      // 🎯 STABLE EVENT LISTENERS
+      // ✨ ENHANCED: Add hover and click listeners
       marker.addListener('click', () => {
-        if (!isDragging && !isMapInteracting) {
-          handleSmoothMarkerClick(cafe);
-        }
+        handleSmoothMarkerClick(cafe);
       });
 
+      // Add mouseover listener for beautiful tooltip
       marker.addListener('mouseover', () => {
-        if (!isDragging && !isMapInteracting) {
-          handleMarkerHover(cafe, true);
-        }
+        handleMarkerHover(cafe, true);
       });
 
+      // Add mouseout listener
       marker.addListener('mouseout', () => {
-        if (!isDragging && !isMapInteracting) {
-          handleMarkerHover(cafe, false);
+        handleMarkerHover(cafe, false);
+      });
+
+      // Track mouse movement for smooth tooltip following
+      marker.addListener('mousemove', (event) => {
+        if (event.domEvent) {
+          handleMouseMove(event.domEvent);
         }
       });
 
@@ -1093,12 +1380,33 @@ const updateMarkerHoverState = useCallback((cafeId, isHovered) => {
     }
     
     .smooth-transition {
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
     }
     
     .map-canvas {
-      transition: ${smoothTransition ? 'filter 0.3s ease' : 'none'};
-      filter: ${isMapInteracting ? 'brightness(1.02)' : 'brightness(1)'};
+      transition: ${smoothTransition ? 'all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)' : 'none'};
+      filter: ${isMapInteracting ? 'brightness(1.01) contrast(1.02)' : 'brightness(1) contrast(1)'};
+      transform: ${smoothTransition ? 'scale(1.002)' : 'scale(1)'};
+      will-change: transform, filter;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      -webkit-transform-style: preserve-3d;
+      transform-style: preserve-3d;
+    }
+    
+    /* Prevent white flashes during transitions */
+    .map-canvas * {
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+    }
+    
+    /* Ultra-smooth Google Maps animations */
+    .gm-style {
+      transition: all 0.3s ease !important;
+    }
+    
+    .gm-style > div {
+      transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
     }
     
     .zoom-indicator {
@@ -1200,7 +1508,7 @@ const updateMarkerHoverState = useCallback((cafeId, isHovered) => {
             cafeType={cafeType}
             searchRadius={searchRadius}
             onSearchChange={onSearchChange}
-            onRefresh={handleSmoothSearch}
+            onRefresh={onRefresh}
             hasUserLocation={!!userLocation}
             cafesCount={cafes.filter(cafe => {
               const cafeType_normalized = (cafe.type || cafe.placeType || '').toLowerCase();
@@ -1209,6 +1517,7 @@ const updateMarkerHoverState = useCallback((cafeId, isHovered) => {
             isEmbedMode={isEmbedMode}
             userLocation={userLocation}
             onLocationRetry={onLocationRetry}
+            onGoToLocation={handleGoToUserLocation}
             onPreciseLocation={onPreciseLocation}
             locationLoading={locationLoading}
             locationError={locationError}
@@ -1227,6 +1536,16 @@ const updateMarkerHoverState = useCallback((cafeId, isHovered) => {
           userLocation={userLocation}
         />
       )}
+
+      {/* ✨ Beautiful Animated Hover Tooltip */}
+      <MarkerHoverTooltip
+        cafe={hoveredCafe}
+        isVisible={showTooltip && hoveredCafe && !selectedCafe}
+        onClose={() => {
+          setShowTooltip(false);
+          setHoveredCafe(null);
+        }}
+      />
 
       {/* Dark Theme Error Message */}
       {error && (
