@@ -1554,26 +1554,6 @@ const updateMarkerHoverState = useCallback((cafeId, isHovered) => {
           <button onClick={handleSmoothSearch}>Retry</button>
         </div>
       )}
-
-      {/* Enhanced Debug Info */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="dark-map-debug-info" style={{
-          position: 'absolute',
-          bottom: '10px',
-          left: '10px',
-          background: 'rgba(0, 0, 0, 0.8)',
-          color: '#00D4FF',
-          padding: '8px 12px',
-          borderRadius: '8px',
-          fontSize: '12px',
-          fontFamily: 'monospace',
-          border: '1px solid rgba(0, 212, 255, 0.3)',
-          backdropFilter: 'blur(10px)'
-        }}>
-          🌑 Dark Map | {cafeType}: {cafes.filter(c => (c.type || c.placeType) === cafeType).length} | 
-          Total: {cafes.length} | Zoom: {zoomLevel} | Hover: {hoveredMarker ? '✓' : '✗'}
-        </div>
-      )}
     </div>
   );
 };

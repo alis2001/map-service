@@ -1,4 +1,4 @@
-// services/apiService.js - ENHANCED FOR MAXIMUM VENUE COVERAGE
+// services/apiService.js - ENHANCED FOR MAXIMUM VENUE COVERAGE + RATE LIMITING RECOVERY
 // Location: /frontend/src/services/apiService.js
 
 import axios from 'axios';
@@ -11,6 +11,98 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// RATE LIMITING RECOVERY SYSTEM
+class RateLimitManager {
+  constructor() {
+    this.isRateLimited = false;
+    this.retryAfter = null;
+    this.requestQueue = [];
+    this.isProcessingQueue = false;
+    this.consecutiveErrors = 0;
+    this.backoffMultiplier = 1;
+    this.maxBackoffTime = 30000; // 30 seconds max
+    this.recoveryTimeout = null;
+  }
+
+  setRateLimited(retryAfter = 5000) {
+    console.warn('🚫 Rate limit detected. Implementing smart recovery...');
+    this.isRateLimited = true;
+    this.retryAfter = Date.now() + retryAfter;
+    this.consecutiveErrors++;
+    this.backoffMultiplier = Math.min(this.consecutiveErrors * 2, 8);
+    
+    // Clear any existing recovery timeout
+    if (this.recoveryTimeout) {
+      clearTimeout(this.recoveryTimeout);
+    }
+    
+    // Auto-recovery mechanism
+    this.recoveryTimeout = setTimeout(() => {
+      this.recover();
+    }, retryAfter * this.backoffMultiplier);
+  }
+
+  recover() {
+    console.log('✅ Attempting rate limit recovery...');
+    this.isRateLimited = false;
+    this.retryAfter = null;
+    this.consecutiveErrors = Math.max(0, this.consecutiveErrors - 1);
+    this.backoffMultiplier = Math.max(1, this.backoffMultiplier * 0.5);
+    
+    // Process queued requests
+    this.processQueue();
+  }
+
+  addToQueue(requestConfig, resolve, reject) {
+    this.requestQueue.push({ requestConfig, resolve, reject });
+    
+    // Limit queue size to prevent memory issues
+    if (this.requestQueue.length > 20) {
+      const { reject: oldReject } = this.requestQueue.shift();
+      oldReject(new Error('Request queue overflow'));
+    }
+  }
+
+  async processQueue() {
+    if (this.isProcessingQueue || this.requestQueue.length === 0) return;
+    
+    this.isProcessingQueue = true;
+    console.log(`🔄 Processing ${this.requestQueue.length} queued requests...`);
+    
+    while (this.requestQueue.length > 0 && !this.isRateLimited) {
+      const { requestConfig, resolve, reject } = this.requestQueue.shift();
+      
+      try {
+        // Add small delay between requests to avoid immediate re-rate-limiting
+        await new Promise(resolve => setTimeout(resolve, 300));
+        const response = await api.request(requestConfig);
+        resolve(response);
+      } catch (error) {
+        reject(error);
+      }
+    }
+    
+    this.isProcessingQueue = false;
+  }
+
+  canMakeRequest() {
+    if (!this.isRateLimited) return true;
+    if (this.retryAfter && Date.now() > this.retryAfter) {
+      this.recover();
+      return true;
+    }
+    return false;
+  }
+
+  getWaitTime() {
+    if (!this.isRateLimited || !this.retryAfter) return 0;
+    return Math.max(0, this.retryAfter - Date.now());
+  }
+}
+
+// Create rate limit manager instance
+const rateLimitManager = new RateLimitManager();
 
 // ENHANCED CACHE for comprehensive results
 class EnhancedCache {
@@ -28,16 +120,25 @@ class EnhancedCache {
     return `${roundedLat}-${roundedLng}-${roundedRadius}`;
   }
 
+  extendCacheDuringRateLimit() {
+    // During rate limiting, extend cache time to reduce API calls
+    this.maxAge = rateLimitManager.isRateLimited ? 20 * 60 * 1000 : 10 * 60 * 1000;
+  }
+
   get(key) {
     const item = this.cache.get(key);
     if (!item) return null;
+    
+    // Extend cache time during rate limiting
+    this.extendCacheDuringRateLimit();
     
     if (Date.now() - item.timestamp > this.maxAge) {
       this.cache.delete(key);
       return null;
     }
     
-    console.log('⚡ COMPREHENSIVE CACHE HIT:', key);
+    const cacheStatus = rateLimitManager.isRateLimited ? ' (RATE LIMIT PROTECTION)' : '';
+    console.log('⚡ COMPREHENSIVE CACHE HIT:', key + cacheStatus);
     return item.data;
   }
 
@@ -63,9 +164,20 @@ class EnhancedCache {
 
 const enhancedCache = new EnhancedCache();
 
-// Request interceptor for debugging
+// ENHANCED REQUEST INTERCEPTOR with rate limiting
 api.interceptors.request.use(
-  (config) => {
+  async (config) => {
+    // Check if we can make the request
+    if (!rateLimitManager.canMakeRequest()) {
+      const waitTime = rateLimitManager.getWaitTime();
+      console.warn(`⏳ Rate limited. Queueing request for ${Math.round(waitTime/1000)}s...`);
+      
+      // Return a promise that resolves when rate limit is lifted
+      return new Promise((resolve, reject) => {
+        rateLimitManager.addToQueue(config, resolve, reject);
+      });
+    }
+
     if (process.env.REACT_APP_DEBUG_MODE === 'true') {
       console.log('⚡ COMPREHENSIVE API Request:', {
         method: config.method?.toUpperCase(),
@@ -81,7 +193,9 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor with enhanced error handling
+// SIMPLE SOLUTION: Just add this to your existing apiService.js response interceptor
+
+// REPLACE your existing response interceptor with this simple version:
 api.interceptors.response.use(
   (response) => {
     if (process.env.REACT_APP_DEBUG_MODE === 'true') {
@@ -100,7 +214,20 @@ api.interceptors.response.use(
       url: error.config?.url
     });
 
-    // Handle specific error cases with Italian messages
+    // SIMPLE RATE LIMIT HANDLING - AUTO REFRESH
+    if (error.response?.status === 429) {
+      console.warn('🚫 Rate limit detected - triggering app refresh in 3 seconds...');
+      
+      // Show the error message briefly, then refresh
+      setTimeout(() => {
+        console.log('🔄 Refreshing application to recover from rate limit...');
+        window.location.reload();
+      }, 3000); // 3 second delay to show the loading screen
+      
+      throw new Error('Ricerca troppo frequente. Ricarico l\'applicazione...');
+    }
+
+    // Your existing error handling continues here...
     if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
       throw new Error('Ricerca completa in corso. Attendi...');
     }
@@ -111,10 +238,6 @@ api.interceptors.response.use(
     
     if (error.response?.status === 503) {
       throw new Error('Servizio temporaneamente non disponibile.');
-    }
-    
-    if (error.response?.status === 429) {
-      throw new Error('Ricerca troppo frequente. Attendi un momento.');
     }
     
     if (error.response?.status >= 500) {
@@ -339,7 +462,9 @@ export const placesAPI = {
       size: enhancedCache.cache.size,
       maxSize: enhancedCache.maxSize,
       maxAge: enhancedCache.maxAge,
-      comprehensive: true
+      comprehensive: true,
+      rateLimited: rateLimitManager.isRateLimited,
+      queueSize: rateLimitManager.requestQueue.length
     };
   }
 };

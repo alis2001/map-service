@@ -1,4 +1,4 @@
-// App.js - UPDATED VERSION - No Default Location, Ultra-Fast Detection
+// App.js - UPDATED VERSION - No Default Location, Ultra-Fast Detection + RATE LIMIT RECOVERY
 // Location: /map-service/frontend/src/App.js
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -49,6 +49,9 @@ function MapApp() {
   const [locationRequested, setLocationRequested] = useState(false);
   const [locationCapability, setLocationCapability] = useState('unknown');
 
+  // ADDED: Rate limit recovery state
+  const [isRateLimitRecovery, setIsRateLimitRecovery] = useState(false);
+
   // 🚀 **ULTRA-FAST GEOLOCATION HOOK**
   const { 
     location: userLocation, 
@@ -69,13 +72,38 @@ function MapApp() {
     cafes,
     loading: cafesLoading,
     error: cafesError,
-    refetch: refetchCafes
+    refetch: refetchCafes,
+    isRefreshing // ADDED: from enhanced useCafes hook
   } = useCafes(
     mapCenter?.lat, 
     mapCenter?.lng, 
     searchRadius, 
     cafeType
   );
+
+  // ADDED: Detect rate limit recovery from isRefreshing state
+  useEffect(() => {
+    if (isRefreshing) {
+      setIsRateLimitRecovery(true);
+      console.log('🚫 Rate limit recovery detected from isRefreshing state');
+    } else {
+      setIsRateLimitRecovery(false);
+    }
+  }, [isRefreshing]);
+
+  // ADDED: Detect rate limit errors from error messages
+  useEffect(() => {
+    if (cafesError && cafesError.message) {
+      const isRateLimitError = cafesError.message.includes('Ricarico') || 
+                              cafesError.message.includes('troppo frequente') ||
+                              cafesError.message.includes('automaticamente');
+      
+      if (isRateLimitError) {
+        setIsRateLimitRecovery(true);
+        console.log('🚫 Rate limit detected from error message:', cafesError.message);
+      }
+    }
+  }, [cafesError]);
 
   // 🏥 **BACKEND HEALTH CHECK**
   const checkBackendHealth = useCallback(async () => {
@@ -220,6 +248,18 @@ function MapApp() {
     }
   }, [getPreciseLocation]);
 
+  // ADDED: Rate limit recovery screen (highest priority)
+  if (isRateLimitRecovery) {
+    return (
+      <LoadingScreen 
+        message="Troppo veloce!"
+        subMessage="Sto ricaricando l'applicazione per tornare operativo..."
+        progress={100}
+        isRateLimitRecovery={true}
+      />
+    );
+  }
+
   // 🏠 **INITIAL LOADING STATE**
   if (!appReady) {
     return (
@@ -331,28 +371,6 @@ function MapApp() {
           zIndex: 10000
         }}>
           ⚠️ {backendError}
-        </div>
-      )}
-
-      {/* 📊 Debug Info (Development Only) */}
-      {process.env.NODE_ENV === 'development' && (
-        <div style={{
-          position: 'fixed',
-          bottom: '10px',
-          left: '10px',
-          background: 'rgba(0, 0, 0, 0.8)',
-          color: '#00FF88',
-          padding: '8px 12px',
-          borderRadius: '8px',
-          fontSize: '12px',
-          fontFamily: 'monospace',
-          zIndex: 10000
-        }}>
-          🗺️ Center: {mapCenter ? `${mapCenter.lat.toFixed(4)}, ${mapCenter.lng.toFixed(4)}` : 'None'} | 
-          📍 User: {userLocation ? 'Yes' : 'No'} | 
-          ☕ Cafes: {cafes?.length || 0} | 
-          🎯 Type: {cafeType} | 
-          📡 {detectionMethod || 'Unknown'}
         </div>
       )}
     </div>

@@ -1,8 +1,8 @@
-// hooks/useCafes.js - UPDATED FOR INSTANT FILTERING & DARK MAP
+// hooks/useCafes.js - UPDATED FOR INSTANT FILTERING & DARK MAP + RATE LIMIT HANDLING
 // Location: /frontend/src/hooks/useCafes.js
 
 import { useQuery } from 'react-query';
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useState } from 'react'; // ADDED useState
 import { placesAPI, apiUtils } from '../services/apiService';
 
 // UPDATED: Ultra-fast hook with perfect type filtering for dark map
@@ -10,6 +10,7 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
   const lastSearchParamsRef = useRef(null);
   const isSearchingRef = useRef(false);
   const errorCountRef = useRef(0);
+  const [isRefreshing, setIsRefreshing] = useState(false); // ADDED for rate limit handling
 
   const createSearchKey = useCallback((lat, lng, rad, typ) => {
     if (!lat || !lng) return null;
@@ -200,14 +201,18 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
       }
     },
     {
-      enabled: !!(latitude && longitude && searchKey),
+      enabled: !!(latitude && longitude && searchKey) && !isRefreshing, // ADDED !isRefreshing
       staleTime: 3 * 60 * 1000,    // 3 minutes for faster updates
       cacheTime: 15 * 60 * 1000,   // 15 minutes cache
       refetchOnWindowFocus: false,
       refetchOnMount: true,
       retry: (failureCount, error) => {
+        // MODIFIED: Don't retry rate limit errors - let the app refresh instead
+        if (error?.message?.includes('Ricarico') || error?.message?.includes('troppo frequente')) {
+          return false;
+        }
         if (error?.response?.status === 429) {
-          return failureCount < 1;
+          return false;
         }
         if (error?.response?.status >= 400 && error?.response?.status < 500) {
           return false;
@@ -221,9 +226,15 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
         console.error('❌ Failed to fetch venues for dark map:', error);
         isSearchingRef.current = false;
         errorCountRef.current = Math.min((errorCountRef.current || 0) + 1, 5);
+        
+        // ADDED: Set refreshing state for rate limit errors
+        if (error.message && (error.message.includes('Ricarico') || error.message.includes('troppo frequente'))) {
+          setIsRefreshing(true);
+        }
       },
       onSuccess: (data) => {
         errorCountRef.current = 0;
+        setIsRefreshing(false); // ADDED
         console.log('✅ Dark map venue data processed:', {
           totalPlaces: data.count,
           cafes: data.cafeCount,
@@ -362,7 +373,7 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
     count: filteredCount,
     userLocation: data?.userLocation || null,
     searchStats: data?.searchStats || { veryClose: 0, walkable: 0, total: 0 },
-    loading,
+    loading: loading || isRefreshing, // MODIFIED to include isRefreshing
     error,
     refetch,
     isFetching,
@@ -379,7 +390,7 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
     
     // COMPUTED VALUES
     hasData: filteredCount > 0,
-    isEmpty: !loading && filteredCount === 0,
+    isEmpty: !loading && !isRefreshing && filteredCount === 0, // MODIFIED
     isRefreshing: isFetching && !loading,
     
     // TYPE-SPECIFIC HELPERS for instant switching
@@ -398,8 +409,10 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
   };
 };
 
-// UPDATED: Text search hook with dark map support
+// UPDATED: Text search hook with dark map support + rate limit handling
 export const usePlaceSearch = (query, userLocation = null) => {
+  const [isRefreshing, setIsRefreshing] = useState(false); // ADDED
+
   const {
     data,
     isLoading: loading,
@@ -464,31 +477,52 @@ export const usePlaceSearch = (query, userLocation = null) => {
         };
       } catch (error) {
         console.error('❌ Search failed for dark map:', error);
+        // ADDED: Set refreshing state for rate limit errors
+        if (error.message && (error.message.includes('Ricarico') || error.message.includes('troppo frequente'))) {
+          setIsRefreshing(true);
+        }
         throw error;
       }
     },
     {
-      enabled: !!(query && query.trim().length >= 2),
+      enabled: !!(query && query.trim().length >= 2) && !isRefreshing, // ADDED !isRefreshing
       staleTime: 3 * 60 * 1000,
       cacheTime: 10 * 60 * 1000,
       refetchOnWindowFocus: false,
-      retry: 1
+      retry: (failureCount, error) => {
+        // ADDED: Don't retry rate limit errors
+        if (error?.message?.includes('Ricarico') || error?.message?.includes('troppo frequente')) {
+          return false;
+        }
+        return failureCount < 1;
+      },
+      onError: (error) => {
+        // ADDED: Set refreshing state for rate limit errors
+        if (error.message && (error.message.includes('Ricarico') || error.message.includes('troppo frequente'))) {
+          setIsRefreshing(true);
+        }
+      },
+      onSuccess: () => {
+        setIsRefreshing(false); // ADDED
+      }
     }
   );
 
   return {
     places: data?.places || [],
     count: data?.count || 0,
-    loading,
+    loading: loading || isRefreshing, // MODIFIED
     error,
     refetch,
-    hasResults: !loading && (data?.count || 0) > 0,
-    noResults: !loading && query && query.trim().length >= 2 && (data?.count || 0) === 0
+    hasResults: !loading && !isRefreshing && (data?.count || 0) > 0, // MODIFIED
+    noResults: !loading && !isRefreshing && query && query.trim().length >= 2 && (data?.count || 0) === 0 // MODIFIED
   };
 };
 
-// UPDATED: Hook for place details with dark map enhancements
+// UPDATED: Hook for place details with dark map enhancements + rate limit handling
 export const usePlaceDetails = (placeId, userLocation = null) => {
+  const [isRefreshing, setIsRefreshing] = useState(false); // ADDED
+
   const {
     data: place,
     isLoading: loading,
@@ -501,51 +535,74 @@ export const usePlaceDetails = (placeId, userLocation = null) => {
 
       console.log('📍 Fetching place details for dark map:', placeId);
 
-      const result = await placesAPI.getPlaceDetails(placeId, userLocation);
-      
-      if (!result.success || !result.place) {
-        throw new Error('Venue not found');
-      }
+      try {
+        const result = await placesAPI.getPlaceDetails(placeId, userLocation);
+        
+        if (!result.success || !result.place) {
+          throw new Error('Venue not found');
+        }
 
-      const formatted = apiUtils.formatPlace(result.place);
-      
-      if (userLocation && formatted.location) {
-        const distance = apiUtils.calculateDistance(
-          userLocation.latitude,
-          userLocation.longitude,
-          formatted.location.latitude,
-          formatted.location.longitude
-        );
-        formatted.distance = Math.round(distance);
-        formatted.formattedDistance = apiUtils.formatDistance(distance);
-      }
+        const formatted = apiUtils.formatPlace(result.place);
+        
+        if (userLocation && formatted.location) {
+          const distance = apiUtils.calculateDistance(
+            userLocation.latitude,
+            userLocation.longitude,
+            formatted.location.latitude,
+            formatted.location.longitude
+          );
+          formatted.distance = Math.round(distance);
+          formatted.formattedDistance = apiUtils.formatDistance(distance);
+        }
 
-      // DARK MAP: Enhanced formatting
-      formatted.emoji = formatted.type === 'restaurant' ? '🍽️' : '☕';
-      formatted.displayType = formatted.type === 'restaurant' ? 'Ristorante' : 'Bar/Caffetteria';
-      formatted.darkMapReady = true;
-      
-      if (formatted.rating) {
-        formatted.ratingStars = '★'.repeat(Math.floor(formatted.rating)) + 
-                               '☆'.repeat(5 - Math.floor(formatted.rating));
-      }
+        // DARK MAP: Enhanced formatting
+        formatted.emoji = formatted.type === 'restaurant' ? '🍽️' : '☕';
+        formatted.displayType = formatted.type === 'restaurant' ? 'Ristorante' : 'Bar/Caffetteria';
+        formatted.darkMapReady = true;
+        
+        if (formatted.rating) {
+          formatted.ratingStars = '★'.repeat(Math.floor(formatted.rating)) + 
+                                 '☆'.repeat(5 - Math.floor(formatted.rating));
+        }
 
-      return formatted;
+        return formatted;
+      } catch (error) {
+        // ADDED: Set refreshing state for rate limit errors
+        if (error.message && (error.message.includes('Ricarico') || error.message.includes('troppo frequente'))) {
+          setIsRefreshing(true);
+        }
+        throw error;
+      }
     },
     {
-      enabled: !!placeId,
+      enabled: !!placeId && !isRefreshing, // ADDED !isRefreshing
       staleTime: 10 * 60 * 1000,
       cacheTime: 30 * 60 * 1000,
       refetchOnWindowFocus: false,
-      retry: 2
+      retry: (failureCount, error) => {
+        // ADDED: Don't retry rate limit errors
+        if (error?.message?.includes('Ricarico') || error?.message?.includes('troppo frequente')) {
+          return false;
+        }
+        return failureCount < 2;
+      },
+      onError: (error) => {
+        // ADDED: Set refreshing state for rate limit errors
+        if (error.message && (error.message.includes('Ricarico') || error.message.includes('troppo frequente'))) {
+          setIsRefreshing(true);
+        }
+      },
+      onSuccess: () => {
+        setIsRefreshing(false); // ADDED
+      }
     }
   );
 
   return {
     place,
-    loading,
+    loading: loading || isRefreshing, // MODIFIED
     error,
     refetch,
-    hasPlace: !!place
+    hasPlace: !!place && !isRefreshing // MODIFIED
   };
 };
