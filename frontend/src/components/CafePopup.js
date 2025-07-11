@@ -1,4 +1,4 @@
-// components/CafePopup.js - ENHANCED VERSION with Dynamic Opening Hours
+// components/CafePopup.js - ENHANCED VERSION with Beautiful Animations
 // Location: /map-service/frontend/src/components/CafePopup.js
 
 import React, { useState, useEffect } from 'react';
@@ -6,6 +6,7 @@ import { usePlaceDetails } from '../hooks/useCafes';
 
 const CafePopup = ({ cafe, onClose, userLocation }) => {
   const [isVisible, setIsVisible] = useState(false);
+  const [animationPhase, setAnimationPhase] = useState('entering');
   const [activeTab, setActiveTab] = useState('info');
   const [currentTime, setCurrentTime] = useState(new Date());
   
@@ -27,17 +28,29 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
     return () => clearInterval(timer);
   }, []);
 
-  // Animation on mount
+  // 🎬 Enhanced Animation on mount
   useEffect(() => {
-    const timer = setTimeout(() => setIsVisible(true), 50);
-    return () => clearTimeout(timer);
+    // Phase 1: Scale and fade in
+    setTimeout(() => setAnimationPhase('phase1'), 50);
+    
+    // Phase 2: Bounce effect  
+    setTimeout(() => setAnimationPhase('phase2'), 200);
+    
+    // Phase 3: Final settle with glow
+    setTimeout(() => {
+      setAnimationPhase('visible');
+      setIsVisible(true);
+    }, 350);
+    
+    return () => {};
   }, []);
 
   const handleClose = () => {
+    setAnimationPhase('exiting');
     setIsVisible(false);
     setTimeout(() => {
       if (onClose) onClose();
-    }, 200);
+    }, 400);
   };
 
   const handleBackdropClick = (e) => {
@@ -314,20 +327,148 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
     }
   };
 
+  // 🎨 BEAUTIFUL ANIMATION FUNCTIONS
+  const getPopupStyles = () => {
+    const baseTransition = 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
+    
+    switch (animationPhase) {
+      case 'entering':
+        return {
+          transform: 'scale(0.3) rotateY(-20deg) translateY(80px)',
+          opacity: 0,
+          filter: 'blur(8px)',
+          transition: baseTransition
+        };
+      case 'phase1':
+        return {
+          transform: 'scale(0.9) rotateY(-5deg) translateY(20px)',
+          opacity: 0.8,
+          filter: 'blur(2px)', 
+          transition: baseTransition
+        };
+      case 'phase2':
+        return {
+          transform: 'scale(1.03) rotateY(2deg) translateY(-5px)',
+          opacity: 0.95,
+          filter: 'blur(0px)',
+          transition: baseTransition,
+          boxShadow: '0 20px 50px rgba(0,0,0,0.3)'
+        };
+      case 'visible':
+        return {
+          transform: 'scale(1) rotateY(0deg) translateY(0px)',
+          opacity: 1,
+          filter: 'blur(0px)',
+          transition: baseTransition,
+          boxShadow: '0 25px 60px rgba(0,0,0,0.4), 0 0 20px rgba(66,133,244,0.15)'
+        };
+      case 'exiting':
+        return {
+          transform: 'scale(0.8) rotateY(15deg) translateY(-30px)',
+          opacity: 0,
+          filter: 'blur(4px)',
+          transition: 'all 0.3s ease-in'
+        };
+      default:
+        return { transition: baseTransition };
+    }
+  };
+
+  const getOverlayStyles = () => {
+    const baseTransition = 'all 0.4s ease-out';
+    
+    switch (animationPhase) {
+      case 'entering':
+      case 'phase1':
+        return {
+          backgroundColor: 'rgba(0,0,0,0)',
+          backdropFilter: 'blur(0px)',
+          transition: baseTransition
+        };
+      case 'phase2':
+      case 'visible':
+        return {
+          backgroundColor: 'rgba(0,0,0,0.6)',
+          backdropFilter: 'blur(8px)',
+          transition: baseTransition
+        };
+      case 'exiting':
+        return {
+          backgroundColor: 'rgba(0,0,0,0)',
+          backdropFilter: 'blur(0px)',
+          transition: 'all 0.3s ease-in'
+        };
+      default:
+        return { transition: baseTransition };
+    }
+  };
+
+  const getElementAnimation = (delay = 0, type = 'slideUp') => {
+    const isVisible = animationPhase === 'visible';
+    
+    const animations = {
+      slideUp: {
+        transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
+        opacity: isVisible ? 1 : 0
+      },
+      slideLeft: {
+        transform: isVisible ? 'translateX(0)' : 'translateX(-20px)',
+        opacity: isVisible ? 1 : 0
+      },
+      scale: {
+        transform: isVisible ? 'scale(1)' : 'scale(0.8)',
+        opacity: isVisible ? 1 : 0
+      },
+      rotate: {
+        transform: isVisible ? 'rotate(0deg) scale(1)' : 'rotate(-180deg) scale(0.5)',
+        opacity: isVisible ? 1 : 0
+      },
+      fadeIn: {
+        opacity: isVisible ? 1 : 0
+      }
+    };
+    
+    return {
+      ...animations[type],
+      transition: `all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) ${delay}ms`
+    };
+  };
+
   return (
     <div 
       className={`popup-overlay ${isVisible ? 'visible' : ''}`}
       onClick={handleBackdropClick}
+      style={getOverlayStyles()}
     >
-      <div className={`cafe-popup ${isVisible ? 'visible' : ''}`}>
+      <div 
+        className={`cafe-popup ${isVisible ? 'visible' : ''}`}
+        style={getPopupStyles()}
+      >
         
         {/* Header */}
-        <div className="popup-header" data-venue-type={placeData.type || placeData.placeType}>
+        <div 
+          className="popup-header" 
+          data-venue-type={placeData.type || placeData.placeType}
+          style={getElementAnimation(100, 'slideUp')}
+        >
           <div className="header-content">
-            <div className="cafe-emoji">{getItalianVenueEmoji(placeData)}</div>
+            <div 
+              className="cafe-emoji"
+              style={getElementAnimation(200, 'rotate')}
+            >
+              {getItalianVenueEmoji(placeData)}
+            </div>
             <div className="header-text">
-              <h2 className="cafe-name">{placeData.name}</h2>
-              <div className="cafe-meta">
+              <h2 
+                className="cafe-name"
+                style={getElementAnimation(300, 'slideLeft')}
+              >
+                {placeData.name}
+              </h2>
+              <div 
+                className="cafe-meta"
+                style={getElementAnimation(400, 'slideLeft')}
+              >
                 <span className="cafe-type">
                   {getItalianVenueTypeDisplay(placeData.type || placeData.placeType)}
                 </span>
@@ -340,15 +481,25 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
               </div>
             </div>
           </div>
-          <button className="close-button" onClick={handleClose}>
+          <button 
+            className="close-button" 
+            onClick={handleClose}
+            style={getElementAnimation(500, 'scale')}
+          >
             ✕
           </button>
         </div>
 
         {/* Quick Stats with Dynamic Status */}
-        <div className="quick-stats">
+        <div 
+          className="quick-stats"
+          style={getElementAnimation(200, 'slideUp')}
+        >
           {placeData.rating && (
-            <div className="stat-item">
+            <div 
+              className="stat-item"
+              style={getElementAnimation(250, 'scale')}
+            >
               <span className="stat-icon">⭐</span>
               <span className="stat-value">{placeData.rating}</span>
               <span className="stat-label">rating</span>
@@ -356,7 +507,10 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
           )}
           
           {placeData.priceLevel !== undefined && (
-            <div className="stat-item">
+            <div 
+              className="stat-item"
+              style={getElementAnimation(300, 'scale')}
+            >
               <span className="stat-icon">💰</span>
               <span className="stat-value">{'€'.repeat(placeData.priceLevel + 1)}</span>
               <span className="stat-label">prezzo</span>
@@ -364,7 +518,10 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
           )}
           
           {/* ENHANCED: Dynamic Opening Status */}
-          <div className="stat-item dynamic-status">
+          <div 
+            className="stat-item dynamic-status"
+            style={getElementAnimation(350, 'scale')}
+          >
             <span 
               className="status-dot" 
               style={{ backgroundColor: openingStatus.statusColor }}
@@ -382,16 +539,21 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
         </div>
 
         {/* Tabs */}
-        <div className="popup-tabs">
+        <div 
+          className="popup-tabs"
+          style={getElementAnimation(300, 'slideUp')}
+        >
           <button 
             className={`tab-button ${activeTab === 'info' ? 'active' : ''}`}
             onClick={() => setActiveTab('info')}
+            style={getElementAnimation(350, 'scale')}
           >
             📍 Info
           </button>
           <button 
             className={`tab-button ${activeTab === 'hours' ? 'active' : ''}`}
             onClick={() => setActiveTab('hours')}
+            style={getElementAnimation(400, 'scale')}
           >
             🕒 Orari
           </button>
@@ -399,6 +561,7 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
             <button 
               className={`tab-button ${activeTab === 'photos' ? 'active' : ''}`}
               onClick={() => setActiveTab('photos')}
+              style={getElementAnimation(450, 'scale')}
             >
               📸 Foto
             </button>
@@ -406,12 +569,18 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
         </div>
 
         {/* Content */}
-        <div className="popup-content">
+        <div 
+          className="popup-content"
+          style={getElementAnimation(400, 'slideUp')}
+        >
           
           {/* Info Tab */}
           {activeTab === 'info' && (
             <div className="info-content">
-              <div className="info-item">
+              <div 
+                className="info-item"
+                style={getElementAnimation(450, 'slideLeft')}
+              >
                 <div className="info-icon">📍</div>
                 <div className="info-text">
                   <div className="info-label">Indirizzo</div>
@@ -420,7 +589,11 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
               </div>
 
               {placeData.phoneNumber && (
-                <div className="info-item clickable" onClick={handleCall}>
+                <div 
+                  className="info-item clickable" 
+                  onClick={handleCall}
+                  style={getElementAnimation(500, 'slideLeft')}
+                >
                   <div className="info-icon">📞</div>
                   <div className="info-text">
                     <div className="info-label">Telefono</div>
@@ -430,7 +603,11 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
               )}
 
               {placeData.website && (
-                <div className="info-item clickable" onClick={handleWebsite}>
+                <div 
+                  className="info-item clickable" 
+                  onClick={handleWebsite}
+                  style={getElementAnimation(550, 'slideLeft')}
+                >
                   <div className="info-icon">🌐</div>
                   <div className="info-text">
                     <div className="info-label">Sito web</div>
@@ -440,7 +617,10 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
               )}
 
               {placeData.priceLevel !== undefined && (
-                <div className="info-item">
+                <div 
+                  className="info-item"
+                  style={getElementAnimation(600, 'slideLeft')}
+                >
                   <div className="info-icon">💰</div>
                   <div className="info-text">
                     <div className="info-label">Fascia di prezzo</div>
@@ -449,7 +629,10 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
                 </div>
               )}
 
-              <div className="info-item">
+              <div 
+                className="info-item"
+                style={getElementAnimation(650, 'slideLeft')}
+              >
                 <div className="info-icon">
                   {getItalianVenueEmoji(placeData)}
                 </div>
@@ -468,7 +651,10 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
             <div className="hours-content">
               
               {/* Dynamic Status Header */}
-              <div className={`dynamic-status-header ${openingStatus.isOpen ? 'open' : 'closed'}`}>
+              <div 
+                className={`dynamic-status-header ${openingStatus.isOpen ? 'open' : 'closed'}`}
+                style={getElementAnimation(450, 'scale')}
+              >
                 <div className="status-main">
                   <span className="status-icon">
                     {openingStatus.isOpen === null ? '❓' : 
@@ -495,14 +681,24 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
               </div>
               
               {detailsLoading ? (
-                <div className="loading-hours">
+                <div 
+                  className="loading-hours"
+                  style={getElementAnimation(500, 'fadeIn')}
+                >
                   <div className="loading-spinner-small"></div>
                   <span>Caricamento orari...</span>
                 </div>
               ) : (
-                <div className="hours-list">
+                <div 
+                  className="hours-list"
+                  style={getElementAnimation(500, 'slideUp')}
+                >
                   {formatOpeningHours(placeData.openingHours).map((day, index) => (
-                    <div key={index} className="hours-item">
+                    <div 
+                      key={index} 
+                      className="hours-item"
+                      style={getElementAnimation(550 + (index * 50), 'slideLeft')}
+                    >
                       <span className="day-name">{day.split(':')[0]}</span>
                       <span className="day-hours">{day.split(':').slice(1).join(':')}</span>
                     </div>
@@ -516,14 +712,24 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
           {activeTab === 'photos' && placeData.photos && (
             <div className="photos-content">
               {detailsLoading ? (
-                <div className="loading-photos">
+                <div 
+                  className="loading-photos"
+                  style={getElementAnimation(450, 'fadeIn')}
+                >
                   <div className="loading-spinner-small"></div>
                   <span>Caricamento foto...</span>
                 </div>
               ) : (
-                <div className="photos-grid">
+                <div 
+                  className="photos-grid"
+                  style={getElementAnimation(450, 'slideUp')}
+                >
                   {placeData.photoUrls?.medium?.slice(0, 6).map((photoUrl, index) => (
-                    <div key={index} className="photo-item">
+                    <div 
+                      key={index} 
+                      className="photo-item"
+                      style={getElementAnimation(500 + (index * 100), 'scale')}
+                    >
                       <img 
                         src={photoUrl} 
                         alt={`${placeData.name} - Foto ${index + 1}`}
@@ -535,7 +741,10 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
                       />
                     </div>
                   )) || (
-                    <div className="no-photos">
+                    <div 
+                      className="no-photos"
+                      style={getElementAnimation(500, 'fadeIn')}
+                    >
                       <span>📸 Foto non disponibili</span>
                     </div>
                   )}
@@ -546,10 +755,15 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
         </div>
 
         {/* Action Buttons */}
-        <div className="popup-actions" data-venue-type={placeData.type || placeData.placeType}>
+        <div 
+          className="popup-actions" 
+          data-venue-type={placeData.type || placeData.placeType}
+          style={getElementAnimation(500, 'slideUp')}
+        >
           <button 
             className="action-btn primary"
             onClick={handleDirections}
+            style={getElementAnimation(550, 'scale')}
           >
             🧭 Indicazioni
           </button>
@@ -558,6 +772,7 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
             <button 
               className="action-btn secondary"
               onClick={handleCall}
+              style={getElementAnimation(600, 'scale')}
             >
               📞 Chiama
             </button>
@@ -567,6 +782,7 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
             <button 
               className="action-btn secondary"
               onClick={handleWebsite}
+              style={getElementAnimation(650, 'scale')}
             >
               🌐 Sito
             </button>
@@ -574,14 +790,18 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
         </div>
 
         {/* Italian venue tips */}
-        <div className="venue-tips" style={{
-          background: 'rgba(79, 70, 229, 0.05)',
-          margin: '0 20px 20px 20px',
-          padding: '12px',
-          borderRadius: '12px',
-          fontSize: '12px',
-          color: '#6B7280'
-        }}>
+        <div 
+          className="venue-tips" 
+          style={{
+            background: 'rgba(79, 70, 229, 0.05)',
+            margin: '0 20px 20px 20px',
+            padding: '12px',
+            borderRadius: '12px',
+            fontSize: '12px',
+            color: '#6B7280',
+            ...getElementAnimation(600, 'slideUp')
+          }}
+        >
           <div style={{ fontWeight: '600', marginBottom: '4px', color: '#4F46E5' }}>
             💡 Consiglio locale
           </div>
