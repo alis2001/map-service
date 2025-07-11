@@ -135,7 +135,7 @@ export const placesAPI = {
   async getAllNearbyPlaces(latitude, longitude, options = {}) {
     try {
       const radius = options.radius || 3000; // INCREASED default to 3km
-      const limit = options.limit || 80;     // INCREASED to 80 results total
+      const limit = options.limit || 100;     // INCREASED to 80 results total
       
       // Check cache first
       const cacheKey = enhancedCache.generateKey(latitude, longitude, radius);
@@ -156,7 +156,7 @@ export const placesAPI = {
             longitude,
             radius,
             type: 'cafe',
-            limit: 40 // Higher limit per type for comprehensive coverage
+            limit: 50 // Higher limit per type for comprehensive coverage
           }
         }),
         api.get('/api/v1/places/nearby', {
@@ -165,7 +165,7 @@ export const placesAPI = {
             longitude,
             radius,
             type: 'restaurant', 
-            limit: 40 // Higher limit per type for comprehensive coverage
+            limit: 50 // Higher limit per type for comprehensive coverage
           }
         })
       ]);

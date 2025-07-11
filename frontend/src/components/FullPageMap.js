@@ -105,7 +105,7 @@ const FullPageMap = ({
     return Math.round(dynamicSize);
   };
 
-  // 🎨 ENHANCED MARKER CREATION with hover effects
+  // Replace the createEnhancedDarkMapMarker function with this enhanced version:
   const createEnhancedDarkMapMarker = (cafe, index, currentType, isHovered = false) => {
     const rating = cafe.rating || 0;
     const reviewCount = cafe.user_ratings_total || cafe.userRatingsTotal || 0;
@@ -151,7 +151,7 @@ const FullPageMap = ({
     
     const colors = getTypeColor();
     
-    // 📏 DYNAMIC SIZE PROGRESSION with zoom awareness
+    // 📏 DYNAMIC SIZE PROGRESSION with zoom awareness AND HOVER ENLARGEMENT
     const getMarkerSize = () => {
       const baseSizes = {
         5: 56, 4: 48, 3: 40, 2: 34, 1: 28
@@ -159,7 +159,7 @@ const FullPageMap = ({
       
       const baseSize = baseSizes[qualityLevel] || 32;
       const zoomMultiplier = Math.min(Math.max(zoomLevel / 15, 0.8), 1.3);
-      const hoverMultiplier = isHovered ? 1.15 : 1;
+      const hoverMultiplier = isHovered ? 1.3 : 1; // 30% larger when hovered
       
       return Math.round(baseSize * zoomMultiplier * hoverMultiplier);
     };
@@ -186,8 +186,11 @@ const FullPageMap = ({
     const starDisplay = getStarDisplay();
     const isVeryClose = cafe.distance && cafe.distance < 200;
     
+    // Calculate total SVG size to accommodate curved text
+    const totalSize = markerSize + (isHovered ? 80 : 24); // Extra space for curved text when hovered
+    
     return `
-      <svg width="${markerSize + 24}" height="${markerSize + 24}" viewBox="0 0 ${markerSize + 24} ${markerSize + 24}" xmlns="http://www.w3.org/2000/svg">
+      <svg width="${totalSize}" height="${totalSize}" viewBox="0 0 ${totalSize} ${totalSize}" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <filter id="glow${index}${isHovered ? 'hover' : ''}">
             <feGaussianBlur stdDeviation="${isHovered ? '4' : '3'}" result="coloredBlur"/>
@@ -203,27 +206,41 @@ const FullPageMap = ({
               <stop offset="0%" style="stop-color:${colors.glow};stop-opacity:0.3" />
               <stop offset="100%" style="stop-color:${colors.glow};stop-opacity:0" />
             </radialGradient>
+            <!-- Path for curved text -->
+            <path id="textPath${index}" d="M ${totalSize/2 - 35} ${totalSize/2 - 25} A 35 35 0 0 1 ${totalSize/2 + 35} ${totalSize/2 - 25}" fill="none" stroke="none"/>
           ` : ''}
         </defs>
         
         ${isHovered ? `
           <!-- Hover pulse effect -->
-          <circle cx="${(markerSize + 24) / 2}" cy="${(markerSize + 24) / 2}" r="${markerSize / 2 + 8}" 
+          <circle cx="${totalSize / 2}" cy="${totalSize / 2}" r="${markerSize / 2 + 12}" 
                   fill="url(#pulseGrad${index})">
-            <animate attributeName="r" values="${markerSize / 2 + 8};${markerSize / 2 + 12};${markerSize / 2 + 8}" 
-                     dur="2s" repeatCount="indefinite"/>
+            <animate attributeName="r" values="${markerSize / 2 + 12};${markerSize / 2 + 18};${markerSize / 2 + 12}" 
+                    dur="2s" repeatCount="indefinite"/>
           </circle>
+          
+          <!-- Curved rainbow text above marker -->
+          <text font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="white" stroke="rgba(0,0,0,0.8)" stroke-width="2">
+            <textPath href="#textPath${index}" startOffset="50%" text-anchor="middle">
+              ${cafe.name || 'Unknown Place'}
+            </textPath>
+          </text>
+          <text font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="${colors.primary}">
+            <textPath href="#textPath${index}" startOffset="50%" text-anchor="middle">
+              ${cafe.name || 'Unknown Place'}
+            </textPath>
+          </text>
         ` : ''}
         
-        <!-- Main marker circle -->
-        <circle cx="${(markerSize + 24) / 2}" cy="${(markerSize + 24) / 2}" r="${markerSize / 2}" 
+        <!-- Main marker circle with WHITE BORDER when hovered -->
+        <circle cx="${totalSize / 2}" cy="${totalSize / 2}" r="${markerSize / 2}" 
                 fill="url(#grad${index}${isHovered ? 'hover' : ''})" 
                 filter="url(#glow${index}${isHovered ? 'hover' : ''})"
-                stroke="white" 
-                stroke-width="${isHovered ? '3' : '2'}"/>
+                stroke="${isHovered ? 'white' : 'rgba(255,255,255,0.6)'}" 
+                stroke-width="${isHovered ? '4' : '2'}"/>
         
         <!-- Venue type emoji -->
-        <text x="${(markerSize + 24) / 2}" y="${(markerSize + 24) / 2 + 6}" 
+        <text x="${totalSize / 2}" y="${totalSize / 2 + 6}" 
               text-anchor="middle" 
               font-size="${Math.max(16, markerSize * 0.35)}" 
               fill="white"
@@ -232,33 +249,33 @@ const FullPageMap = ({
         </text>
         
         ${starDisplay.pattern === 'crown-full' ? `
-          <text x="${(markerSize + 24) / 2}" y="16" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
-          <text x="${(markerSize + 24) / 2 - 12}" y="22" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
-          <text x="${(markerSize + 24) / 2 + 12}" y="22" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
-          <text x="${(markerSize + 24) / 2 - 7}" y="28" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
-          <text x="${(markerSize + 24) / 2 + 7}" y="28" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
+          <text x="${totalSize / 2}" y="16" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
+          <text x="${totalSize / 2 - 12}" y="22" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
+          <text x="${totalSize / 2 + 12}" y="22" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
+          <text x="${totalSize / 2 - 7}" y="28" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
+          <text x="${totalSize / 2 + 7}" y="28" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
         ` : starDisplay.pattern === 'crown-4' ? `
-          <text x="${(markerSize + 24) / 2 - 9}" y="18" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
-          <text x="${(markerSize + 24) / 2 + 9}" y="18" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
-          <text x="${(markerSize + 24) / 2 - 5}" y="26" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
-          <text x="${(markerSize + 24) / 2 + 5}" y="26" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
+          <text x="${totalSize / 2 - 9}" y="18" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
+          <text x="${totalSize / 2 + 9}" y="18" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
+          <text x="${totalSize / 2 - 5}" y="26" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
+          <text x="${totalSize / 2 + 5}" y="26" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
         ` : starDisplay.pattern === 'triangle' ? `
-          <text x="${(markerSize + 24) / 2}" y="16" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
-          <text x="${(markerSize + 24) / 2 - 9}" y="26" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
-          <text x="${(markerSize + 24) / 2 + 9}" y="26" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
+          <text x="${totalSize / 2}" y="16" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
+          <text x="${totalSize / 2 - 9}" y="26" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
+          <text x="${totalSize / 2 + 9}" y="26" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
         ` : starDisplay.pattern === 'sides' ? `
-          <text x="${(markerSize + 24) / 2 - 11}" y="20" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
-          <text x="${(markerSize + 24) / 2 + 11}" y="20" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
+          <text x="${totalSize / 2 - 11}" y="20" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
+          <text x="${totalSize / 2 + 11}" y="20" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
         ` : starDisplay.pattern === 'single' ? `
-          <text x="${(markerSize + 24) / 2}" y="16" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
+          <text x="${totalSize / 2}" y="16" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
         ` : ''}
         
         ${qualityLevel >= 4 && rating > 0 ? `
-          <circle cx="${(markerSize + 24) / 2}" cy="${markerSize + 16}" r="${isHovered ? '11' : '10'}" 
+          <circle cx="${totalSize / 2}" cy="${markerSize + 16}" r="${isHovered ? '11' : '10'}" 
                   fill="rgba(0,0,0,0.8)" 
                   stroke="white" 
                   stroke-width="1"/>
-          <text x="${(markerSize + 24) / 2}" y="${markerSize + 20}" 
+          <text x="${totalSize / 2}" y="${markerSize + 20}" 
                 text-anchor="middle" 
                 font-size="${isHovered ? '11' : '10'}" 
                 fill="white" 
@@ -276,7 +293,41 @@ const FullPageMap = ({
                 text-anchor="middle" 
                 font-size="10" 
                 fill="white">📍</text>
-        ` : ''}
+        ` : ''}// 🎯 REAL-TIME MARKER HOVER UPDATES
+const updateMarkerHoverState = useCallback((cafeId, isHovered) => {
+  const marker = markersRef.current.get(cafeId);
+  if (!marker) return;
+
+  // Find the cafe data
+  const cafe = cafes.find(c => (c.id || c.googlePlaceId) === cafeId);
+  if (!cafe) return;
+
+  // Get the marker's current position and index
+  const position = marker.getPosition();
+  const index = Array.from(markersRef.current.keys()).indexOf(cafeId);
+
+  // Create new marker SVG with hover state
+  const markerSVG = createEnhancedDarkMapMarker(cafe, index, currentFilterRef.current, isHovered);
+  
+  // Calculate size based on hover state
+  const popularityScore = calculatePopularityScore(cafe);
+  const baseSize = getMarkerSizeFromPopularity(popularityScore, zoomLevel);
+  const hoverMultiplier = isHovered ? 1.3 : 1;
+  const markerSize = Math.round(baseSize * hoverMultiplier);
+  const totalSize = markerSize + (isHovered ? 80 : 24);
+
+  // Update the marker icon with smooth transition
+  marker.setIcon({
+    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(markerSVG),
+    scaledSize: new window.google.maps.Size(totalSize, totalSize),
+    anchor: new window.google.maps.Point(totalSize / 2, totalSize / 2)
+  });
+
+  // Update z-index for hover state
+  const newZIndex = Math.round(popularityScore * 1000) + 100 + (isHovered ? 2000 : 0);
+  marker.setZIndex(newZIndex);
+
+}, [cafes, zoomLevel, calculatePopularityScore, getMarkerSizeFromPopularity, createEnhancedDarkMapMarker]);
       </svg>
     `;
   };
@@ -301,22 +352,23 @@ const FullPageMap = ({
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const distance = R * c;
 
-    // 🚀 ULTRA-SENSITIVE ZOOM-AWARE thresholds
+    // 🚀 BALANCED THRESHOLDS - Fast updates but not excessive
+    // 🚀 ULTRA-SENSITIVE THRESHOLDS - Very responsive to small movements
     let threshold;
     if (zoomLevel >= 18) {
-      threshold = 50;   // Very zoomed in = very sensitive (50m)
+      threshold = 25;    // Very zoomed in = extremely sensitive (25m)
     } else if (zoomLevel >= 16) {
-      threshold = 100;  // Zoomed in = sensitive (100m)
+      threshold = 50;    // Zoomed in = very sensitive (50m)
     } else if (zoomLevel >= 14) {
-      threshold = 200;  // Medium zoom = medium sensitivity (200m)
+      threshold = 100;   // Medium zoom = sensitive (100m)
     } else if (zoomLevel >= 12) {
-      threshold = 350;  // Zoomed out = less sensitive (350m)
+      threshold = 200;   // Zoomed out = moderately sensitive (200m)
     } else {
-      threshold = 500;  // Very zoomed out = standard (500m)
+      threshold = 300;   // Very zoomed out = less sensitive but still responsive (300m)
     }
-    
+
     console.log(`🔍 SENSITIVE: Distance ${Math.round(distance)}m | Threshold ${threshold}m | Zoom ${zoomLevel}`);
-    
+
     return distance > threshold;
   }, [zoomLevel]);
 
@@ -406,14 +458,14 @@ const FullPageMap = ({
       
       // Always check for search with ultra-sensitive thresholds
       if (shouldTriggerNewSearch(newCenter)) {
-        // Much faster search delays based on zoom level
+        // With this:
         let searchDelay;
         if (zoomLevel >= 16) {
-          searchDelay = 200; // Very fast for zoomed in
+          searchDelay = 400; // Very fast for zoomed in
         } else if (zoomLevel >= 14) {
-          searchDelay = 400; // Fast for medium zoom
+          searchDelay = 600; // Fast for medium zoom
         } else {
-          searchDelay = 600; // Standard for zoomed out
+          searchDelay = 800; // Still fast for zoomed out
         }
         
         console.log(`🚀 IMMEDIATE search scheduled in ${searchDelay}ms (zoom: ${zoomLevel})`);
@@ -515,7 +567,7 @@ const FullPageMap = ({
       }
       
       // Longer delay to let zoom animation complete and prevent marker flickering
-      const refreshDelay = 1200; // Increased delay for stability
+      const refreshDelay = 1500; // Increased delay for stability
       
       console.log(`🚀 ZOOM refresh scheduled in ${refreshDelay}ms`);
       
@@ -728,7 +780,7 @@ const FullPageMap = ({
                   // Ultra-fast search on center change
                   smoothSearchTimeoutRef.current = setTimeout(() => {
                     handleSmoothSearch();
-                  }, zoomLevel >= 16 ? 200 : 400);
+                  }, zoomLevel >= 16 ? 300 : 600);
                 }
               }
             }
@@ -769,7 +821,7 @@ const FullPageMap = ({
 
     initMap();
   }, [googleMapsReady, center, mapInitialized, zoom, isEmbedMode, handleDragStart, handleDragEnd, handleZoomChanged, isDragging, selectedCafe, handleSmoothPopupClose]);
-
+  
   // Update map center only for external changes
   useEffect(() => {
     if (googleMapRef.current && mapLoaded && mapInitialized && !isUserDraggingRef.current) {
@@ -808,21 +860,31 @@ const FullPageMap = ({
     const userLocationSVG = `
       <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
         <defs>
-          <!-- Pulsing blue gradient like Google Maps -->
-          <radialGradient id="userGradientGoogle" cx="50%" cy="50%" r="50%">
+          <!-- Outer pulse gradient -->
+          <radialGradient id="outerPulse" cx="50%" cy="50%" r="50%">
             <stop offset="0%" style="stop-color:#4285F4;stop-opacity:0.8" />
-            <stop offset="40%" style="stop-color:#4285F4;stop-opacity:0.4" />
+            <stop offset="50%" style="stop-color:#4285F4;stop-opacity:0.4" />
             <stop offset="100%" style="stop-color:#4285F4;stop-opacity:0.1" />
           </radialGradient>
           
-          <!-- Blue inner circle gradient -->
-          <radialGradient id="userInnerGradient" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" style="stop-color:#4285F4;stop-opacity:1" />
-            <stop offset="100%" style="stop-color:#1a73e8;stop-opacity:1" />
+          <!-- Main button gradient that changes from dark to light -->
+          <radialGradient id="mainButton" cx="30%" cy="30%" r="70%">
+            <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.4" />
+            <stop offset="30%" style="stop-color:#4285F4;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#1557b0;stop-opacity:1" />
+            <animateTransform attributeName="gradientTransform" type="rotate" 
+                            values="0 20 20;360 20 20" dur="3s" repeatCount="indefinite"/>
           </radialGradient>
           
-          <!-- Subtle glow effect -->
-          <filter id="userGlow">
+          <!-- Lightening overlay gradient -->
+          <radialGradient id="lightenOverlay" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.8" />
+            <stop offset="70%" style="stop-color:#87ceeb;stop-opacity:0.6" />
+            <stop offset="100%" style="stop-color:#4285F4;stop-opacity:0.2" />
+          </radialGradient>
+          
+          <!-- Glow effect -->
+          <filter id="buttonGlow" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
             <feMerge>
               <feMergeNode in="coloredBlur"/>
@@ -831,22 +893,26 @@ const FullPageMap = ({
           </filter>
         </defs>
         
-        <!-- Outer pulsing circle (Google Maps style) -->
-        <circle cx="20" cy="20" r="18" fill="url(#userGradientGoogle)" opacity="0.6">
-          <animate attributeName="r" values="18;22;18" dur="2s" repeatCount="indefinite"/>
-          <animate attributeName="opacity" values="0.6;0.3;0.6" dur="2s" repeatCount="indefinite"/>
+        <!-- Outer pulsing circle -->
+        <circle cx="20" cy="20" r="18" fill="url(#outerPulse)">
+          <animate attributeName="r" values="18;24;18" dur="2s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values="0.6;0.2;0.6" dur="2s" repeatCount="indefinite"/>
         </circle>
         
-        <!-- Middle circle -->
-        <circle cx="20" cy="20" r="12" fill="url(#userGradientGoogle)" opacity="0.8"/>
+        <!-- Main blue button -->
+        <circle cx="20" cy="20" r="10" fill="url(#mainButton)" 
+                stroke="rgba(255,255,255,0.6)" stroke-width="2" 
+                filter="url(#buttonGlow)"/>
         
-        <!-- Inner solid circle with border -->
-        <circle cx="20" cy="20" r="8" fill="url(#userInnerGradient)" stroke="white" stroke-width="2" filter="url(#userGlow)"/>
+        <!-- Lightening overlay that pulses -->
+        <circle cx="20" cy="20" r="10" fill="url(#lightenOverlay)">
+          <animate attributeName="opacity" values="0.3;0.8;0.3" dur="1.5s" repeatCount="indefinite"/>
+        </circle>
         
-        <!-- Lightning bolt icon -->
-        <g transform="translate(-1, -2)">
-          <path d="M21 10 L17 16 L21 16 L19 22 L23 16 L19 16 Z" fill="white" stroke="none"/>
-        </g>
+        <!-- Bright flash effect -->
+        <circle cx="20" cy="20" r="8" fill="#ffffff">
+          <animate attributeName="opacity" values="0;0.6;0" dur="2s" repeatCount="indefinite"/>
+        </circle>
       </svg>
     `;
 

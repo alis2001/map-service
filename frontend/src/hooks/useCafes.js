@@ -55,7 +55,7 @@ export const useCafes = (latitude, longitude, radius = 1500, type = 'cafe') => {
         // UPDATED: Get ALL places in one call for instant filtering
         const result = await placesAPI.getAllNearbyPlaces(latitude, longitude, {
           radius,
-          limit: 50 // Get more data for better filtering
+          limit: 100 // Get more data for better filtering
         });
 
         console.log('✅ All venues fetched for dark map:', {
