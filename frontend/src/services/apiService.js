@@ -16,7 +16,7 @@ const api = axios.create({
 class EnhancedCache {
   constructor() {
     this.cache = new Map();
-    this.maxAge = 5 * 60 * 1000; // 5 minutes cache for comprehensive results
+    this.maxAge = 10 * 60 * 1000; // 5 minutes cache for comprehensive results
     this.maxSize = 150; // Increased cache size
   }
 

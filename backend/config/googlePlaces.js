@@ -21,19 +21,19 @@ const getApiKey = () => {
 // ENHANCED: Configuration for MAXIMUM COVERAGE
 const getConfig = () => ({
   apiKey: getApiKey(),
-  defaultRadius: 2000, // INCREASED from 1500 to 2000 for better coverage
-  maxResults: 60,      // INCREASED from 20 to 60 for more results
+  defaultRadius: 2000,
+  maxResults: 60,
   language: 'it',
   region: 'IT',
   
-  // Rate limiting configuration
+  // 🔧 REDUCED rate limiting to prevent 429 errors
   rateLimit: {
-    maxRequestsPerMinute: 30, // INCREASED from 20 to 30
+    maxRequestsPerMinute: 15, // REDUCED from 30 to 15
     requestsThisMinute: 0,
     lastResetTime: Date.now(),
     requestQueue: [],
     processing: false,
-    backoffTime: 0
+    backoffTime: 1000 // 1 second backoff
   },
   
   // ENHANCED: Comprehensive place type mappings for ALL Italian venues

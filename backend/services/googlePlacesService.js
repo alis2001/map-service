@@ -418,15 +418,30 @@ class GooglePlacesService {
             continue;
           }
 
-          console.log('✅ PLACE VALIDATION PASSED - SAVING TO DB');
+          console.log('✅ PLACE VALIDATION PASSED - CHECKING VENUE TYPE');
 
           const detectedType = this.detectItalianVenueType(place, placeType);
+          
+          // ✅ NEW: Filter out excluded venues
+          if (detectedType === null) {
+            console.log('❌ VENUE TYPE EXCLUDED - SKIPPING:', {
+              name: place.name,
+              types: place.types?.slice(0, 3)
+            });
+            continue;
+          }
+
+          console.log('✅ VENUE TYPE CONFIRMED - SAVING TO DB:', {
+            name: place.name,
+            detectedType: detectedType
+          });
+
           const savedPlace = await this.saveOrUpdatePlace(place, detectedType);
           if (savedPlace) {
             processedPlaces.push(savedPlace);
             console.log('💾 PLACE SAVED SUCCESSFULLY');
           }
-          
+                
         } catch (error) {
           console.log('❌ FAILED TO PROCESS PLACE:', error.message);
           logger.warn('Failed to process individual place', {
@@ -450,105 +465,120 @@ class GooglePlacesService {
     }
   }
 
-  // UPDATED: Better Italian venue type detection
+  // UPDATED: Enhanced Italian venue type detection with exclusion rules
   detectItalianVenueType(place, fallbackType) {
     const name = (place.name || '').toLowerCase();
     const types = place.types || [];
     
-    console.log('🏷️ TYPE DETECTION:', { 
+    console.log('🏷️ ENHANCED TYPE DETECTION:', { 
       name: name.substring(0, 30), 
       types: types.slice(0, 5), 
       fallback: fallbackType 
     });
     
-    // PRIORITY 1: Clear restaurant indicators
-    if (types.includes('restaurant') || 
-        types.includes('meal_delivery') || 
-        types.includes('meal_takeaway') ||
-        name.includes('ristorante') || 
-        name.includes('pizzeria') || 
-        name.includes('trattoria') || 
-        name.includes('osteria')) {
-      console.log('🍽️ DETECTED AS RESTAURANT');
+    // ❌ EXCLUSION RULES - Skip these types entirely
+    const excludedTypes = [
+      'lodging', 'hotel', 'motel', 'hostel', 'resort',
+      'gas_station', 'petrol_station', 'fuel',
+      'hospital', 'pharmacy', 'doctor',
+      'bank', 'atm', 'finance',
+      'gym', 'spa', 'beauty_salon',
+      'car_dealer', 'car_repair', 'car_wash',
+      'school', 'university', 'library',
+      'church', 'mosque', 'synagogue',
+      'government', 'courthouse', 'embassy',
+      'parking', 'bus_station', 'subway_station',
+      'shopping_mall', 'department_store', 'clothing_store',
+      'electronics_store', 'furniture_store', 'hardware_store',
+      'real_estate_agency', 'insurance_agency',
+      'tourist_attraction', 'museum', 'zoo'
+    ];
+
+    // Check if place should be excluded
+    const hasExcludedType = types.some(type => excludedTypes.includes(type));
+    if (hasExcludedType) {
+      console.log('❌ EXCLUDED - Contains excluded type:', types.filter(t => excludedTypes.includes(t)));
+      return null; // Will be filtered out
+    }
+
+    // ❌ EXCLUSION BY NAME - Skip these name patterns
+    const excludedNamePatterns = [
+      'hotel', 'motel', 'hostel', 'resort', 'b&b', 'bed and breakfast',
+      'esso', 'shell', 'bp', 'total', 'agip', 'q8', 'distributore',
+      'supermercato', 'supermarket', 'conad', 'coop', 'esselunga',
+      'farmacia', 'pharmacy', 'ospedale', 'hospital',
+      'banca', 'bank', 'unicredit', 'intesa', 'poste',
+      'palestra', 'gym', 'fitness', 'centro estetico',
+      'parrucchiere', 'barbiere', 'salone',
+      'ufficio', 'agenzia', 'studio', 'centro commerciale'
+    ];
+
+    const hasExcludedName = excludedNamePatterns.some(pattern => 
+      name.includes(pattern)
+    );
+    if (hasExcludedName) {
+      console.log('❌ EXCLUDED - Contains excluded name pattern');
+      return null; // Will be filtered out
+    }
+
+    // ✅ POSITIVE IDENTIFICATION - Restaurants
+    const restaurantIndicators = [
+      // Italian restaurant types
+      'ristorante', 'pizzeria', 'trattoria', 'osteria', 'tavola calda',
+      'braceria', 'griglieria', 'paninoteca', 'hamburgeria',
+      // Food-related types
+      'restaurant', 'meal_delivery', 'meal_takeaway', 'food'
+    ];
+
+    const isRestaurant = types.some(type => ['restaurant', 'meal_delivery', 'meal_takeaway'].includes(type)) ||
+                        restaurantIndicators.some(indicator => name.includes(indicator));
+
+    if (isRestaurant) {
+      console.log('🍽️ CONFIRMED RESTAURANT');
       return 'restaurant';
     }
-    
-    // PRIORITY 2: Everything else is cafe (including Google's "bar" type)
-    console.log('☕ DETECTED AS CAFE (including bars)');
-    return 'cafe';
-  }
 
-  async saveOrUpdatePlace(placeData, placeType = null) {
-    try {
-      const finalPlaceType = placeType || this.detectItalianVenueType(placeData);
+    // ✅ POSITIVE IDENTIFICATION - Cafes/Bars
+    const cafeIndicators = [
+      // Italian cafe/bar types
+      'bar', 'caffè', 'caffe', 'caffetteria', 'pasticceria', 'gelateria',
+      'panetteria', 'bakery', 'dolceria', 'cornetteria',
+      // Drink-focused types
+      'cafe', 'coffee_shop', 'tea_house'
+    ];
 
-      console.log('💾 SAVING PLACE TO DATABASE:', {
-        googlePlaceId: placeData.googlePlaceId,
-        name: placeData.name,
-        placeType: finalPlaceType
-      });
+    const isCafe = types.some(type => ['cafe', 'bar', 'bakery'].includes(type)) ||
+                  cafeIndicators.some(indicator => name.includes(indicator));
 
-      const placeRecord = {
-        googlePlaceId: placeData.googlePlaceId,
-        name: placeData.name,
-        address: placeData.address || '',
-        latitude: placeData.latitude,
-        longitude: placeData.longitude,
-        placeType: finalPlaceType,
-        rating: placeData.rating || null,
-        priceLevel: placeData.priceLevel || null,
-        phoneNumber: placeData.phoneNumber || null,
-        website: placeData.website || null,
-        openingHours: placeData.openingHours || null,
-        photos: placeData.photos || [],
-        businessStatus: placeData.businessStatus || 'OPERATIONAL',
-        lastUpdated: new Date()
-      };
-
-      const place = await prisma.place.upsert({
-        where: { googlePlaceId: placeData.googlePlaceId },
-        update: {
-          ...placeRecord,
-          updatedAt: new Date()
-        },
-        create: {
-          ...placeRecord,
-          createdAt: new Date()
-        }
-      });
-
-      console.log('✅ PLACE SAVED TO DATABASE:', {
-        id: place.id,
-        googlePlaceId: place.googlePlaceId,
-        name: place.name
-      });
-
-      return place;
-      
-    } catch (error) {
-      console.error('❌ DATABASE SAVE ERROR:', error);
-      
-      if (error.code === 'P2002') {
-        console.log('⚠️ Duplicate place, updating existing...');
-        try {
-          const existingPlace = await prisma.place.findUnique({
-            where: { googlePlaceId: placeData.googlePlaceId }
-          });
-          if (existingPlace) {
-            return existingPlace;
-          }
-        } catch (updateError) {
-          console.error('Failed to handle duplicate:', updateError);
-        }
-      }
-      
-      logger.error('Failed to save place to database', {
-        googlePlaceId: placeData.googlePlaceId,
-        error: error.message
-      });
-      
-      throw error;
+    if (isCafe) {
+      console.log('☕ CONFIRMED CAFE/BAR');
+      return 'cafe';
     }
+
+    // ✅ SPECIAL CASES - Food establishments that might not have obvious types
+    const foodEstablishmentIndicators = [
+      'aperitivo', 'enoteca', 'vineria', 'wine_bar',
+      'pub', 'birreria', 'cocktail', 'lounge',
+      'taverna', 'locanda', 'agriturismo'
+    ];
+
+    const isFoodEstablishment = foodEstablishmentIndicators.some(indicator => 
+      name.includes(indicator) || types.includes(indicator)
+    );
+
+    if (isFoodEstablishment) {
+      // Determine if it's more restaurant-like or bar-like
+      const restaurantLike = ['agriturismo', 'taverna', 'locanda'].some(indicator => 
+        name.includes(indicator)
+      );
+      
+      console.log(restaurantLike ? '🍽️ SPECIAL RESTAURANT' : '☕ SPECIAL CAFE/BAR');
+      return restaurantLike ? 'restaurant' : 'cafe';
+    }
+
+    // ❌ If we can't positively identify it as food/drink, exclude it
+    console.log('❌ CANNOT IDENTIFY AS FOOD/DRINK ESTABLISHMENT - EXCLUDING');
+    return null;
   }
 
   async getPlaceById(placeId, options = {}) {
@@ -778,8 +808,26 @@ class GooglePlacesService {
     let formattedPlaces = places.map(place => {
       const formatted = formatPlace(place, userLocation);
       
+      // ✅ NEW: Ensure popularity data is included
+      formatted.rating = place.rating || 0;
+      formatted.user_ratings_total = place.user_ratings_total || place.userRatingsTotal || 0;
+      formatted.userRatingsTotal = place.user_ratings_total || place.userRatingsTotal || 0; // Duplicate for compatibility
+      
+      // ✅ Enhanced venue metadata
       formatted.emoji = this.getItalianVenueEmoji(formatted.placeType, formatted.name);
       formatted.displayType = this.getItalianVenueDisplayType(formatted.placeType);
+      
+      // ✅ NEW: Add popularity indicators for frontend
+      formatted.isHighRated = (formatted.rating || 0) >= 4.5;
+      formatted.isPopular = (formatted.userRatingsTotal || 0) >= 50;
+      formatted.popularityTier = this.getPopularityTier(formatted.rating, formatted.userRatingsTotal);
+      
+      console.log('📊 FORMATTED PLACE POPULARITY:', {
+        name: formatted.name.substring(0, 20),
+        rating: formatted.rating,
+        reviewCount: formatted.userRatingsTotal,
+        tier: formatted.popularityTier
+      });
       
       return formatted;
     });
@@ -999,7 +1047,85 @@ class GooglePlacesService {
       };
     }
   }
+  // ✅ NEW: Save or update place with review count data
+  async saveOrUpdatePlace(placeData, placeType = null) {
+    try {
+      const finalPlaceType = placeType || this.detectItalianVenueType(placeData);
 
+      console.log('💾 SAVING PLACE TO DATABASE:', {
+        googlePlaceId: placeData.googlePlaceId,
+        name: placeData.name,
+        placeType: finalPlaceType
+      });
+
+      const placeRecord = {
+        googlePlaceId: placeData.googlePlaceId,
+        name: placeData.name,
+        address: placeData.address || '',
+        latitude: placeData.latitude,
+        longitude: placeData.longitude,
+        placeType: finalPlaceType,
+        rating: placeData.rating || null,
+        priceLevel: placeData.priceLevel || null,
+        phoneNumber: placeData.phoneNumber || null,
+        website: placeData.website || null,
+        openingHours: placeData.openingHours || null,
+        photos: placeData.photos || [],
+        businessStatus: placeData.businessStatus || 'OPERATIONAL',
+        
+        // ✅ NEW: Include review count for popularity scoring
+        userRatingsTotal: placeData.user_ratings_total || placeData.userRatingsTotal || 0,
+        
+        lastUpdated: new Date()
+      };
+
+      const place = await prisma.place.upsert({
+        where: { googlePlaceId: placeData.googlePlaceId },
+        update: {
+          ...placeRecord,
+          updatedAt: new Date()
+        },
+        create: {
+          ...placeRecord,
+          createdAt: new Date()
+        }
+      });
+
+      console.log('✅ PLACE SAVED TO DATABASE:', {
+        id: place.id,
+        googlePlaceId: place.googlePlaceId,
+        name: place.name,
+        rating: place.rating,
+        reviewCount: place.userRatingsTotal
+      });
+
+      return place;
+      
+    } catch (error) {
+      console.error('❌ DATABASE SAVE ERROR:', error);
+      
+      if (error.code === 'P2002') {
+        console.log('⚠️ Duplicate place, updating existing...');
+        try {
+          const existingPlace = await prisma.place.findUnique({
+            where: { googlePlaceId: placeData.googlePlaceId }
+          });
+          if (existingPlace) {
+            return existingPlace;
+          }
+        } catch (updateError) {
+          console.error('Failed to handle duplicate:', updateError);
+        }
+      }
+      
+      logger.error('Failed to save place to database', {
+        googlePlaceId: placeData.googlePlaceId,
+        error: error.message
+      });
+      
+      throw error;
+    }
+  }
   // ENHANCED: Health check with detailed status
   async healthCheck() {
     try {
@@ -1032,6 +1158,17 @@ class GooglePlacesService {
         timestamp: new Date().toISOString()
       };
     }
+  }
+  // ✅ NEW: Calculate popularity tier for frontend use
+  getPopularityTier(rating = 0, reviewCount = 0) {
+    const ratingScore = (rating / 5) * 0.7;
+    const reviewScore = Math.min(reviewCount / 100, 1) * 0.3;
+    const totalScore = ratingScore + reviewScore;
+    
+    if (totalScore >= 0.8) return 'premium'; // Very popular
+    if (totalScore >= 0.6) return 'popular'; // Popular
+    if (totalScore >= 0.4) return 'decent';  // Decent
+    return 'basic'; // Basic
   }
 }
 

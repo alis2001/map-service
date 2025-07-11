@@ -12,25 +12,35 @@ datasource db {
 }
 
 model Place {
-  id              String  @id @default(cuid())
-  googlePlaceId   String  @unique
+  id              String   @id @default(cuid())
+  googlePlaceId   String   @unique
   name            String
   address         String
   latitude        Float
   longitude       Float
-  placeType       String  // 'cafe' or 'bar'
+  placeType       String   // 'cafe', 'bar', 'restaurant'
   rating          Float?
   priceLevel      Int?
   phoneNumber     String?
   website         String?
   openingHours    Json?
   photos          Json?
-  businessStatus  String?
-  isActive        Boolean @default(true)
+  businessStatus  String?  @default("OPERATIONAL")
+  isActive        Boolean  @default(true)
+  
+  // ✅ NEW: Add review count field for popularity scoring
+  userRatingsTotal Int?    @default(0)
+  
   lastUpdated     DateTime @default(now())
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  // Add indexes for better performance including new popularity fields
+  @@index([latitude, longitude])
+  @@index([placeType])
+  @@index([rating])
+  @@index([userRatingsTotal]) // ✅ NEW: Index for review count queries
+  @@index([rating, userRatingsTotal]) // ✅ NEW: Composite index for popularity queries
   @@map("places")
 }
 
