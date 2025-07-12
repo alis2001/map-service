@@ -508,20 +508,20 @@ const updateMarkerHoverState = useCallback((cafeId, isHovered) => {
       lng: newCenter.lng
     });
     
-    // Smooth loading animation
+    // Show dragging loading during search
     setIsRefreshing(true);
-    setSmoothTransition(true);
-    
-    // Trigger the actual refresh
+
+    // Trigger refresh
     if (onRefresh) {
       onRefresh();
     }
-    
+
+    // Hide loading after search completes - shorter duration for better UX
     // End refresh animation smoothly
     setTimeout(() => {
       setIsRefreshing(false);
       setSmoothTransition(false);
-    }, 1500);
+    }, 1000); // Change this from 1500 to 1000
     
   }, [onCenterChange, onRefresh, isDragging]);
 
@@ -1454,15 +1454,10 @@ const updateMarkerHoverState = useCallback((cafeId, isHovered) => {
         {isZoomingIn ? '🔍 Zoom In' : isZoomingOut ? '🔍 Zoom Out' : ''}
       </div>
       
-      {/* Smooth Loading Indicators */}
+      {/* Smooth Loading Indicators - ONLY for map dragging */}
       <SmoothLoader 
-        isVisible={isRefreshing} 
+        isVisible={isRefreshing && !error} 
         message="🔄 Aggiornamento luoghi..." 
-      />
-      
-      <SmoothLoader 
-        isVisible={loading && !isRefreshing} 
-        message="⚡ Caricamento mappa..." 
       />
 
       {/* Initial Loading Screen */}
@@ -1474,10 +1469,10 @@ const updateMarkerHoverState = useCallback((cafeId, isHovered) => {
         />
       )}
 
-      {/* INSTANT Map Update Loader */}
-      {(isMapUpdating || (hasInitialLoad && loading)) && (
+      {/* Map dragging/update loading - ONLY for normal map interactions */}
+      {(isRefreshing || (loading && !error)) && !selectedCafe && (
         <MapUpdateLoader
-          loading={isMapUpdating || (hasInitialLoad && loading)}
+          loading={true}
           searchType={cafeType}
           forcefulMode={false}
         />

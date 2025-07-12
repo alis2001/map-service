@@ -5,6 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { QueryClient, QueryClientProvider } from 'react-query';
 import FullPageMap from './components/FullPageMap';
 import LoadingScreen from './components/LoadingScreen';
+import StartupLoadingScreen from './components/StartupLoadingScreen'; // ADDED: Missing import
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useGeolocation } from './hooks/useGeolocation';
 import { useCafes } from './hooks/useCafes';
@@ -49,8 +50,13 @@ function MapApp() {
   const [locationRequested, setLocationRequested] = useState(false);
   const [locationCapability, setLocationCapability] = useState('unknown');
 
-  // ADDED: Rate limit recovery state
+  // Rate limit recovery state
   const [isRateLimitRecovery, setIsRateLimitRecovery] = useState(false);
+
+  // ADDED: Missing startup loading state variables
+  const [loadingStage, setLoadingStage] = useState('initializing');
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [isFullyReady, setIsFullyReady] = useState(false);
 
   // 🚀 **ULTRA-FAST GEOLOCATION HOOK**
   const { 
@@ -73,7 +79,7 @@ function MapApp() {
     loading: cafesLoading,
     error: cafesError,
     refetch: refetchCafes,
-    isRefreshing // ADDED: from enhanced useCafes hook
+    isRefreshing // from enhanced useCafes hook
   } = useCafes(
     mapCenter?.lat, 
     mapCenter?.lng, 
@@ -81,29 +87,35 @@ function MapApp() {
     cafeType
   );
 
-  // ADDED: Detect rate limit recovery from isRefreshing state
-  useEffect(() => {
-    if (isRefreshing) {
-      setIsRateLimitRecovery(true);
-      console.log('🚫 Rate limit recovery detected from isRefreshing state');
-    } else {
-      setIsRateLimitRecovery(false);
-    }
-  }, [isRefreshing]);
-
-  // ADDED: Detect rate limit errors from error messages
+  // Rate limit detection - ONLY for confirmed API errors
   useEffect(() => {
     if (cafesError && cafesError.message) {
-      const isRateLimitError = cafesError.message.includes('Ricarico') || 
-                              cafesError.message.includes('troppo frequente') ||
-                              cafesError.message.includes('automaticamente');
+      // VERY PRECISE detection - only trigger on confirmed rate limit message
+      const isConfirmedRateLimit = 
+        cafesError.message.includes('RATE_LIMIT_CONFIRMED:') ||
+        cafesError.message.includes('troppe richieste') ||
+        cafesError.message.includes('Too Many Requests') ||
+        cafesError.message.includes('429') ||
+        (cafesError.status === 429);
       
-      if (isRateLimitError) {
+      if (isConfirmedRateLimit && !isRateLimitRecovery) {
+        console.log('🚫 CONFIRMED Rate limit detected:', cafesError.message);
         setIsRateLimitRecovery(true);
-        console.log('🚫 Rate limit detected from error message:', cafesError.message);
+        
+        // Auto-recovery after 8 seconds
+        const recoveryTimer = setTimeout(() => {
+          console.log('✅ Rate limit recovery completed, reloading...');
+          setIsRateLimitRecovery(false);
+          window.location.reload();
+        }, 8000);
+        
+        return () => clearTimeout(recoveryTimer);
       }
+    } else {
+      // Clear rate limit recovery if error is resolved
+      setIsRateLimitRecovery(false);
     }
-  }, [cafesError]);
+  }, [cafesError, isRateLimitRecovery]);
 
   // 🏥 **BACKEND HEALTH CHECK**
   const checkBackendHealth = useCallback(async () => {
@@ -127,28 +139,61 @@ function MapApp() {
     }
   }, []);
 
-  // 🚀 **APP INITIALIZATION**
+  // 🚀 **APP INITIALIZATION WITH LOADING STAGES**
   useEffect(() => {
     console.log('🚀 Starting app initialization...');
+    setLoadingStage('initializing');
+    setLoadingProgress(0);
     
     const initializeApp = async () => {
-      // Quick backend check
+      // Stage 1: Backend Health Check
+      setLoadingProgress(20);
       const backendOk = await checkBackendHealth();
       
       if (backendOk) {
-        console.log('⚡ App ready');
+        console.log('✅ Backend ready');
+        setLoadingProgress(40);
         setAppReady(true);
       } else {
         // Continue with degraded mode
         console.log('⚡ App ready with degraded backend');
+        setLoadingProgress(30);
         setAppReady(true);
       }
+      
+      // Stage 2: Location Detection
+      setLoadingStage('location');
+      setLoadingProgress(50);
     };
 
     initializeApp();
   }, [checkBackendHealth]);
 
-  // 🗺️ **MAP CENTER UPDATE - Only from Real User Location**
+  // 📍 **LOCATION STAGE MANAGEMENT**
+  useEffect(() => {
+    if (appReady && !locationRequested && !userLocation && !locationLoading) {
+      console.log('📍 Auto-requesting location...');
+      setLocationRequested(true);
+      setLoadingStage('location');
+      setLoadingProgress(60);
+      
+      if (refreshLocation) {
+        refreshLocation();
+      }
+    }
+  }, [appReady, locationRequested, userLocation, locationLoading, refreshLocation]);
+
+  // 📍 **LOCATION PROGRESS TRACKING**
+  useEffect(() => {
+    if (locationLoading) {
+      setLoadingStage('location');
+      setLoadingProgress(70);
+    } else if (userLocation && hasLocation) {
+      setLoadingProgress(80);
+    }
+  }, [locationLoading, userLocation, hasLocation]);
+
+  // 🗺️ **MAP CENTER UPDATE AND STAGE PROGRESSION**
   useEffect(() => {
     if (userLocation && hasLocation && !locationLoading) {
       console.log('📍 Setting map center to user location:', {
@@ -160,29 +205,66 @@ function MapApp() {
         lat: userLocation.latitude,
         lng: userLocation.longitude
       });
+      
+      // Move to map stage
+      setLoadingStage('map');
+      setLoadingProgress(90);
     }
   }, [userLocation, hasLocation, locationLoading]);
 
-  // 📱 **AUTO-REQUEST LOCATION ON FIRST VISIT**
+  // 🗺️ **FINAL READINESS CHECK**
   useEffect(() => {
-    if (!locationRequested && !userLocation && !locationLoading) {
-      console.log('📍 Auto-requesting location on first visit...');
-      setLocationRequested(true);
-      if (refreshLocation) {
-        refreshLocation();
-      }
+    // App is fully ready when we have a map center and not in rate limit recovery
+    if (appReady && mapCenter && !isRateLimitRecovery) {
+      // Small delay to ensure everything is settled
+      const timer = setTimeout(() => {
+        setLoadingStage('ready');
+        setLoadingProgress(100);
+        setIsFullyReady(true);
+        console.log('🎉 App fully ready!');
+      }, 500);
+      
+      return () => clearTimeout(timer);
     }
-  }, [locationRequested, userLocation, locationLoading, refreshLocation]);
+  }, [appReady, mapCenter, isRateLimitRecovery]);
 
-  // Search change handler
-  const onSearchChange = useCallback(({ type, radius }) => {
-    if (type !== undefined) {
-      setCafeType(type);
+  // 🔄 **SEARCH CHANGE HANDLER**
+  const handleSearchChange = useCallback((changes) => {
+    console.log('🔍 Search parameters changed:', changes);
+    
+    if (changes.type !== undefined) {
+      setCafeType(changes.type);
     }
-    if (radius !== undefined) {
-      setSearchRadius(radius);
+    
+    if (changes.radius !== undefined) {
+      setSearchRadius(parseInt(changes.radius));
     }
-  }, []);
+    
+    // Auto-refetch with new parameters
+    setTimeout(() => {
+      if (refetchCafes && mapCenter) {
+        console.log('🔄 Auto-refetching with new search params');
+        refetchCafes();
+      }
+    }, 300);
+    
+  }, [refetchCafes, mapCenter]);
+
+  // 📍 **LOCATION HANDLERS**
+  const handleLocationRetry = useCallback(() => {
+    console.log('🔄 Retrying location detection...');
+    setLocationRequested(false);
+    if (refreshLocation) {
+      refreshLocation();
+    }
+  }, [refreshLocation]);
+
+  const handlePreciseLocation = useCallback(() => {
+    console.log('🎯 Requesting precise location...');
+    if (getPreciseLocation) {
+      getPreciseLocation();
+    }
+  }, [getPreciseLocation]);
 
   // Go to user location handler with smooth animation
   const handleGoToUserLocation = useCallback(() => {
@@ -211,44 +293,7 @@ function MapApp() {
     
   }, [userLocation, refreshLocation, refetchCafes]);
 
-  // 🔄 **SEARCH CHANGE HANDLER**
-  const handleSearchChange = useCallback((changes) => {
-    console.log('🔍 Search parameters changed:', changes);
-    
-    if (changes.type !== undefined) {
-      setCafeType(changes.type);
-    }
-    
-    if (changes.radius !== undefined) {
-      setSearchRadius(parseInt(changes.radius));
-    }
-    
-    // Auto-refetch with new parameters
-    setTimeout(() => {
-      if (refetchCafes && mapCenter) {
-        console.log('🔄 Auto-refetching with new search params');
-        refetchCafes();
-      }
-    }, 300);
-    
-  }, [refetchCafes, mapCenter]);
-
-  // 📍 **LOCATION HANDLERS**
-  const handleLocationRetry = useCallback(() => {
-    console.log('🔄 Retrying location detection...');
-    if (refreshLocation) {
-      refreshLocation();
-    }
-  }, [refreshLocation]);
-
-  const handlePreciseLocation = useCallback(() => {
-    console.log('🎯 Requesting precise location...');
-    if (getPreciseLocation) {
-      getPreciseLocation();
-    }
-  }, [getPreciseLocation]);
-
-  // ADDED: Rate limit recovery screen (highest priority)
+  // 1. Rate limit recovery screen (highest priority) - ONLY for confirmed API errors
   if (isRateLimitRecovery) {
     return (
       <LoadingScreen 
@@ -260,29 +305,54 @@ function MapApp() {
     );
   }
 
-  // 🏠 **INITIAL LOADING STATE**
-  if (!appReady) {
+  // 2. Creative startup loading screen (before map is ready)
+  if (!isFullyReady) {
+    const getMessage = () => {
+      switch (loadingStage) {
+        case 'initializing': return 'Avvio applicazione...';
+        case 'location': return 'Rilevamento posizione...';
+        case 'map': return 'Preparazione mappa...';
+        case 'ready': return 'Finalizzazione...';
+        default: return 'Caricamento...';
+      }
+    };
+
+    const getSubMessage = () => {
+      switch (loadingStage) {
+        case 'initializing': return 'Controllo servizi backend';
+        case 'location': return qualityText && sourceText ? `${qualityText} • ${sourceText}` : 'Attivazione GPS';
+        case 'map': return 'Configurazione interfaccia mappa';
+        case 'ready': return 'Caricamento dati locali';
+        default: return '';
+      }
+    };
+
     return (
-      <LoadingScreen 
-        message="Avvio applicazione..."
-        subMessage="Preparazione servizi mappa"
+      <StartupLoadingScreen
+        stage={loadingStage}
+        progress={loadingProgress}
+        message={getMessage()}
+        subMessage={getSubMessage()}
+        locationQuality={qualityText}
+        onLocationRetry={loadingStage === 'location' ? handleLocationRetry : null}
+      />
+    );
+  }
+
+  // 3. Location error state (if location failed and no map center)
+  if (!mapCenter && locationError && !locationLoading && appReady) {
+    return (
+      <StartupLoadingScreen
+        stage="location"
         progress={50}
+        message="Posizione richiesta"
+        subMessage="Per trovare i migliori locali nelle vicinanze"
+        onLocationRetry={handleLocationRetry}
       />
     );
   }
 
-  // 📍 **LOCATION LOADING STATE**
-  if (!mapCenter && locationLoading && !locationError) {
-    return (
-      <LoadingScreen 
-        message="Rilevamento posizione..."
-        subMessage={`${qualityText || 'Ricerca GPS'} • ${sourceText || 'Sensori dispositivo'}`}
-        progress={75}
-      />
-    );
-  }
-
-  // ❌ **CRITICAL ERROR STATE**
+  // ❌ **FALLBACK ERROR STATE**
   if (!mapCenter && locationError && !locationLoading) {
     return (
       <div className="map-app">
