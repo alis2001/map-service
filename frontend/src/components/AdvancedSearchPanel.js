@@ -5,6 +5,8 @@ const AdvancedSearchPanel = ({
   onPlaceSelect, 
   onCityChange, 
   currentMapCenter,
+  currentCafeType = 'cafe',
+  onCafeTypeChange,
   className = "" 
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -20,7 +22,8 @@ const AdvancedSearchPanel = ({
   const [placeQuery, setPlaceQuery] = useState('');
   const [placeResults, setPlaceResults] = useState([]);
   const [loadingPlaces, setLoadingPlaces] = useState(false);
-  const [searchType, setSearchType] = useState('all');
+  // Use the app's cafe type instead of local state
+  const searchType = currentCafeType === 'restaurant' ? 'restaurant' : 'cafe';
   
   // UI state
   const [showCitySuggestions, setShowCitySuggestions] = useState(false);
@@ -172,9 +175,8 @@ const AdvancedSearchPanel = ({
   };
 
   const searchTypes = [
-    { value: 'all', label: 'Tutto', icon: Search, color: '#3B82F6' },
     { value: 'cafe', label: 'Bar/Caffè', icon: Coffee, color: '#F59E0B' },
-    { value: 'restaurant', label: 'Ristoranti', icon: Utensils, color: '#10B981' }
+    { value: 'restaurant', label: 'Ristoranti', icon: Utensils, color: '#E74C3C' }
   ];
 
   return (
@@ -448,7 +450,12 @@ const AdvancedSearchPanel = ({
                   return (
                     <button
                       key={type.value}
-                      onClick={() => setSearchType(type.value)}
+                      onClick={() => {
+                        console.log('🎨 Search panel type clicked:', type.value);
+                        if (onCafeTypeChange) {
+                            onCafeTypeChange(type.value);
+                        }
+                      }}
                       style={{
                         flex: 1,
                         display: 'flex',

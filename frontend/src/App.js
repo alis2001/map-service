@@ -264,104 +264,158 @@ function MapApp() {
     }
   }, [refreshLocation]);
 
-  const handleSearchPlaceSelect = useCallback((place) => {
+  const handleSearchPlaceSelect = useCallback(async (place) => {
     console.log('🔍 Search place selected:', place);
     console.log('🔍 Raw place object:', JSON.stringify(place, null, 2));
     
+    // Helper function to continue processing after getting coordinates
+    const continueWithCoordinates = (lat, lng) => {
+      console.log('📍 Final extracted coordinates:', { lat, lng });
+      console.log('📍 Coordinates valid?', { 
+        lat: !isNaN(lat) && lat !== null && lat !== undefined,
+        lng: !isNaN(lng) && lng !== null && lng !== undefined
+      });
+      
+      if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
+        console.error('❌ Invalid coordinates, cannot proceed');
+        return;
+      }
+      
+      // Format the place data to match the existing cafe structure
+      const formattedPlace = {
+        id: place.id || place.googlePlaceId || `search_${Date.now()}`,
+        googlePlaceId: place.id || place.googlePlaceId,
+        name: place.name,
+        address: place.address,
+        latitude: lat,
+        longitude: lng,
+        rating: place.rating,
+        priceLevel: place.priceLevel,
+        types: place.types || ['establishment'],
+        openingHours: place.openingHours,
+        photos: place.photos || [],
+        distance: place.distance,
+        formattedDistance: place.formattedDistance,
+        isOpen: place.isOpen,
+        location: {
+          latitude: lat,
+          longitude: lng,
+          lat: lat,      // Keep both formats for compatibility
+          lng: lng
+        },
+        source: 'search',
+        // Add marker-specific fields
+        emoji: place.types?.includes('restaurant') ? '🍽️' : '☕',
+        type: place.types?.includes('restaurant') ? 'restaurant' : 'cafe',
+        placeType: place.types?.includes('restaurant') ? 'restaurant' : 'cafe',
+        isSearchResult: true
+      };
+      
+      console.log('🎯 Formatted place for map:', formattedPlace);
+      
+      // IMPORTANT: Set selected cafe FIRST
+      setSelectedCafe(formattedPlace);
+      setSelectedSearchPlace(formattedPlace);
+
+      // Add the search result to cafe markers
+      console.log('🎯 Adding search result to cafe markers');
+      
+      // Then update map center with a slight delay to ensure state updates
+      setTimeout(() => {
+        console.log('📍 Setting map center to exact search coordinates:', { lat, lng });
+        setMapCenter({
+          lat: lat,
+          lng: lng
+        });
+        
+        // Force high zoom for search results
+        setZoom(18);
+        
+        // Force a refresh of the cafes to ensure the marker appears
+        setTimeout(() => {
+          if (refetchCafes) {
+            console.log('🔄 Refreshing cafes to show search result marker');
+            refetchCafes();
+          }
+        }, 100);
+        
+        // Additional: Force map to pan to exact location after everything loads
+        setTimeout(() => {
+          console.log('🎯 Final positioning to search result coordinates');
+          setMapCenter({
+            lat: lat,
+            lng: lng
+          });
+        }, 500);
+      }, 50);
+      
+      console.log('✅ Search place integration completed');
+    };
+
     // More robust coordinate extraction - check all possible formats
     let lat, lng;
     
-    // Try different coordinate formats from search results
-    if (place.latitude && place.longitude) {
+    console.log('🔍 Getting exact coordinates for place:', place.name);
+
+    // If we have the place ID, use Google Places API to get exact coordinates
+    if (place.id && window.google && window.google.maps && window.google.maps.places) {
+      try {
+        const service = new window.google.maps.places.PlacesService(document.createElement('div'));
+        
+        service.getDetails({
+          placeId: place.id,
+          fields: ['geometry', 'name', 'formatted_address']
+        }, (placeResult, status) => {
+          if (status === window.google.maps.places.PlacesServiceStatus.OK && placeResult.geometry) {
+            lat = placeResult.geometry.location.lat();
+            lng = placeResult.geometry.location.lng();
+            console.log('📍 Using Google Places API coordinates:', { lat, lng });
+            
+            // Continue with the rest of the function
+            continueWithCoordinates(lat, lng);
+          } else {
+            console.log('⚠️ Google Places API failed, using city coordinates');
+            if (place.city && place.city.coordinates) {
+              lat = parseFloat(place.city.coordinates.lat);
+              lng = parseFloat(place.city.coordinates.lng);
+              continueWithCoordinates(lat, lng);
+            }
+          }
+        });
+        return; // Exit early, continue in callback
+      } catch (error) {
+        console.log('⚠️ Google Places API error:', error);
+      }
+    }
+
+    // Try different coordinate formats from search results (if Google Places API not available)
+    if (place.coordinates && place.coordinates.lat && place.coordinates.lng) {
+      lat = parseFloat(place.coordinates.lat);
+      lng = parseFloat(place.coordinates.lng);
+      console.log('📍 Using coordinates object (primary):', { lat, lng });
+    } else if (place.latitude && place.longitude) {
       lat = parseFloat(place.latitude);
       lng = parseFloat(place.longitude);
       console.log('📍 Using direct lat/lng:', { lat, lng });
-    } else if (place.coordinates && place.coordinates.lat && place.coordinates.lng) {
-      lat = parseFloat(place.coordinates.lat);
-      lng = parseFloat(place.coordinates.lng);
-      console.log('📍 Using coordinates object:', { lat, lng });
     } else if (place.location && place.location.lat && place.location.lng) {
       lat = parseFloat(place.location.lat);
       lng = parseFloat(place.location.lng);
       console.log('📍 Using location object:', { lat, lng });
-    } else if (place.city && place.city.coordinates) {
-      // Fallback to city coordinates if place coordinates not available
-      lat = parseFloat(place.city.coordinates.lat);
-      lng = parseFloat(place.city.coordinates.lng);
-      console.log('📍 Using city coordinates as fallback:', { lat, lng });
-    }
-    
-    console.log('📍 Final extracted coordinates:', { lat, lng });
-    console.log('📍 Coordinates valid?', { 
-      lat: !isNaN(lat) && lat !== null && lat !== undefined,
-      lng: !isNaN(lng) && lng !== null && lng !== undefined
-    });
-    
-    if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
-      console.error('❌ Still invalid coordinates. Full place object:', place);
-      // Let's try to continue anyway with city coordinates
+    } else if (place.location && place.location.latitude && place.location.longitude) {
+      lat = parseFloat(place.location.latitude);
+      lng = parseFloat(place.location.longitude);
+      console.log('📍 Using location object (lat/long format):', { lat, lng });
+    } else {
+      console.log('⚠️ No place coordinates found, using city coordinates as fallback');
       if (place.city && place.city.coordinates) {
         lat = parseFloat(place.city.coordinates.lat);
         lng = parseFloat(place.city.coordinates.lng);
-        console.log('🔄 Trying city coordinates:', { lat, lng });
-      }
-      
-      if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
-        console.error('❌ No valid coordinates found anywhere');
-        return;
+        console.log('📍 Using city coordinates as fallback:', { lat, lng });
       }
     }
-    
-    // Format the place data to match the existing cafe structure
-    const formattedPlace = {
-      id: place.id || place.googlePlaceId || `search_${Date.now()}`,
-      googlePlaceId: place.id || place.googlePlaceId,
-      name: place.name,
-      address: place.address,
-      latitude: lat,
-      longitude: lng,
-      rating: place.rating,
-      priceLevel: place.priceLevel,
-      types: place.types || ['establishment'],
-      openingHours: place.openingHours,
-      photos: place.photos || [],
-      distance: place.distance,
-      formattedDistance: place.formattedDistance,
-      isOpen: place.isOpen,
-      location: {
-        lat: lat,
-        lng: lng
-      },
-      source: 'search'
-    };
-    
-    console.log('🎯 Formatted place for map:', formattedPlace);
-    
-    // IMPORTANT: Set selected cafe FIRST
-    setSelectedCafe(formattedPlace);
-    setSelectedSearchPlace(formattedPlace);
-    
-    // Then update map center with a slight delay to ensure state updates
-    setTimeout(() => {
-      console.log('📍 Setting map center to:', { lat, lng });
-      setMapCenter({
-        lat: lat,
-        lng: lng
-      });
-      
-      // Force zoom change
-      setZoom(19);
-      
-      // Force a refresh of the cafes to ensure the marker appears
-      setTimeout(() => {
-        if (refetchCafes) {
-          console.log('🔄 Refreshing cafes to show search result marker');
-          refetchCafes();
-        }
-      }, 100);
-    }, 50);
-    
-    console.log('✅ Search place integration completed');
+
+    // Continue with extracted coordinates
+    continueWithCoordinates(lat, lng);
   }, [refetchCafes]);
 
   const handleSearchResultsUpdate = useCallback((results) => {
@@ -508,25 +562,45 @@ function MapApp() {
   return (
     <div className="map-app">
 
-      {/* Advanced Search Panel */}
-      {isFullyReady && (
-        <AdvancedSearchPanel
-          onPlaceSelect={handleSearchPlaceSelect}
-          onCityChange={(cityCoordinates) => {
-            console.log('🏙️ City changed, updating map center:', cityCoordinates);
-            setMapCenter(cityCoordinates);
-            setZoom(13); // City-level zoom
-          }}
-          onResultsUpdate={handleSearchResultsUpdate}
-          userLocation={userLocation}
-          currentMapCenter={mapCenter}
-          className="z-50"
-        />
-      )}
+      <AdvancedSearchPanel
+        onPlaceSelect={handleSearchPlaceSelect}
+        onCityChange={(cityCoordinates) => {
+          console.log('🏙️ City changed, updating map center:', cityCoordinates);
+          setMapCenter(cityCoordinates);
+          setZoom(13); // City-level zoom
+        }}
+        onResultsUpdate={handleSearchResultsUpdate}
+        userLocation={userLocation}
+        currentMapCenter={mapCenter}
+        currentCafeType={cafeType}
+        onCafeTypeChange={(newType) => {
+          console.log('🔄 Search panel changed cafe type to:', newType);
+          setCafeType(newType);
+        }}
+        className="z-50"
+      />
       <FullPageMap
         center={mapCenter}
         zoom={zoom}
-        cafes={[...cafes || [], ...(selectedSearchPlace ? [selectedSearchPlace] : [])]}  // Add search result to cafes
+        cafes={(() => {
+          const baseCafes = cafes || [];
+          if (selectedSearchPlace) {
+            // Remove any existing search results to avoid duplicates
+            const filteredCafes = baseCafes.filter(cafe => cafe.source !== 'search');
+            // Add the new search result with proper marker structure
+            const searchWithMarkerData = {
+              ...selectedSearchPlace,
+              // Ensure all required marker fields are present
+              emoji: selectedSearchPlace.types?.includes('restaurant') ? '🍽️' : '☕',
+              type: selectedSearchPlace.types?.includes('restaurant') ? 'restaurant' : 'cafe',
+              placeType: selectedSearchPlace.types?.includes('restaurant') ? 'restaurant' : 'cafe',
+              isSearchResult: true
+            };
+            console.log('🎯 Adding search marker to map:', searchWithMarkerData.name);
+            return [...filteredCafes, searchWithMarkerData];
+          }
+          return baseCafes;
+        })()}
         selectedCafe={selectedCafe}
         userLocation={userLocation}
         onCafeSelect={setSelectedCafe}

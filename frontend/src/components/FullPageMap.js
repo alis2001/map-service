@@ -148,10 +148,19 @@ const FullPageMap = ({
     
     const currentCenter = googleMapRef.current.getCenter();
     const currentZoom = googleMapRef.current.getZoom();
+    // Handle different location formats for search markers
     const targetPosition = {
-      lat: userLocation.latitude,
-      lng: userLocation.longitude
+      lat: cafe.location?.latitude || cafe.location?.lat || cafe.latitude,
+      lng: cafe.location?.longitude || cafe.location?.lng || cafe.longitude
     };
+
+    console.log('🎯 Target position for zoom:', targetPosition);
+
+    // Ensure we have valid coordinates
+    if (!targetPosition.lat || !targetPosition.lng) {
+      console.error('❌ Invalid target position for marker click:', cafe);
+      return;
+    }
     
     // Calculate optimal zoom level for user location (good overview)
     const targetZoom = Math.max(16, currentZoom);
@@ -232,7 +241,7 @@ const FullPageMap = ({
     
   }, [userLocation, selectedCafe, onClosePopup, onCenterChange, onRefresh]);
   // Replace the createEnhancedDarkMapMarker function with this enhanced version:
-  const createEnhancedDarkMapMarker = (cafe, index, currentType, isHovered = false) => {
+  const createEnhancedDarkMapMarker = (cafe, index, currentType, isHovered = false, isSearchResult = false) => {
     const rating = cafe.rating || 0;
     const reviewCount = cafe.user_ratings_total || cafe.userRatingsTotal || 0;
     
@@ -276,6 +285,13 @@ const FullPageMap = ({
     };
     
     const colors = getTypeColor();
+    // 🎯 SPECIAL SEARCH RESULT MARKER TREATMENT
+    if (isSearchResult) {
+      colors.primary = '#9C27B0';  // Purple for search results
+      colors.secondary = '#7B1FA2';
+      colors.glow = '#BA68C8';
+      console.log('🔍 Creating special search result marker for:', cafe.name);
+    }
     
     // 📏 DYNAMIC SIZE PROGRESSION with zoom awareness AND HOVER ENLARGEMENT
     const getMarkerSize = () => {
@@ -1293,27 +1309,46 @@ const updateMarkerHoverState = useCallback((cafeId, isHovered) => {
       // Use stable hover state (don't check real-time hover during creation)
       const isHovered = !isDragging && !isMapInteracting && hoveredMarker === cafeId;
 
-      const markerSVG = createEnhancedDarkMapMarker(cafe, index, currentFilterRef.current, isHovered);
+      // Special handling for search result markers
+      const isSearchMarker = cafe.source === 'search' || cafe.isSearchResult;
+      const markerSVG = createEnhancedDarkMapMarker(cafe, index, currentFilterRef.current, isHovered, isSearchMarker);
 
       const popularityScore = calculatePopularityScore(cafe);
       const markerSize = getMarkerSizeFromPopularity(popularityScore, zoomLevel);
 
+      // Calculate z-index with special priority for search results
+      const baseZIndex = Math.round(popularityScore * 1000) + 100;
+      const hoverZIndex = isHovered ? 1000 : 0;
+      const searchZIndex = isSearchMarker ? 5000 : 0; // Highest priority for search results
+
       const marker = new window.google.maps.Marker({
         position: position,
         map: googleMapRef.current,
-        title: `${cafe.emoji || (currentFilterRef.current === 'restaurant' ? '🍽️' : '☕')} ${cafe.name}`,
+        title: `${isSearchMarker ? '🔍 ' : ''}${cafe.emoji || (currentFilterRef.current === 'restaurant' ? '🍽️' : '☕')} ${cafe.name}`,
         icon: {
           url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(markerSVG),
           scaledSize: new window.google.maps.Size(markerSize + 24, markerSize + 24),
           anchor: new window.google.maps.Point((markerSize + 24) / 2, (markerSize + 24) / 2)
         },
-        zIndex: Math.round(popularityScore * 1000) + 100 + (isHovered ? 1000 : 0),
+        zIndex: baseZIndex + hoverZIndex + searchZIndex,
         optimized: true, // Enable optimization for stability
         visible: true
       });
 
-      // ✨ ENHANCED: Add hover and click listeners
+      // Log search marker creation
+      if (isSearchMarker) {
+        console.log('🎯 Search marker created with highest priority:', {
+          name: cafe.name,
+          zIndex: baseZIndex + hoverZIndex + searchZIndex,
+          position: position
+        });
+      }
+
+      // ✨ ENHANCED: Add hover and click listeners with special handling for search markers
       marker.addListener('click', () => {
+        if (isSearchMarker) {
+          console.log('🔍 Search marker clicked - triggering enhanced zoom:', cafe.name);
+        }
         handleSmoothMarkerClick(cafe);
       });
 

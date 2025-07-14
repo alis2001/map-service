@@ -194,28 +194,71 @@ class SearchService {
       // Use Google Places Text Search (optimized)
       const searchRadius = 15000; // 15km radius for city search
       
-      // Build search query with location bias
-      const searchQuery = type === 'all' ? 
-        `${query} in ${cityCoordinates.lat},${cityCoordinates.lng}` :
-        `${type} ${query} in ${cityCoordinates.lat},${cityCoordinates.lng}`;
-      
-      const results = await googlePlacesService.searchByText(searchQuery, {
-        latitude: cityCoordinates.lat,
-        longitude: cityCoordinates.lng,
-        limit,
-        userLocation: cityCoordinates
-      });
+      console.log(`🎯 Advanced search for "${query}" in city`);
+
+      // Multiple search strategies for better results
+      const searchStrategies = this.generateSearchStrategies(query, type);
+      console.log('🔍 Search strategies:', searchStrategies);
+
+      let allResults = [];
+      const seenPlaceIds = new Set();
+
+      // Execute multiple searches and combine results
+      for (const searchTerm of searchStrategies.slice(0, 3)) { // Limit to 3 searches
+        try {
+          const searchQuery = `${searchTerm} near ${cityCoordinates.lat},${cityCoordinates.lng}`;
+          
+          const results = await googlePlacesService.searchByText(searchQuery, {
+            latitude: cityCoordinates.lat,
+            longitude: cityCoordinates.lng,
+            limit: Math.min(limit * 2, 40), // Search more to filter better
+            userLocation: cityCoordinates
+          });
+
+          // Add unique results
+          results.places.forEach(place => {
+            if (!seenPlaceIds.has(place.googlePlaceId)) {
+              seenPlaceIds.add(place.googlePlaceId);
+              allResults.push({
+                ...place,
+                searchScore: this.calculateSearchScore(place, query)
+              });
+            }
+          });
+        } catch (error) {
+          console.log(`⚠️ Search failed for "${searchTerm}":`, error.message);
+        }
+      }
+
+      console.log(`🔍 Combined results: ${allResults.length} places found`);
+
+      // Use the combined results
+      const results = { places: allResults };
       
       // Filter and enhance results
       const enhancedResults = results.places
         .filter(place => {
-          // Filter by type if specified
-          if (type !== 'all') {
-            const placeTypes = (place.types || []).join(' ').toLowerCase();
-            return placeTypes.includes(type) || 
-                   place.name.toLowerCase().includes(query.toLowerCase());
-          }
-          return true;
+            // Strict type filtering - only return places that match the selected type
+            if (type === 'restaurant') {
+                const placeTypes = (place.types || []).join(' ').toLowerCase();
+                return placeTypes.includes('restaurant') || 
+                    placeTypes.includes('meal_takeaway') ||
+                    placeTypes.includes('meal_delivery') ||
+                    placeTypes.includes('food') ||
+                    placeTypes.includes('pizza') ||
+                    place.name.toLowerCase().includes('pizzeria') ||
+                    place.name.toLowerCase().includes('ristorante') ||
+                    place.name.toLowerCase().includes('trattoria');
+            } else if (type === 'cafe') {
+                const placeTypes = (place.types || []).join(' ').toLowerCase();
+                return placeTypes.includes('cafe') || 
+                    placeTypes.includes('bar') ||
+                    placeTypes.includes('coffee') ||
+                    place.name.toLowerCase().includes('bar') ||
+                    place.name.toLowerCase().includes('cafe') ||
+                    place.name.toLowerCase().includes('caffè');
+            }
+            return true;
         })
         .map(place => ({
           id: place.googlePlaceId,
@@ -228,15 +271,13 @@ class SearchService {
           distance: place.distance,
           formattedDistance: place.formattedDistance,
           emoji: this.getPlaceEmoji(place.types),
-          isOpen: place.openingHours?.openNow
+          isOpen: place.openingHours?.openNow,
+          searchScore: place.searchScore // Include search score
         }))
         .sort((a, b) => {
-          // Sort by: name match > rating > distance
-          const aNameMatch = a.name.toLowerCase().includes(query.toLowerCase());
-          const bNameMatch = b.name.toLowerCase().includes(query.toLowerCase());
-          
-          if (aNameMatch !== bNameMatch) {
-            return aNameMatch ? -1 : 1;
+          // Sort by search score first, then rating, then distance
+          if (a.searchScore !== b.searchScore) {
+            return (b.searchScore || 0) - (a.searchScore || 0);
           }
           
           if (a.rating !== b.rating) {
@@ -244,7 +285,8 @@ class SearchService {
           }
           
           return (a.distance || 0) - (b.distance || 0);
-        });
+        })
+        .slice(0, limit); // Limit results after sorting
       
       const searchResult = {
         query,
@@ -266,6 +308,95 @@ class SearchService {
       logger.error('Place search failed', { query, type, error: error.message });
       return { results: [], count: 0, error: error.message };
     }
+  }
+
+  // Generate intelligent search strategies
+  generateSearchStrategies(query, type) {
+    const strategies = [];
+    const lowerQuery = query.toLowerCase();
+    
+    // 1. Original query
+    strategies.push(query);
+    
+    // 2. Query with type
+    if (type !== 'all') {
+      strategies.push(`${type} ${query}`);
+      strategies.push(`${query} ${type}`);
+    }
+    
+    // 3. Smart variations for common Italian terms
+    const variations = {
+      'nocera': ['nocera cafe', 'cafe nocera', 'bar nocera', 'nocera bar'],
+      'centrale': ['bar centrale', 'cafe centrale', 'centrale bar'],
+      'sport': ['bar sport', 'cafe sport', 'sport bar'],
+      'italia': ['bar italia', 'cafe italia', 'italia bar'],
+      'torino': ['cafe torino', 'bar torino', 'torino bar'],
+      'pizza': ['pizzeria', 'pizza al taglio', 'pizza da asporto'],
+      'gelato': ['gelateria', 'gelato artigianale'],
+      'caffe': ['cafe', 'caffè', 'bar caffe'],
+      'cafe': ['caffe', 'caffè', 'bar cafe'],
+      'bar': ['cafe', 'caffè', 'bar']
+    };
+    
+    // Add variations based on query content
+    Object.keys(variations).forEach(key => {
+      if (lowerQuery.includes(key)) {
+        variations[key].forEach(variation => {
+          if (!strategies.includes(variation)) {
+            strategies.push(variation);
+          }
+        });
+      }
+    });
+    
+    // 4. Partial match for longer queries
+    if (query.length >= 4) {
+      strategies.push(query.substring(0, Math.max(3, query.length - 1)));
+    }
+    
+    return strategies;
+  }
+
+  // Calculate relevance score for search results
+  calculateSearchScore(place, originalQuery) {
+    let score = 0;
+    const query = originalQuery.toLowerCase();
+    const name = place.name.toLowerCase();
+    const address = (place.address || '').toLowerCase();
+
+    // Exact name match (highest score)
+    if (name === query) score += 100;
+    
+    // Name starts with query
+    if (name.startsWith(query)) score += 80;
+    
+    // Name contains query as whole word
+    const queryWords = query.split(/\s+/);
+    const nameWords = name.split(/\s+/);
+    
+    queryWords.forEach(qWord => {
+      nameWords.forEach(nWord => {
+        if (nWord === qWord) score += 70; // Exact word match
+        if (nWord.startsWith(qWord)) score += 50; // Word starts with query
+        if (nWord.includes(qWord)) score += 30; // Word contains query
+      });
+    });
+    
+    // Name contains query anywhere
+    if (name.includes(query)) score += 40;
+    
+    // Address contains query
+    if (address.includes(query)) score += 20;
+    
+    // Rating bonus
+    if (place.rating >= 4.5) score += 15;
+    if (place.rating >= 4.0) score += 10;
+    
+    // Popular place bonus
+    if (place.user_ratings_total > 100) score += 10;
+    if (place.user_ratings_total > 50) score += 5;
+    
+    return score;
   }
 
   // 🎯 SMART SUGGESTIONS based on popular searches
