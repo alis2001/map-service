@@ -1,4 +1,4 @@
-// config/googlePlaces.js - ENHANCED FOR MAXIMUM COVERAGE
+// config/googlePlaces.js - OPTIMIZED FOR COST EFFICIENCY
 // Location: /backend/config/googlePlaces.js
 
 const { Client } = require('@googlemaps/google-maps-services-js');
@@ -7,6 +7,37 @@ const { cache } = require('./redis');
 
 // Initialize Google Maps client
 const googleMapsClient = new Client({});
+
+// API call monitoring
+let apiCallCounter = {
+  totalCalls: 0,
+  lastReset: Date.now(),
+  callsThisHour: 0,
+  estimatedCost: 0
+};
+
+const logApiCall = (endpoint, cost = 0.05) => {
+  apiCallCounter.totalCalls++;
+  apiCallCounter.callsThisHour++;
+  apiCallCounter.estimatedCost += cost;
+  
+  const now = Date.now();
+  if (now - apiCallCounter.lastReset > 3600000) { // Reset every hour
+    console.log('📊 HOURLY API USAGE REPORT:', {
+      callsThisHour: apiCallCounter.callsThisHour,
+      estimatedHourlyCost: `€${(apiCallCounter.callsThisHour * 0.05).toFixed(2)}`,
+      projectedDailyCost: `€${(apiCallCounter.callsThisHour * 0.05 * 24).toFixed(2)}`
+    });
+    apiCallCounter.callsThisHour = 0;
+    apiCallCounter.lastReset = now;
+  }
+  
+  console.log('💰 API CALL LOGGED:', {
+    endpoint,
+    totalToday: apiCallCounter.totalCalls,
+    estimatedCost: `€${apiCallCounter.estimatedCost.toFixed(2)}`
+  });
+};
 
 const getApiKey = () => {
   const apiKey = process.env.GOOGLE_PLACES_API_KEY;
@@ -18,7 +49,7 @@ const getApiKey = () => {
   return apiKey;
 };
 
-// ENHANCED: Configuration for MAXIMUM COVERAGE
+// OPTIMIZED: Configuration for COST EFFICIENCY
 const getConfig = () => ({
   apiKey: getApiKey(),
   defaultRadius: 2000,
@@ -26,271 +57,68 @@ const getConfig = () => ({
   language: 'it',
   region: 'IT',
   
-  // 🔧 REDUCED rate limiting to prevent 429 errors
+  // 🔧 EMERGENCY rate limiting to prevent cost overruns
   rateLimit: {
-    maxRequestsPerMinute: 15, // REDUCED from 30 to 15
+    maxRequestsPerMinute: 3, // REDUCED from 15 to 3 for emergency cost control
     requestsThisMinute: 0,
     lastResetTime: Date.now(),
     requestQueue: [],
     processing: false,
-    backoffTime: 1000 // 1 second backoff
+    backoffTime: 2000 // 2 second backoff
   },
   
-  // ENHANCED: Comprehensive place type mappings for ALL Italian venues
+  // SIMPLIFIED: Single place type mapping (no comprehensive search)
   placeTypes: {
-    // EXPANDED cafe mapping to catch ALL Italian bars/cafes
-    cafe: [
-      'cafe', 'bar', 'bakery', 'establishment',
-      'food', 'point_of_interest', 'store'
-    ],
-    
-    // EXPANDED restaurant mapping to catch ALL Italian restaurants
-    restaurant: [
-      'restaurant', 'meal_delivery', 'meal_takeaway', 
-      'food', 'establishment', 'point_of_interest'
-    ]
+    cafe: ['cafe'],
+    restaurant: ['restaurant']
   },
   
-  // ENHANCED: Multiple search strategies for comprehensive coverage
-  searchStrategies: {
-    // Primary search with main types
-    primary: {
-      cafe: ['cafe', 'bar'],
-      restaurant: ['restaurant', 'food']
-    },
-    
-    // Secondary search with broader types
-    secondary: {
-      cafe: ['bakery', 'establishment'],
-      restaurant: ['meal_delivery', 'meal_takeaway']
-    },
-    
-    // Text-based search for Italian venue names
-    textSearch: {
-      cafe: ['bar', 'caffè', 'caffe', 'caffetteria', 'pasticceria'],
-      restaurant: ['ristorante', 'pizzeria', 'trattoria', 'osteria']
-    }
-  },
-  
-  // Cache settings optimized for comprehensive searches
+  // Cache settings optimized for longer retention
   cache: {
-    nearbySearch: 600,    // 10 minutes for nearby searches
-    placeDetails: 1800,   // 30 minutes for place details
+    nearbySearch: 1800,   // 30 minutes for nearby searches (increased)
+    placeDetails: 7200,   // 2 hours for place details (increased)
     photos: 86400,        // 24 hours for photo URLs
-    textSearch: 1200      // 20 minutes for text searches
+    textSearch: 3600      // 1 hour for text searches (increased)
   }
 });
 
-// ENHANCED: Comprehensive search function that gets ALL venues
+// OPTIMIZED: Single API call search function (replaces comprehensive search)
 const searchAllVenuesComprehensive = async (latitude, longitude, type = 'cafe', radius = null) => {
-  try {
-    const apiKey = getApiKey();
-    const config = getConfig();
-    
-    if (!apiKey) {
-      throw new Error('Google Places API key not configured');
-    }
-
-    const searchRadius = radius || config.defaultRadius;
-    const allResults = new Map(); // Use Map to avoid duplicates by place_id
-    
-    console.log('🔍 COMPREHENSIVE SEARCH STARTING:', {
-      latitude,
-      longitude, 
-      type,
-      searchRadius,
-      strategies: Object.keys(config.searchStrategies).length
-    });
-
-    // STRATEGY 1: Primary type search
-    console.log('📍 Strategy 1: Primary type search');
-    const primaryTypes = config.searchStrategies.primary[type] || [type];
-    
-    for (const searchType of primaryTypes) {
-      try {
-        const results = await makeRateLimitedRequest(async () => {
-          return await googleMapsClient.placesNearby({
-            params: {
-              key: apiKey,
-              location: { lat: latitude, lng: longitude },
-              radius: searchRadius,
-              type: searchType,
-              language: config.language,
-              region: config.region
-            }
-          });
-        });
-        
-        if (results.data.results) {
-          results.data.results.forEach(place => {
-            allResults.set(place.place_id, place);
-          });
-          
-          console.log(`✅ Primary search (${searchType}): ${results.data.results.length} results`);
-        }
-      } catch (error) {
-        console.warn(`⚠️ Primary search failed for ${searchType}:`, error.message);
-      }
-    }
-
-    // STRATEGY 2: Secondary type search
-    console.log('📍 Strategy 2: Secondary type search');
-    const secondaryTypes = config.searchStrategies.secondary[type] || [];
-    
-    for (const searchType of secondaryTypes) {
-      try {
-        const results = await makeRateLimitedRequest(async () => {
-          return await googleMapsClient.placesNearby({
-            params: {
-              key: apiKey,
-              location: { lat: latitude, lng: longitude },
-              radius: searchRadius,
-              type: searchType,
-              language: config.language,
-              region: config.region
-            }
-          });
-        });
-        
-        if (results.data.results) {
-          results.data.results.forEach(place => {
-            allResults.set(place.place_id, place);
-          });
-          
-          console.log(`✅ Secondary search (${searchType}): ${results.data.results.length} results`);
-        }
-      } catch (error) {
-        console.warn(`⚠️ Secondary search failed for ${searchType}:`, error.message);
-      }
-    }
-
-    // STRATEGY 3: Text-based search for Italian venues
-    console.log('📍 Strategy 3: Italian text search');
-    const textQueries = config.searchStrategies.textSearch[type] || [];
-    
-    for (const query of textQueries) {
-      try {
-        const results = await makeRateLimitedRequest(async () => {
-          return await googleMapsClient.textSearch({
-            params: {
-              key: apiKey,
-              query: query,
-              location: { lat: latitude, lng: longitude },
-              radius: searchRadius,
-              language: config.language,
-              region: config.region
-            }
-          });
-        });
-        
-        if (results.data.results) {
-          results.data.results.forEach(place => {
-            // Only add if within radius
-            const distance = calculateDistanceToPlace(latitude, longitude, place);
-            if (distance <= searchRadius) {
-              allResults.set(place.place_id, place);
-            }
-          });
-          
-          console.log(`✅ Text search (${query}): ${results.data.results.length} results`);
-        }
-      } catch (error) {
-        console.warn(`⚠️ Text search failed for ${query}:`, error.message);
-      }
-    }
-
-    // STRATEGY 4: Broader establishment search
-    console.log('📍 Strategy 4: Broader establishment search');
-    try {
-      const results = await makeRateLimitedRequest(async () => {
-        return await googleMapsClient.placesNearby({
-          params: {
-            key: apiKey,
-            location: { lat: latitude, lng: longitude },
-            radius: searchRadius,
-            type: 'establishment',
-            language: config.language,
-            region: config.region
-          }
-        });
-      });
-      
-      if (results.data.results) {
-        // Filter establishment results to match our venue type
-        const filtered = results.data.results.filter(place => {
-          const placeTypes = place.types || [];
-          const name = (place.name || '').toLowerCase();
-          
-          if (type === 'cafe') {
-            return placeTypes.some(t => ['cafe', 'bar', 'bakery'].includes(t)) ||
-                   name.includes('bar') || name.includes('caffè') || name.includes('caffe');
-          } else if (type === 'restaurant') {
-            return placeTypes.some(t => ['restaurant', 'food', 'meal_delivery'].includes(t)) ||
-                   name.includes('ristorante') || name.includes('pizzeria') || name.includes('trattoria');
-          }
-          return false;
-        });
-        
-        filtered.forEach(place => {
-          allResults.set(place.place_id, place);
-        });
-        
-        console.log(`✅ Establishment search: ${filtered.length} relevant results`);
-      }
-    } catch (error) {
-      console.warn('⚠️ Establishment search failed:', error.message);
-    }
-
-    // Convert Map back to Array and format results
-    const finalResults = Array.from(allResults.values()).map(place => {
-      console.log('🔍 RAW GOOGLE PLACE:', {
-        place_id: place.place_id,
-        name: place.name,
-        geometry: place.geometry,
-        vicinity: place.vicinity,
-        types: place.types?.slice(0, 3)
-      });
-      
-      const mappedPlace = {
-        googlePlaceId: place.place_id,
-        name: place.name,
-        address: place.vicinity || place.formatted_address || '',
-        latitude: place.geometry?.location?.lat,
-        longitude: place.geometry?.location?.lng,
-        rating: place.rating,
-        priceLevel: place.price_level,
-        types: place.types,
-        businessStatus: place.business_status,
-        photos: place.photos ? place.photos.map(photo => ({
-          photoReference: photo.photo_reference,
-          width: photo.width,
-          height: photo.height
-        })) : [],
-        openingHours: place.opening_hours ? {
-          openNow: place.opening_hours.open_now,
-          periods: place.opening_hours.periods,
-          weekdayText: place.opening_hours.weekday_text
-        } : null,
-        plusCode: place.plus_code,
-        userRatingsTotal: place.user_ratings_total
-      };
-      
-      return mappedPlace;
-    });
-
-    console.log('🎉 COMPREHENSIVE SEARCH COMPLETED:', {
-      totalUniqueVenues: finalResults.length,
-      searchRadius: searchRadius,
-      strategiesUsed: 4,
-      type: type
-    });
-
-    return finalResults;
-    
-  } catch (error) {
-    console.error('❌ COMPREHENSIVE SEARCH FAILED:', error);
-    throw error;
+  console.log('🔧 OPTIMIZED SEARCH - Using efficient single API call instead of comprehensive');
+  
+  const apiKey = getApiKey();
+  const config = getConfig();
+  
+  if (!apiKey) {
+    throw new Error('Google Places API key not configured');
   }
+
+  const searchRadius = radius || config.defaultRadius;
+  
+  console.log('🔍 EFFICIENT SEARCH STARTING:', {
+    latitude,
+    longitude,
+    type,
+    searchRadius,
+    strategies: 1 // Only 1 strategy now
+  });
+
+  // SINGLE API CALL instead of 10+
+  const results = await makeRateLimitedRequest(async () => {
+    return await googleMapsClient.placesNearby({
+      params: {
+        key: apiKey,
+        location: { lat: latitude, lng: longitude },
+        radius: searchRadius,
+        type: type === 'cafe' ? 'cafe' : 'restaurant',
+        language: config.language,
+        region: config.region
+      }
+    });
+  }, 'placesNearby');
+
+  console.log(`✅ EFFICIENT SEARCH COMPLETED: ${results.data.results.length} places with 1 API call`);
+  return results.data.results || [];
 };
 
 // Helper function to calculate distance to place
@@ -314,8 +142,8 @@ const calculateDistanceToPlace = (userLat, userLng, place) => {
   return R * c;
 };
 
-// Rate-limited request wrapper (unchanged but essential)
-async function makeRateLimitedRequest(requestFunction) {
+// Rate-limited request wrapper with monitoring
+async function makeRateLimitedRequest(requestFunction, endpoint = 'unknown') {
   const config = getConfig();
   
   // Check rate limit
@@ -335,6 +163,7 @@ async function makeRateLimitedRequest(requestFunction) {
   
   try {
     config.rateLimit.requestsThisMinute++;
+    logApiCall(endpoint); // Log every API call for monitoring
     const result = await requestFunction();
     return result;
   } catch (error) {
@@ -347,11 +176,13 @@ async function makeRateLimitedRequest(requestFunction) {
   }
 }
 
-// Export the comprehensive search function and existing functions
+// Export functions with monitoring support
 module.exports = {
   googleMapsClient,
   getConfig,
   getApiKey,
+  apiCallCounter, // Export for monitoring
+  
   validateApiKey: async () => {
     const apiKey = getApiKey();
     if (!apiKey) return false;
@@ -366,7 +197,7 @@ module.exports = {
             type: 'cafe'
           }
         });
-      });
+      }, 'validateApiKey');
       
       return response.status === 200;
     } catch (error) {
@@ -375,7 +206,7 @@ module.exports = {
     }
   },
   
-  // MAIN EXPORT: Use comprehensive search instead of simple search
+  // MAIN EXPORT: Use optimized search instead of comprehensive search
   searchNearbyPlaces: searchAllVenuesComprehensive,
   
   // Keep existing functions for compatibility
@@ -390,6 +221,7 @@ module.exports = {
     const cacheKey = `details:${placeId}`;
     const cachedResult = await cache.get(cacheKey);
     if (cachedResult) {
+      console.log('⚡ PLACE DETAILS CACHE HIT');
       return cachedResult;
     }
     
@@ -407,7 +239,7 @@ module.exports = {
           region: config.region
         }
       });
-    });
+    }, 'placeDetails');
     
     const place = response.data.result;
     const placeDetails = {
@@ -453,7 +285,7 @@ module.exports = {
     
     const response = await makeRateLimitedRequest(async () => {
       return await googleMapsClient.textSearch({ params });
-    });
+    }, 'textSearch');
     
     const places = response.data.results.map(place => ({
       googlePlaceId: place.place_id,
@@ -495,6 +327,10 @@ module.exports = {
         rateLimit: {
           requestsThisMinute: config.rateLimit.requestsThisMinute,
           maxRequestsPerMinute: config.rateLimit.maxRequestsPerMinute
+        },
+        monitoring: {
+          totalCallsToday: apiCallCounter.totalCalls,
+          estimatedCost: `€${apiCallCounter.estimatedCost.toFixed(2)}`
         }
       };
     } catch (error) {

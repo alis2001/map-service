@@ -1,4 +1,4 @@
-// utils/helpers.js - FIXED VERSION with Complete API Utils
+// utils/helpers.js - OPTIMIZED VERSION with Fixed Cache Keys
 // Location: /backend/utils/helpers.js
 
 const logger = require('./logger');
@@ -10,11 +10,11 @@ const successResponse = (res, data = null, message = 'Success', statusCode = 200
     message,
     timestamp: new Date().toISOString()
   };
-  
+
   if (data !== null) {
     response.data = data;
   }
-  
+
   return res.status(statusCode).json(response);
 };
 
@@ -27,7 +27,7 @@ const errorResponse = (res, message = 'Internal Server Error', statusCode = 500,
     },
     timestamp: new Date().toISOString()
   };
-  
+
   return res.status(statusCode).json(response);
 };
 
@@ -47,7 +47,7 @@ const calculatePagination = (page = 1, limit = 10, totalCount = 0) => {
   const itemsPerPage = Math.min(100, Math.max(1, parseInt(limit)));
   const totalPages = Math.ceil(totalCount / itemsPerPage);
   const offset = (currentPage - 1) * itemsPerPage;
-  
+
   return {
     currentPage,
     itemsPerPage,
@@ -67,7 +67,7 @@ const extractPaginationParams = (query) => {
   const limit = parseInt(query.limit) || 10;
   const sortBy = query.sortBy || 'createdAt';
   const sortOrder = (query.sortOrder || 'desc').toLowerCase();
-  
+
   return {
     page: Math.max(1, page),
     limit: Math.min(100, Math.max(1, limit)),
@@ -77,203 +77,186 @@ const extractPaginationParams = (query) => {
 };
 
 // Data formatting helpers
-const formatUser = (user, includePrivate = false) => {
+const formatUser = (user) => {
   if (!user) return null;
-  
+
   const formatted = {
     id: user.id,
-    username: user.username,
-    firstName: user.firstName,
-    lastName: user.lastName,
+    email: user.email,
+    name: user.name,
     avatar: user.avatar,
-    createdAt: user.createdAt
+    role: user.role,
+    isActive: user.isActive,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt
   };
-  
-  if (includePrivate) {
-    formatted.email = user.email;
-    formatted.isActive = user.isActive;
-    formatted.updatedAt = user.updatedAt;
-  }
-  
+
+  // Remove password and other sensitive fields
+  delete formatted.password;
+  delete formatted.resetToken;
+  delete formatted.emailVerificationToken;
+
   return formatted;
 };
 
-const formatPlace = (place, userLocation = null) => {
+const formatPlace = (place) => {
   if (!place) return null;
-  
-  const formatted = {
-    id: place.id,
-    googlePlaceId: place.googlePlaceId,
+
+  return {
+    id: place.id || place.googlePlaceId,
+    googlePlaceId: place.googlePlaceId || place.place_id,
     name: place.name,
-    address: place.address,
-    location: {
-      latitude: place.latitude,
-      longitude: place.longitude
-    },
-    placeType: place.placeType,
-    type: place.placeType, // Alias for compatibility
+    address: place.address || place.formatted_address,
+    latitude: place.latitude || place.geometry?.location?.lat,
+    longitude: place.longitude || place.geometry?.location?.lng,
+    placeType: place.placeType || place.type,
     rating: place.rating,
-    priceLevel: place.priceLevel,
-    phoneNumber: place.phoneNumber,
+    priceLevel: place.priceLevel || place.price_level,
+    phoneNumber: place.phoneNumber || place.formatted_phone_number,
     website: place.website,
-    businessStatus: place.businessStatus,
-    openingHours: place.openingHours,
+    businessStatus: place.businessStatus || place.business_status,
+    openingHours: place.openingHours || place.opening_hours,
     photos: place.photos || [],
-    photoUrls: place.photoUrls || {},
-    lastUpdated: place.lastUpdated
+    distance: place.distance,
+    formattedDistance: place.formattedDistance,
+    createdAt: place.createdAt,
+    updatedAt: place.updatedAt
   };
-  
-  // Calculate distance if user location provided
-  if (userLocation && userLocation.latitude && userLocation.longitude) {
-    formatted.distance = calculateDistance(
-      userLocation.latitude,
-      userLocation.longitude,
-      place.latitude,
-      place.longitude
-    );
-    formatted.formattedDistance = formatDistance(formatted.distance);
-  }
-  
-  return formatted;
 };
 
 const formatLocation = (location) => {
   if (!location) return null;
-  
+
   return {
-    id: location.id,
-    coordinates: {
-      latitude: location.latitude,
-      longitude: location.longitude
-    },
-    accuracy: location.accuracy,
+    latitude: parseFloat(location.latitude),
+    longitude: parseFloat(location.longitude),
     address: location.address,
     city: location.city,
-    country: location.country,
-    timestamp: location.timestamp
+    country: location.country
   };
 };
 
-// Distance calculation (Haversine formula)
-const calculateDistance = (lat1, lng1, lat2, lng2) => {
+// Distance calculations
+const calculateDistance = (lat1, lon1, lat2, lon2) => {
   const R = 6371e3; // Earth's radius in meters
   const φ1 = lat1 * Math.PI / 180;
   const φ2 = lat2 * Math.PI / 180;
   const Δφ = (lat2 - lat1) * Math.PI / 180;
-  const Δλ = (lng2 - lng1) * Math.PI / 180;
-  
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
+
   const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
             Math.cos(φ1) * Math.cos(φ2) *
             Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  
-  return Math.round(R * c); // Distance in meters, rounded
+
+  return R * c; // Distance in meters
 };
 
-// Format distance for display
 const formatDistance = (distanceInMeters) => {
-  if (!distanceInMeters || distanceInMeters < 0) return null;
-  
   if (distanceInMeters < 1000) {
-    return `${distanceInMeters}m`;
+    return `${Math.round(distanceInMeters)}m`;
   } else {
-    const km = (distanceInMeters / 1000).toFixed(1);
-    return `${km}km`;
+    return `${(distanceInMeters / 1000).toFixed(1)}km`;
   }
 };
 
-// Time formatting helpers
+const sortByDistance = (places, userLat, userLng) => {
+  return places.map(place => {
+    const distance = calculateDistance(userLat, userLng, place.latitude, place.longitude);
+    return {
+      ...place,
+      distance: Math.round(distance),
+      formattedDistance: formatDistance(distance)
+    };
+  }).sort((a, b) => a.distance - b.distance);
+};
+
+// Time helpers
 const timeAgo = (date) => {
   const now = new Date();
-  const past = new Date(date);
-  const diffInSeconds = Math.floor((now - past) / 1000);
-  
-  if (diffInSeconds < 60) return 'just now';
-  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
-  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
-  if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)}d ago`;
-  if (diffInSeconds < 31536000) return `${Math.floor(diffInSeconds / 2592000)}mo ago`;
-  return `${Math.floor(diffInSeconds / 31536000)}y ago`;
-};
+  const diffInSeconds = Math.floor((now - new Date(date)) / 1000);
 
-const formatDate = (date, format = 'ISO') => {
-  if (!date) return null;
-  
-  const d = new Date(date);
-  
-  switch (format) {
-    case 'ISO':
-      return d.toISOString();
-    case 'local':
-      return d.toLocaleString();
-    case 'date':
-      return d.toLocaleDateString();
-    case 'time':
-      return d.toLocaleTimeString();
-    default:
-      return d.toISOString();
+  const intervals = {
+    year: 31536000,
+    month: 2592000,
+    week: 604800,
+    day: 86400,
+    hour: 3600,
+    minute: 60
+  };
+
+  for (const [unit, seconds] of Object.entries(intervals)) {
+    const interval = Math.floor(diffInSeconds / seconds);
+    if (interval >= 1) {
+      return `${interval} ${unit}${interval === 1 ? '' : 's'} ago`;
+    }
   }
+
+  return 'Just now';
 };
 
-// String manipulation helpers
+const formatDate = (date, format = 'en-US') => {
+  if (!date) return null;
+
+  const options = {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  };
+
+  return new Date(date).toLocaleDateString(format, options);
+};
+
+// String helpers
 const capitalize = (str) => {
-  if (!str || typeof str !== 'string') return str;
+  if (!str) return '';
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 };
 
-const truncateText = (text, maxLength = 100, suffix = '...') => {
-  if (!text || typeof text !== 'string') return text;
-  if (text.length <= maxLength) return text;
-  return text.substring(0, maxLength - suffix.length) + suffix;
+const truncateText = (text, maxLength = 100) => {
+  if (!text || text.length <= maxLength) return text;
+  return text.slice(0, maxLength).trim() + '...';
 };
 
 const slugify = (text) => {
-  if (!text || typeof text !== 'string') return '';
+  if (!text) return '';
+
   return text
+    .toString()
     .toLowerCase()
-    .replace(/[^\w\s-]/g, '') // Remove special characters
-    .replace(/[\s_-]+/g, '-') // Replace spaces and underscores with hyphens
-    .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w\-]+/g, '')
+    .replace(/\-\-+/g, '-')
+    .replace(/^-+/, '')
+    .replace(/-+$/, '');
 };
 
 // Array helpers
 const removeDuplicates = (array, key = null) => {
-  if (!Array.isArray(array)) return array;
-  
+  if (!Array.isArray(array)) return [];
+
   if (key) {
     const seen = new Set();
     return array.filter(item => {
-      const keyValue = item[key];
-      if (seen.has(keyValue)) {
-        return false;
-      }
-      seen.add(keyValue);
+      const val = item[key];
+      if (seen.has(val)) return false;
+      seen.add(val);
       return true;
     });
   }
-  
-  return [...new Set(array)];
-};
 
-const sortByDistance = (places, userLat, userLng) => {
-  if (!Array.isArray(places) || !userLat || !userLng) return places;
-  
-  return places
-    .map(place => ({
-      ...place,
-      distance: calculateDistance(userLat, userLng, place.latitude, place.longitude)
-    }))
-    .sort((a, b) => a.distance - b.distance);
+  return [...new Set(array)];
 };
 
 const groupBy = (array, key) => {
   if (!Array.isArray(array)) return {};
-  
+
   return array.reduce((groups, item) => {
     const group = item[key];
-    if (!groups[group]) {
-      groups[group] = [];
-    }
+    groups[group] = groups[group] || [];
     groups[group].push(item);
     return groups;
   }, {});
@@ -282,23 +265,25 @@ const groupBy = (array, key) => {
 // Object helpers
 const pick = (obj, keys) => {
   if (!obj || typeof obj !== 'object') return {};
-  
+
   const result = {};
   keys.forEach(key => {
     if (key in obj) {
       result[key] = obj[key];
     }
   });
+
   return result;
 };
 
 const omit = (obj, keys) => {
   if (!obj || typeof obj !== 'object') return {};
-  
+
   const result = { ...obj };
   keys.forEach(key => {
     delete result[key];
   });
+
   return result;
 };
 
@@ -306,6 +291,7 @@ const deepClone = (obj) => {
   if (obj === null || typeof obj !== 'object') return obj;
   if (obj instanceof Date) return new Date(obj.getTime());
   if (obj instanceof Array) return obj.map(item => deepClone(item));
+
   if (typeof obj === 'object') {
     const cloned = {};
     for (const key in obj) {
@@ -315,7 +301,7 @@ const deepClone = (obj) => {
   }
 };
 
-// Cache key generators
+// OPTIMIZED: Cache key generators with improved precision for cost efficiency
 const generateCacheKey = (...parts) => {
   return parts
     .filter(part => part !== null && part !== undefined)
@@ -323,8 +309,14 @@ const generateCacheKey = (...parts) => {
     .join(':');
 };
 
-const generateLocationCacheKey = (lat, lng, radius, type) => {
-  return generateCacheKey('location', lat, lng, radius, type);
+// FIXED: Cache key with proper rounding for cache hits
+const generateLocationCacheKey = (latitude, longitude, radius, type) => {
+  // Round to ~100m precision to increase cache hits
+  const roundedLat = Math.round(latitude * 100) / 100; // 2 decimals = ~1km precision
+  const roundedLng = Math.round(longitude * 100) / 100;
+  const roundedRadius = Math.ceil(radius / 500) * 500; // Round radius to 500m increments
+
+  return `nearby:${roundedLat}:${roundedLng}:${roundedRadius}:${type}`;
 };
 
 const generateUserCacheKey = (userId) => {
@@ -406,7 +398,7 @@ const logError = (error, context = {}) => {
   });
 };
 
-// FIXED: API Utils object for Google Places service
+// API Utils object for Google Places service
 const apiUtils = {
   // Format place data for display
   formatPlace(place) {
@@ -429,24 +421,23 @@ const apiUtils = {
       cafe: '☕',
       bar: '🍺',
       pub: '🍺',
-      restaurant: '🍽️',
+      restaurant: '🍽',
       bakery: '🥐',
       default: '📍'
     };
-    
     return typeEmojis[type] || typeEmojis.default;
   },
 
   // Get rating stars
   getRatingStars(rating) {
     if (!rating) return '';
-    
+
     const fullStars = Math.floor(rating);
     const hasHalfStar = rating % 1 >= 0.5;
     const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
-    
-    return '★'.repeat(fullStars) + 
-           (hasHalfStar ? '☆' : '') + 
+
+    return '★'.repeat(fullStars) +
+           (hasHalfStar ? '☆' : '') +
            '☆'.repeat(emptyStars);
   },
 
@@ -485,68 +476,68 @@ module.exports = {
   successResponse,
   errorResponse,
   paginatedResponse,
-  
+
   // Pagination helpers
   calculatePagination,
   extractPaginationParams,
-  
+
   // Data formatting
   formatUser,
   formatPlace,
   formatLocation,
-  
+
   // Distance and location
   calculateDistance,
   formatDistance,
   sortByDistance,
-  
+
   // Time helpers
   timeAgo,
   formatDate,
-  
+
   // String helpers
   capitalize,
   truncateText,
   slugify,
-  
+
   // Array helpers
   removeDuplicates,
   groupBy,
-  
+
   // Object helpers
   pick,
   omit,
   deepClone,
-  
-  // Cache helpers
+
+  // Cache helpers (OPTIMIZED)
   generateCacheKey,
   generateLocationCacheKey,
   generateUserCacheKey,
-  
+
   // Error helpers
   asyncHandler,
   catchAsync,
-  
+
   // Rate limiting
   generateRateLimitKey,
   getRemainingTime,
-  
+
   // Environment
   isDevelopment,
   isProduction,
   isTest,
-  
+
   // URL helpers
   buildUrl,
-  
+
   // Random generators
   generateRandomString,
   generateRandomNumber,
-  
+
   // Logging helpers
   logRequest,
   logError,
 
-  // FIXED: Export apiUtils for Google Places service
+  // API Utils for Google Places service
   apiUtils
 };

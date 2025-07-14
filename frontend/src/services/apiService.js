@@ -255,80 +255,60 @@ api.interceptors.response.use(
 // ENHANCED Places API for Maximum Coverage
 export const placesAPI = {
   // ⚡ Get ALL nearby places with COMPREHENSIVE search
+  // ⚡ OPTIMIZED Nearby search - parallel requests instead of sequential
   async getAllNearbyPlaces(latitude, longitude, options = {}) {
     try {
-      const radius = options.radius || 3000; // INCREASED default to 3km
-      const limit = options.limit || 100;     // INCREASED to 80 results total
+      const { radius = 2000, limit = 30 } = options;
       
-      // Check cache first
-      const cacheKey = enhancedCache.generateKey(latitude, longitude, radius);
+      // Cache key for combined results with improved precision
+      const cacheKey = `combined:${Math.round(latitude * 100) / 100}:${Math.round(longitude * 100) / 100}:${radius}`;
       const cached = enhancedCache.get(cacheKey);
       
       if (cached) {
-        console.log('⚡ RETURNING COMPREHENSIVE CACHED RESULTS:', cached.totalPlaces);
+        console.log('⚡ FRONTEND CACHE HIT - No backend calls needed');
         return cached;
       }
 
-      console.log('⚡ FETCHING ALL PLACES WITH COMPREHENSIVE SEARCH...');
+      console.log('🔍 FETCHING BOTH TYPES IN PARALLEL (optimized)...');
       
-      // Make parallel requests for cafes AND restaurants with higher limits
+      // Make PARALLEL calls instead of sequential to reduce total time
       const [cafeResponse, restaurantResponse] = await Promise.all([
         api.get('/api/v1/places/nearby', {
-          params: {
-            latitude,
-            longitude,
-            radius,
-            type: 'cafe',
-            limit: 50 // Higher limit per type for comprehensive coverage
-          }
+          params: { latitude, longitude, radius, type: 'cafe', limit: Math.floor(limit / 2) },
+          timeout: 8000
         }),
         api.get('/api/v1/places/nearby', {
-          params: {
-            latitude,
-            longitude,
-            radius,
-            type: 'restaurant', 
-            limit: 50 // Higher limit per type for comprehensive coverage
-          }
+          params: { latitude, longitude, radius, type: 'restaurant', limit: Math.floor(limit / 2) },
+          timeout: 8000
         })
       ]);
 
-      // Combine results
-      const cafePlaces = cafeResponse.data.data?.places || [];
-      const restaurantPlaces = restaurantResponse.data.data?.places || [];
-      
+      const cafePlaces = cafeResponse.data?.data?.places || [];
+      const restaurantPlaces = restaurantResponse.data?.data?.places || [];
+
       const combinedResults = {
         success: true,
+        cafePlaces,
+        restaurantPlaces,
         allPlaces: [...cafePlaces, ...restaurantPlaces],
-        cafePlaces: cafePlaces,
-        restaurantPlaces: restaurantPlaces,
         totalPlaces: cafePlaces.length + restaurantPlaces.length,
-        userLocation: {
-          latitude,
-          longitude
-        },
-        searchMetadata: {
-          radius,
-          comprehensive: true,
-          strategies: 5,
-          timestamp: new Date().toISOString()
-        }
+        userLocation: { latitude, longitude },
+        optimized: true
       };
 
-      // Cache the combined results
+      // Cache combined results with longer TTL
       enhancedCache.set(cacheKey, combinedResults);
-      
-      console.log('⚡ COMPREHENSIVE PLACES FETCHED:', {
+
+      console.log('✅ OPTIMIZED FETCH COMPLETED:', {
         cafes: cafePlaces.length,
         restaurants: restaurantPlaces.length,
         total: combinedResults.totalPlaces,
-        radius: radius + 'm'
+        backendCalls: 2 // Instead of 10+ with comprehensive search
       });
 
       return combinedResults;
-      
     } catch (error) {
-      console.error('❌ Failed to fetch comprehensive places:', error);
+      console.error('❌ Failed to fetch places (optimized):', error);
       throw error;
     }
   },
