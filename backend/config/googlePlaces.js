@@ -118,7 +118,25 @@ const searchAllVenuesComprehensive = async (latitude, longitude, type = 'cafe', 
   }, 'placesNearby');
 
   console.log(`✅ EFFICIENT SEARCH COMPLETED: ${results.data.results.length} places with 1 API call`);
-  return results.data.results || [];
+
+  // 🔧 CRITICAL FIX: Map raw Google data to expected format
+  const mappedPlaces = (results.data.results || []).map(place => ({
+    googlePlaceId: place.place_id,
+    name: place.name,
+    address: place.formatted_address || place.vicinity,
+    latitude: place.geometry?.location?.lat,
+    longitude: place.geometry?.location?.lng,
+    rating: place.rating,
+    priceLevel: place.price_level,
+    types: place.types,
+    businessStatus: place.business_status,
+    photos: place.photos || [],
+    openingHours: place.opening_hours,
+    userRatingsTotal: place.user_ratings_total
+  }));
+
+  console.log(`🔧 MAPPED PLACES: ${mappedPlaces.length} places mapped to expected format`);
+  return mappedPlaces;
 };
 
 // Helper function to calculate distance to place

@@ -1225,16 +1225,22 @@ const updateMarkerHoverState = useCallback((cafeId, isHovered) => {
       selectedType: cafeType,
       zoomLevel,
       isDragging,
-      isMapInteracting
+      isMapInteracting,
+      allCafes: cafes.map(cafe => ({
+        name: cafe.name,
+        type: cafe.type,
+        placeType: cafe.placeType,
+        hasLocation: !!(cafe.location && cafe.location.latitude && cafe.location.longitude)
+      })),
+      rawCafesArray: cafes
     });
 
     currentFilterRef.current = cafeType;
 
+    // FIXED: Since useCafes already filters by type, use all provided cafes
     const perfectlyFilteredCafes = cafes.filter(cafe => {
-      const cafeType_raw = cafe.type || cafe.placeType || '';
-      const cafeType_normalized = cafeType_raw.toLowerCase().trim();
-      const selectedType_normalized = currentFilterRef.current.toLowerCase().trim();
-      return cafeType_normalized === selectedType_normalized;
+      // Basic validation - ensure we have location data
+      return cafe.location && cafe.location.latitude && cafe.location.longitude;
     });
 
     // 🔧 STABILITY: Only update markers when NOT interacting
@@ -1243,13 +1249,15 @@ const updateMarkerHoverState = useCallback((cafeId, isHovered) => {
       return; // Keep existing markers stable
     }
 
-    // 🔧 DEBOUNCED UPDATES: Prevent rapid updates
+    // 🔧 SIMPLIFIED UPDATES: Allow all marker updates
     const existingMarkerCount = markersRef.current.size;
     const newMarkerCount = perfectlyFilteredCafes.length;
-    
-    // Only update if significant change or first load
-    if (existingMarkerCount > 0 && Math.abs(existingMarkerCount - newMarkerCount) < 3) {
-      console.log('📍 STABLE: Minor change, keeping existing markers');
+
+    console.log(`🔧 UPDATE CHECK: ${newMarkerCount} new markers vs ${existingMarkerCount} existing`);
+
+    // Only skip if we have no new markers and no existing markers (avoid empty updates)
+    if (newMarkerCount === 0 && existingMarkerCount === 0) {
+      console.log('📍 SKIP: No markers to show');
       return;
     }
 
