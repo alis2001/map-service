@@ -8,6 +8,8 @@ const rateLimit = require('express-rate-limit');
 const compression = require('compression');
 const morgan = require('morgan');
 const dotenv = require('dotenv');
+const searchRoutes = require('./routes/searchRoutes');
+
 
 // Load environment variables
 dotenv.config();
@@ -188,7 +190,8 @@ app.get('/health', async (req, res) => {
 
 // API routes (only places API)
 app.use('/api/v1/places', placesRoutes);
-
+// Search panel ROute
+app.use('/api/v1/search', searchRoutes);
 // Root endpoint with service status
 app.get('/', (req, res) => {
   res.json({
@@ -306,6 +309,20 @@ async function initializeServices() {
     serviceStatus.googlePlaces.fallbackMode = 'basic_search';
     console.log('📱 App will continue with limited places functionality');
     // Continue even if Google Places fails
+  }
+
+  // 4. Initialize Search Service (for city/place search)
+  try {
+    console.log('🔍 Initializing Search Service...');
+    const searchService = require('./services/searchService');
+    await searchService.initialize();
+    console.log('✅ Search Service initialized successfully');
+    console.log(`📊 Loaded Italian cities database with ${(await searchService.healthCheck()).citiesLoaded} cities`);
+    results.searchService = true;
+  } catch (searchError) {
+    console.warn('⚠️ Search Service initialization failed:', searchError.message);
+    console.log('📱 City search will be unavailable');
+    results.searchService = false;
   }
 
   return results;
