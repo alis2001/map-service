@@ -150,15 +150,15 @@ const FullPageMap = ({
     const currentZoom = googleMapRef.current.getZoom();
     // Handle different location formats for search markers
     const targetPosition = {
-      lat: cafe.location?.latitude || cafe.location?.lat || cafe.latitude,
-      lng: cafe.location?.longitude || cafe.location?.lng || cafe.longitude
+      lat: userLocation.latitude,
+      lng: userLocation.longitude
     };
 
     console.log('🎯 Target position for zoom:', targetPosition);
 
     // Ensure we have valid coordinates
     if (!targetPosition.lat || !targetPosition.lng) {
-      console.error('❌ Invalid target position for marker click:', cafe);
+      console.error('❌ Invalid target position for marker click:', userLocation);
       return;
     }
     
@@ -435,44 +435,46 @@ const FullPageMap = ({
                 text-anchor="middle" 
                 font-size="10" 
                 fill="white">📍</text>
-        ` : ''}// 🎯 REAL-TIME MARKER HOVER UPDATES
-const updateMarkerHoverState = useCallback((cafeId, isHovered) => {
-  const marker = markersRef.current.get(cafeId);
-  if (!marker) return;
-
-  // Find the cafe data
-  const cafe = cafes.find(c => (c.id || c.googlePlaceId) === cafeId);
-  if (!cafe) return;
-
-  // Get the marker's current position and index
-  const position = marker.getPosition();
-  const index = Array.from(markersRef.current.keys()).indexOf(cafeId);
-
-  // Create new marker SVG with hover state
-  const markerSVG = createEnhancedDarkMapMarker(cafe, index, currentFilterRef.current, isHovered);
-  
-  // Calculate size based on hover state
-  const popularityScore = calculatePopularityScore(cafe);
-  const baseSize = getMarkerSizeFromPopularity(popularityScore, zoomLevel);
-  const hoverMultiplier = isHovered ? 1.3 : 1;
-  const markerSize = Math.round(baseSize * hoverMultiplier);
-  const totalSize = markerSize + (isHovered ? 80 : 24);
-
-  // Update the marker icon with smooth transition
-  marker.setIcon({
-    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(markerSVG),
-    scaledSize: new window.google.maps.Size(totalSize, totalSize),
-    anchor: new window.google.maps.Point(totalSize / 2, totalSize / 2)
-  });
-
-  // Update z-index for hover state
-  const newZIndex = Math.round(popularityScore * 1000) + 100 + (isHovered ? 2000 : 0);
-  marker.setZIndex(newZIndex);
-
-}, [cafes, zoomLevel, calculatePopularityScore, getMarkerSizeFromPopularity, createEnhancedDarkMapMarker]);
+        ` : ''}
       </svg>
     `;
   };
+
+  // 🎯 REAL-TIME MARKER HOVER UPDATES
+  const updateMarkerHoverState = useCallback((cafeId, isHovered) => {
+    const marker = markersRef.current.get(cafeId);
+    if (!marker) return;
+
+    // Find the cafe data
+    const cafe = cafes.find(c => (c.id || c.googlePlaceId) === cafeId);
+    if (!cafe) return;
+
+    // Get the marker's current position and index
+    const position = marker.getPosition();
+    const index = Array.from(markersRef.current.keys()).indexOf(cafeId);
+
+    // Create new marker SVG with hover state
+    const markerSVG = createEnhancedDarkMapMarker(cafe, index, currentFilterRef.current, isHovered);
+    
+    // Calculate size based on hover state
+    const popularityScore = calculatePopularityScore(cafe);
+    const baseSize = getMarkerSizeFromPopularity(popularityScore, zoomLevel);
+    const hoverMultiplier = isHovered ? 1.3 : 1;
+    const markerSize = Math.round(baseSize * hoverMultiplier);
+    const totalSize = markerSize + (isHovered ? 80 : 24);
+
+    // Update the marker icon with smooth transition
+    marker.setIcon({
+      url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(markerSVG),
+      scaledSize: new window.google.maps.Size(totalSize, totalSize),
+      anchor: new window.google.maps.Point(totalSize / 2, totalSize / 2)
+    });
+
+    // Update z-index for hover state
+    const newZIndex = Math.round(popularityScore * 1000) + 100 + (isHovered ? 2000 : 0);
+    marker.setZIndex(newZIndex);
+
+  }, [cafes, zoomLevel, calculatePopularityScore, getMarkerSizeFromPopularity, createEnhancedDarkMapMarker]);
 
   // ⚡ ULTRA-SENSITIVE TRIGGERING for responsive search
   const shouldTriggerNewSearch = useCallback((newCenter) => {
@@ -1254,9 +1256,9 @@ const updateMarkerHoverState = useCallback((cafeId, isHovered) => {
     currentFilterRef.current = cafeType;
 
     // FIXED: Since useCafes already filters by type, use all provided cafes
-    const perfectlyFilteredCafes = cafes.filter(cafe => {
+    const perfectlyFilteredCafes = cafes.filter(cafeItem => {
       // Basic validation - ensure we have location data
-      return cafe.location && cafe.location.latitude && cafe.location.longitude;
+      return cafeItem.location && cafeItem.location.latitude && cafeItem.location.longitude;
     });
 
     // 🔧 STABILITY: Only update markers when NOT interacting
@@ -1548,8 +1550,9 @@ const updateMarkerHoverState = useCallback((cafeId, isHovered) => {
             onSearchChange={onSearchChange}
             onRefresh={onRefresh}
             hasUserLocation={!!userLocation}
-            cafesCount={cafes.filter(cafe => {
-              const cafeType_normalized = (cafe.type || cafe.placeType || '').toLowerCase();
+            cafes={cafes}
+            cafesCount={cafes.filter(cafeItem => {
+              const cafeType_normalized = (cafeItem.type || cafeItem.placeType || '').toLowerCase();
               return cafeType_normalized === cafeType.toLowerCase();
             }).length}
             isEmbedMode={isEmbedMode}
