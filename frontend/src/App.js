@@ -10,6 +10,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { useGeolocation } from './hooks/useGeolocation';
 import { useCafes } from './hooks/useCafes';
 import { healthAPI } from './services/apiService';
+import AdvancedSearchPanel from './components/AdvancedSearchPanel';
 import './styles/App.css';
 
 // Create a client for React Query
@@ -38,6 +39,10 @@ function MapApp() {
   const [backendReady, setBackendReady] = useState(false);
   const [backendError, setBackendError] = useState(null);
   const [appReady, setAppReady] = useState(false);
+
+  // Search panel state
+  const [searchPanelResults, setSearchPanelResults] = useState([]);
+  const [selectedSearchPlace, setSelectedSearchPlace] = useState(null);
   
   // App state management
   const [selectedCafe, setSelectedCafe] = useState(null);
@@ -259,6 +264,110 @@ function MapApp() {
     }
   }, [refreshLocation]);
 
+  const handleSearchPlaceSelect = useCallback((place) => {
+    console.log('🔍 Search place selected:', place);
+    console.log('🔍 Raw place object:', JSON.stringify(place, null, 2));
+    
+    // More robust coordinate extraction - check all possible formats
+    let lat, lng;
+    
+    // Try different coordinate formats from search results
+    if (place.latitude && place.longitude) {
+      lat = parseFloat(place.latitude);
+      lng = parseFloat(place.longitude);
+      console.log('📍 Using direct lat/lng:', { lat, lng });
+    } else if (place.coordinates && place.coordinates.lat && place.coordinates.lng) {
+      lat = parseFloat(place.coordinates.lat);
+      lng = parseFloat(place.coordinates.lng);
+      console.log('📍 Using coordinates object:', { lat, lng });
+    } else if (place.location && place.location.lat && place.location.lng) {
+      lat = parseFloat(place.location.lat);
+      lng = parseFloat(place.location.lng);
+      console.log('📍 Using location object:', { lat, lng });
+    } else if (place.city && place.city.coordinates) {
+      // Fallback to city coordinates if place coordinates not available
+      lat = parseFloat(place.city.coordinates.lat);
+      lng = parseFloat(place.city.coordinates.lng);
+      console.log('📍 Using city coordinates as fallback:', { lat, lng });
+    }
+    
+    console.log('📍 Final extracted coordinates:', { lat, lng });
+    console.log('📍 Coordinates valid?', { 
+      lat: !isNaN(lat) && lat !== null && lat !== undefined,
+      lng: !isNaN(lng) && lng !== null && lng !== undefined
+    });
+    
+    if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
+      console.error('❌ Still invalid coordinates. Full place object:', place);
+      // Let's try to continue anyway with city coordinates
+      if (place.city && place.city.coordinates) {
+        lat = parseFloat(place.city.coordinates.lat);
+        lng = parseFloat(place.city.coordinates.lng);
+        console.log('🔄 Trying city coordinates:', { lat, lng });
+      }
+      
+      if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
+        console.error('❌ No valid coordinates found anywhere');
+        return;
+      }
+    }
+    
+    // Format the place data to match the existing cafe structure
+    const formattedPlace = {
+      id: place.id || place.googlePlaceId || `search_${Date.now()}`,
+      googlePlaceId: place.id || place.googlePlaceId,
+      name: place.name,
+      address: place.address,
+      latitude: lat,
+      longitude: lng,
+      rating: place.rating,
+      priceLevel: place.priceLevel,
+      types: place.types || ['establishment'],
+      openingHours: place.openingHours,
+      photos: place.photos || [],
+      distance: place.distance,
+      formattedDistance: place.formattedDistance,
+      isOpen: place.isOpen,
+      location: {
+        lat: lat,
+        lng: lng
+      },
+      source: 'search'
+    };
+    
+    console.log('🎯 Formatted place for map:', formattedPlace);
+    
+    // IMPORTANT: Set selected cafe FIRST
+    setSelectedCafe(formattedPlace);
+    setSelectedSearchPlace(formattedPlace);
+    
+    // Then update map center with a slight delay to ensure state updates
+    setTimeout(() => {
+      console.log('📍 Setting map center to:', { lat, lng });
+      setMapCenter({
+        lat: lat,
+        lng: lng
+      });
+      
+      // Force zoom change
+      setZoom(19);
+      
+      // Force a refresh of the cafes to ensure the marker appears
+      setTimeout(() => {
+        if (refetchCafes) {
+          console.log('🔄 Refreshing cafes to show search result marker');
+          refetchCafes();
+        }
+      }, 100);
+    }, 50);
+    
+    console.log('✅ Search place integration completed');
+  }, [refetchCafes]);
+
+  const handleSearchResultsUpdate = useCallback((results) => {
+    setSearchPanelResults(results);
+  }, []);
+
   const handlePreciseLocation = useCallback(() => {
     console.log('🎯 Requesting precise location...');
     if (getPreciseLocation) {
@@ -398,10 +507,26 @@ function MapApp() {
   // 🗺️ **MAIN APP WITH MAP**
   return (
     <div className="map-app">
+
+      {/* Advanced Search Panel */}
+      {isFullyReady && (
+        <AdvancedSearchPanel
+          onPlaceSelect={handleSearchPlaceSelect}
+          onCityChange={(cityCoordinates) => {
+            console.log('🏙️ City changed, updating map center:', cityCoordinates);
+            setMapCenter(cityCoordinates);
+            setZoom(13); // City-level zoom
+          }}
+          onResultsUpdate={handleSearchResultsUpdate}
+          userLocation={userLocation}
+          currentMapCenter={mapCenter}
+          className="z-50"
+        />
+      )}
       <FullPageMap
         center={mapCenter}
         zoom={zoom}
-        cafes={cafes || []}
+        cafes={[...cafes || [], ...(selectedSearchPlace ? [selectedSearchPlace] : [])]}  // Add search result to cafes
         selectedCafe={selectedCafe}
         userLocation={userLocation}
         onCafeSelect={setSelectedCafe}

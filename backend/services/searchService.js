@@ -3,7 +3,7 @@
 
 const fs = require('fs').promises;
 const path = require('path');
-const redisService = require('./redisService');
+const { cache } = require('../config/redis');
 const googlePlacesService = require('./googlePlacesService');
 const logger = require('../utils/logger');
 
@@ -38,7 +38,7 @@ class SearchService {
 
   async loadCitiesData() {
     try {
-      const citiesPath = '/home/ai/Projects/map-service/cities/gi_db_comuni-2025-03-06-bb67f/json/gi_comuni.json';
+      const citiesPath = path.join(__dirname, '../cities.json');
       console.log('📂 Loading cities data from:', citiesPath);
       
       const citiesJson = await fs.readFile(citiesPath, 'utf8');
@@ -109,7 +109,7 @@ class SearchService {
       
       // Check cache first
       const cacheKey = `city_search:${searchQuery}:${limit}`;
-      const cached = await redisService.get(cacheKey);
+      const cached = await cache.get(cacheKey);
       if (cached) {
         console.log('⚡ City search cache hit');
         return cached;
@@ -166,7 +166,7 @@ class SearchService {
         }));
       
       // Cache results for 1 hour
-      await redisService.set(cacheKey, sortedResults, 3600);
+      await cache.set(cacheKey, sortedResults, 3600);
       
       console.log(`✅ Found ${sortedResults.length} cities for "${searchQuery}"`);
       return sortedResults;
@@ -185,7 +185,7 @@ class SearchService {
       
       // Cache key includes city coordinates and search params
       const cacheKey = `place_search:${cityCoordinates.lat.toFixed(3)}:${cityCoordinates.lng.toFixed(3)}:${query}:${type}:${limit}`;
-      const cached = await redisService.get(cacheKey);
+      const cached = await cache.get(cacheKey);
       if (cached) {
         console.log('⚡ Place search cache hit');
         return cached;
@@ -256,7 +256,7 @@ class SearchService {
       };
       
       // Cache for 2 hours (places change less frequently)
-      await redisService.set(cacheKey, searchResult, 7200);
+      await cache.set(cacheKey, searchResult, 7200);
       
       console.log(`✅ Found ${enhancedResults.length} places for "${query}"`);
       return searchResult;
@@ -272,7 +272,7 @@ class SearchService {
   async getPopularSearches(cityId, type = 'all', limit = 10) {
     try {
       const cacheKey = `popular_searches:${cityId}:${type}:${limit}`;
-      const cached = await redisService.get(cacheKey);
+      const cached = await cache.get(cacheKey);
       if (cached) return cached;
       
       // Popular Italian venue types by city type
@@ -300,7 +300,7 @@ class SearchService {
       }));
       
       // Cache for 24 hours
-      await redisService.set(cacheKey, result, 86400);
+      await cache.set(cacheKey, result, 86400);
       return result;
       
     } catch (error) {

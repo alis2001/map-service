@@ -40,7 +40,7 @@ const AdvancedSearchPanel = ({
 
     setLoadingCities(true);
     try {
-      const response = await fetch(`/api/v1/search/cities?q=${encodeURIComponent(query)}&limit=8`);
+      const response = await fetch(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001'}/api/v1/search/cities?q=${encodeURIComponent(query)}&limit=8`);
       const data = await response.json();
       
       if (data.success) {
@@ -64,9 +64,7 @@ const AdvancedSearchPanel = ({
 
     setLoadingPlaces(true);
     try {
-      const response = await fetch(
-        `/api/v1/search/places?q=${encodeURIComponent(query)}&lat=${city.coordinates.lat}&lng=${city.coordinates.lng}&type=${type}&limit=10`
-      );
+      const response = await fetch(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001'}/api/v1/search/places?q=${encodeURIComponent(query)}&lat=${city.coordinates.lat}&lng=${city.coordinates.lng}&type=${type}&limit=10`);
       const data = await response.json();
       
       if (data.success) {
@@ -103,7 +101,7 @@ const AdvancedSearchPanel = ({
     const loadPopularSuggestions = async () => {
       if (selectedCity && currentStep === 'place') {
         try {
-          const response = await fetch(`/api/v1/search/suggestions?cityId=${selectedCity.id}&type=${searchType}&limit=6`);
+          const response = await fetch(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001'}/api/v1/search/suggestions?cityId=${selectedCity.id}&type=${searchType}&limit=6`);
           const data = await response.json();
           
           if (data.success) {
@@ -174,64 +172,139 @@ const AdvancedSearchPanel = ({
   };
 
   const searchTypes = [
-    { value: 'all', label: 'Tutto', icon: Search, color: 'blue' },
-    { value: 'cafe', label: 'Bar/Caffè', icon: Coffee, color: 'amber' },
-    { value: 'restaurant', label: 'Ristoranti', icon: Utensils, color: 'green' }
+    { value: 'all', label: 'Tutto', icon: Search, color: '#3B82F6' },
+    { value: 'cafe', label: 'Bar/Caffè', icon: Coffee, color: '#F59E0B' },
+    { value: 'restaurant', label: 'Ristoranti', icon: Utensils, color: '#10B981' }
   ];
 
   return (
-    <div className={`fixed top-4 left-4 z-50 ${className}`}>
+    <div style={{ 
+      position: 'fixed', 
+      top: '16px', 
+      left: '16px', 
+      zIndex: 50 
+    }}>
       {/* Search Toggle Button */}
       {!isExpanded && (
         <button
           onClick={() => setIsExpanded(true)}
-          className="group bg-gray-900/95 backdrop-blur-md text-white p-4 rounded-2xl shadow-2xl border border-gray-700/50 hover:bg-gray-800/95 transition-all duration-300 hover:scale-105"
+          style={{
+            background: 'rgba(17, 24, 39, 0.95)',
+            backdropFilter: 'blur(16px)',
+            color: 'white',
+            padding: '16px',
+            borderRadius: '16px',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            border: '1px solid rgba(55, 65, 81, 0.5)',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px'
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.background = 'rgba(31, 41, 55, 0.95)';
+            e.target.style.transform = 'scale(1.05)';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.background = 'rgba(17, 24, 39, 0.95)';
+            e.target.style.transform = 'scale(1)';
+          }}
         >
-          <div className="flex items-center gap-3">
-            <Search className="w-6 h-6 text-blue-400 group-hover:text-blue-300" />
-            <span className="text-sm font-medium">Cerca locali</span>
-          </div>
+          <Search size={24} style={{ color: '#60A5FA' }} />
+          <span style={{ fontSize: '14px', fontWeight: '500' }}>Cerca locali</span>
         </button>
       )}
 
       {/* Expanded Search Panel */}
       {isExpanded && (
-        <div className="bg-gray-900/95 backdrop-blur-md rounded-2xl shadow-2xl border border-gray-700/50 p-6 w-96 max-h-[80vh] overflow-hidden flex flex-col">
+        <div style={{
+          background: 'rgba(17, 24, 39, 0.95)',
+          backdropFilter: 'blur(16px)',
+          borderRadius: '16px',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          border: '1px solid rgba(55, 65, 81, 0.5)',
+          padding: '24px',
+          width: '384px',
+          maxHeight: '80vh',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
           {/* Header */}
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-              <Search className="w-5 h-5 text-blue-400" />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <h3 style={{ 
+              fontSize: '18px', 
+              fontWeight: '600', 
+              color: 'white', 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              margin: 0
+            }}>
+              <Search size={20} style={{ color: '#60A5FA' }} />
               Ricerca Avanzata
             </h3>
             <button
               onClick={() => setIsExpanded(false)}
-              className="text-gray-400 hover:text-white transition-colors p-1"
+              style={{
+                color: '#9CA3AF',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '4px',
+                fontSize: '18px',
+                transition: 'color 0.3s ease'
+              }}
+              onMouseEnter={(e) => e.target.style.color = 'white'}
+              onMouseLeave={(e) => e.target.style.color = '#9CA3AF'}
             >
               ✕
             </button>
           </div>
 
           {/* Progress Steps */}
-          <div className="flex items-center gap-2 mb-6">
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
-              currentStep === 'city' ? 'bg-blue-500/20 text-blue-300' : 'bg-gray-700/50 text-gray-400'
-            }`}>
-              <MapPin className="w-4 h-4" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '24px' }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '6px 12px',
+              borderRadius: '8px',
+              fontSize: '14px',
+              background: currentStep === 'city' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(55, 65, 81, 0.5)',
+              color: currentStep === 'city' ? '#93C5FD' : '#9CA3AF',
+              transition: 'all 0.3s ease'
+            }}>
+              <MapPin size={16} />
               1. Città
             </div>
-            <div className={`w-8 h-0.5 ${selectedCity ? 'bg-blue-500' : 'bg-gray-600'} transition-colors`} />
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
-              currentStep === 'place' ? 'bg-blue-500/20 text-blue-300' : 'bg-gray-700/50 text-gray-400'
-            }`}>
-              <Search className="w-4 h-4" />
+            <div style={{
+              width: '32px',
+              height: '2px',
+              background: selectedCity ? '#3B82F6' : '#4B5563',
+              transition: 'background 0.3s ease'
+            }} />
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '6px 12px',
+              borderRadius: '8px',
+              fontSize: '14px',
+              background: currentStep === 'place' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(55, 65, 81, 0.5)',
+              color: currentStep === 'place' ? '#93C5FD' : '#9CA3AF',
+              transition: 'all 0.3s ease'
+            }}>
+              <Search size={16} />
               2. Locale
             </div>
           </div>
 
           {/* City Search Step */}
           {currentStep === 'city' && (
-            <div className="space-y-4">
-              <div className="relative">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ position: 'relative' }}>
                 <input
                   ref={cityInputRef}
                   type="text"
@@ -242,17 +315,57 @@ const AdvancedSearchPanel = ({
                   }}
                   onFocus={() => setShowCitySuggestions(true)}
                   placeholder="Digita il nome della città..."
-                  className="w-full bg-gray-800/50 text-white placeholder-gray-400 border border-gray-600/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                  style={{
+                    width: '100%',
+                    background: 'rgba(31, 41, 55, 0.5)',
+                    color: 'white',
+                    border: '1px solid rgba(75, 85, 99, 0.5)',
+                    borderRadius: '12px',
+                    padding: '12px 40px 12px 16px',
+                    fontSize: '16px',
+                    outline: 'none',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = 'rgba(59, 130, 246, 0.5)';
+                    e.target.style.boxShadow = '0 0 0 2px rgba(59, 130, 246, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = 'rgba(75, 85, 99, 0.5)';
+                    e.target.style.boxShadow = 'none';
+                  }}
                 />
-                <MapPin className="absolute right-3 top-3.5 w-5 h-5 text-gray-400" />
+                <MapPin 
+                  size={20} 
+                  style={{ 
+                    position: 'absolute', 
+                    right: '12px', 
+                    top: '12px', 
+                    color: '#9CA3AF' 
+                  }} 
+                />
               </div>
 
               {/* City Results */}
               {showCitySuggestions && (cityResults.length > 0 || loadingCities) && (
-                <div className="bg-gray-800/50 rounded-xl border border-gray-600/50 max-h-60 overflow-y-auto">
+                <div style={{
+                  background: 'rgba(31, 41, 55, 0.5)',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(75, 85, 99, 0.5)',
+                  maxHeight: '240px',
+                  overflowY: 'auto'
+                }}>
                   {loadingCities ? (
-                    <div className="p-4 text-center text-gray-400">
-                      <div className="animate-spin w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2" />
+                    <div style={{ padding: '16px', textAlign: 'center', color: '#9CA3AF' }}>
+                      <div style={{
+                        width: '20px',
+                        height: '20px',
+                        border: '2px solid #3B82F6',
+                        borderTop: '2px solid transparent',
+                        borderRadius: '50%',
+                        margin: '0 auto 8px',
+                        animation: 'spin 1s linear infinite'
+                      }} />
                       Caricamento città...
                     </div>
                   ) : (
@@ -260,12 +373,28 @@ const AdvancedSearchPanel = ({
                       <button
                         key={city.id}
                         onClick={() => handleCitySelect(city)}
-                        className="w-full text-left p-3 hover:bg-gray-700/50 transition-colors flex items-center gap-3 group"
+                        style={{
+                          width: '100%',
+                          textAlign: 'left',
+                          padding: '12px',
+                          background: 'none',
+                          border: 'none',
+                          color: 'white',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          transition: 'background 0.3s ease'
+                        }}
+                        onMouseEnter={(e) => e.target.style.background = 'rgba(55, 65, 81, 0.5)'}
+                        onMouseLeave={(e) => e.target.style.background = 'none'}
                       >
-                        <MapPin className="w-4 h-4 text-blue-400 group-hover:text-blue-300" />
+                        <MapPin size={16} style={{ color: '#60A5FA' }} />
                         <div>
-                          <div className="text-white font-medium">{city.name}</div>
-                          <div className="text-gray-400 text-sm">{city.province} {city.isCapital && '• Capoluogo'}</div>
+                          <div style={{ fontWeight: '500' }}>{city.name}</div>
+                          <div style={{ fontSize: '14px', color: '#9CA3AF' }}>
+                            {city.province} {city.isCapital && '• Capoluogo'}
+                          </div>
                         </div>
                       </button>
                     ))
@@ -277,24 +406,41 @@ const AdvancedSearchPanel = ({
 
           {/* Place Search Step */}
           {currentStep === 'place' && selectedCity && (
-            <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1, overflow: 'hidden' }}>
               {/* Selected City */}
-              <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-blue-400" />
-                  <span className="text-blue-300 font-medium">{selectedCity.name}</span>
-                  <span className="text-blue-400 text-sm">({selectedCity.province})</span>
+              <div style={{
+                background: 'rgba(59, 130, 246, 0.1)',
+                border: '1px solid rgba(59, 130, 246, 0.3)',
+                borderRadius: '12px',
+                padding: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <MapPin size={16} style={{ color: '#60A5FA' }} />
+                  <span style={{ color: '#93C5FD', fontWeight: '500' }}>{selectedCity.name}</span>
+                  <span style={{ color: '#60A5FA', fontSize: '14px' }}>({selectedCity.province})</span>
                 </div>
                 <button
                   onClick={resetSearch}
-                  className="text-blue-400 hover:text-blue-300 text-sm transition-colors"
+                  style={{
+                    color: '#60A5FA',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    transition: 'color 0.3s ease'
+                  }}
+                  onMouseEnter={(e) => e.target.style.color = '#93C5FD'}
+                  onMouseLeave={(e) => e.target.style.color = '#60A5FA'}
                 >
                   Cambia
                 </button>
               </div>
 
               {/* Search Type Selector */}
-              <div className="flex gap-2">
+              <div style={{ display: 'flex', gap: '8px' }}>
                 {searchTypes.map((type) => {
                   const Icon = type.icon;
                   const isActive = searchType === type.value;
@@ -303,21 +449,42 @@ const AdvancedSearchPanel = ({
                     <button
                       key={type.value}
                       onClick={() => setSearchType(type.value)}
-                      className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                        isActive 
-                          ? `bg-${type.color}-500/20 text-${type.color}-300 border border-${type.color}-500/30` 
-                          : 'bg-gray-700/50 text-gray-400 border border-gray-600/30 hover:bg-gray-600/50'
-                      }`}
+                      style={{
+                        flex: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        background: isActive ? `${type.color}20` : 'rgba(55, 65, 81, 0.5)',
+                        color: isActive ? type.color : '#9CA3AF',
+                        border: isActive ? `1px solid ${type.color}30` : '1px solid rgba(75, 85, 99, 0.3)',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isActive) {
+                          e.target.style.background = 'rgba(75, 85, 99, 0.5)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isActive) {
+                          e.target.style.background = 'rgba(55, 65, 81, 0.5)';
+                        }
+                      }}
                     >
-                      <Icon className="w-4 h-4" />
-                      <span className="hidden sm:inline">{type.label}</span>
+                      <Icon size={16} />
+                      <span style={{ display: window.innerWidth > 640 ? 'inline' : 'none' }}>
+                        {type.label}
+                      </span>
                     </button>
                   );
                 })}
               </div>
 
               {/* Place Search Input */}
-              <div className="relative">
+              <div style={{ position: 'relative' }}>
                 <input
                   ref={placeInputRef}
                   type="text"
@@ -328,24 +495,67 @@ const AdvancedSearchPanel = ({
                   }}
                   onFocus={() => setShowPlaceSuggestions(true)}
                   placeholder="Nome del locale (es. Bar Centrale)..."
-                  className="w-full bg-gray-800/50 text-white placeholder-gray-400 border border-gray-600/50 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all"
+                  style={{
+                    width: '100%',
+                    background: 'rgba(31, 41, 55, 0.5)',
+                    color: 'white',
+                    border: '1px solid rgba(75, 85, 99, 0.5)',
+                    borderRadius: '12px',
+                    padding: '12px 40px 12px 16px',
+                    fontSize: '16px',
+                    outline: 'none',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = 'rgba(59, 130, 246, 0.5)';
+                    e.target.style.boxShadow = '0 0 0 2px rgba(59, 130, 246, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = 'rgba(75, 85, 99, 0.5)';
+                    e.target.style.boxShadow = 'none';
+                  }}
                 />
-                <Search className="absolute right-3 top-3.5 w-5 h-5 text-gray-400" />
+                <Search 
+                  size={20} 
+                  style={{ 
+                    position: 'absolute', 
+                    right: '12px', 
+                    top: '12px', 
+                    color: '#9CA3AF' 
+                  }} 
+                />
               </div>
 
               {/* Popular Suggestions */}
               {!placeQuery && popularSuggestions.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium text-gray-300">Ricerche popolari:</h4>
-                  <div className="grid grid-cols-2 gap-2">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <h4 style={{ fontSize: '14px', fontWeight: '500', color: '#D1D5DB', margin: 0 }}>
+                    Ricerche popolari:
+                  </h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                     {popularSuggestions.map((suggestion) => (
                       <button
                         key={suggestion.id}
                         onClick={() => handlePopularSuggestionClick(suggestion)}
-                        className="text-left p-2 bg-gray-700/30 hover:bg-gray-600/50 rounded-lg transition-colors flex items-center gap-2 text-sm"
+                        style={{
+                          textAlign: 'left',
+                          padding: '8px',
+                          background: 'rgba(55, 65, 81, 0.3)',
+                          borderRadius: '8px',
+                          border: 'none',
+                          color: '#D1D5DB',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          fontSize: '14px',
+                          transition: 'background 0.3s ease'
+                        }}
+                        onMouseEnter={(e) => e.target.style.background = 'rgba(75, 85, 99, 0.5)'}
+                        onMouseLeave={(e) => e.target.style.background = 'rgba(55, 65, 81, 0.3)'}
                       >
-                        <span className="text-lg">{suggestion.icon}</span>
-                        <span className="text-gray-300">{suggestion.query}</span>
+                        <span style={{ fontSize: '18px' }}>{suggestion.icon}</span>
+                        <span>{suggestion.query}</span>
                       </button>
                     ))}
                   </div>
@@ -354,45 +564,94 @@ const AdvancedSearchPanel = ({
 
               {/* Place Results */}
               {showPlaceSuggestions && (placeResults.length > 0 || loadingPlaces) && (
-                <div className="bg-gray-800/50 rounded-xl border border-gray-600/50 flex-1 overflow-hidden flex flex-col">
+                <div style={{
+                  background: 'rgba(31, 41, 55, 0.5)',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(75, 85, 99, 0.5)',
+                  flex: 1,
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}>
                   {loadingPlaces ? (
-                    <div className="p-4 text-center text-gray-400">
-                      <div className="animate-spin w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2" />
+                    <div style={{ padding: '16px', textAlign: 'center', color: '#9CA3AF' }}>
+                      <div style={{
+                        width: '20px',
+                        height: '20px',
+                        border: '2px solid #3B82F6',
+                        borderTop: '2px solid transparent',
+                        borderRadius: '50%',
+                        margin: '0 auto 8px',
+                        animation: 'spin 1s linear infinite'
+                      }} />
                       Ricerca locali...
                     </div>
                   ) : (
-                    <div className="overflow-y-auto flex-1">
+                    <div style={{ overflowY: 'auto', flex: 1 }}>
                       {placeResults.map((place) => (
                         <button
                           key={place.id}
                           onClick={() => handlePlaceSelect(place)}
-                          className="w-full text-left p-3 hover:bg-gray-700/50 transition-colors border-b border-gray-600/30 last:border-b-0 group"
+                          style={{
+                            width: '100%',
+                            textAlign: 'left',
+                            padding: '12px',
+                            background: 'none',
+                            border: 'none',
+                            borderBottom: '1px solid rgba(75, 85, 99, 0.3)',
+                            color: 'white',
+                            cursor: 'pointer',
+                            transition: 'background 0.3s ease'
+                          }}
+                          onMouseEnter={(e) => e.target.style.background = 'rgba(55, 65, 81, 0.5)'}
+                          onMouseLeave={(e) => e.target.style.background = 'none'}
                         >
-                          <div className="flex items-start gap-3">
-                            <span className="text-xl mt-0.5">{place.emoji}</span>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-white font-medium group-hover:text-blue-300 transition-colors truncate">
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                            <span style={{ fontSize: '20px', marginTop: '2px' }}>
+                              {place.emoji}
+                            </span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ 
+                                fontWeight: '500', 
+                                marginBottom: '4px',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis'
+                              }}>
                                 {place.name}
                               </div>
-                              <div className="text-gray-400 text-sm truncate">{place.address}</div>
-                              <div className="flex items-center gap-3 mt-1">
+                              <div style={{ 
+                                fontSize: '14px', 
+                                color: '#9CA3AF', 
+                                marginBottom: '4px',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis'
+                              }}>
+                                {place.address}
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                                 {place.rating && (
-                                  <div className="flex items-center gap-1 text-yellow-400 text-sm">
-                                    <Star className="w-3 h-3 fill-current" />
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#FBBF24', fontSize: '14px' }}>
+                                    <Star size={12} style={{ fill: 'currentColor' }} />
                                     <span>{place.rating.toFixed(1)}</span>
                                   </div>
                                 )}
                                 {place.formattedDistance && (
-                                  <div className="flex items-center gap-1 text-blue-400 text-sm">
-                                    <Navigation className="w-3 h-3" />
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#60A5FA', fontSize: '14px' }}>
+                                    <Navigation size={12} />
                                     <span>{place.formattedDistance}</span>
                                   </div>
                                 )}
                                 {place.isOpen !== undefined && (
-                                  <div className={`flex items-center gap-1 text-sm ${
-                                    place.isOpen ? 'text-green-400' : 'text-red-400'
-                                  }`}>
-                                    <Clock className="w-3 h-3" />
+                                  <div style={{ 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: '4px', 
+                                    fontSize: '14px',
+                                    color: place.isOpen ? '#10B981' : '#EF4444'
+                                  }}>
+                                    <Clock size={12} />
                                     <span>{place.isOpen ? 'Aperto' : 'Chiuso'}</span>
                                   </div>
                                 )}
@@ -409,6 +668,13 @@ const AdvancedSearchPanel = ({
           )}
         </div>
       )}
+      
+      <style jsx>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 };
