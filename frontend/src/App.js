@@ -1,4 +1,4 @@
-// App.js - VERSIONE INTEGRATA CON SCOPERTA UTENTI - COMPLETA
+// App.js - VERSIONE INTEGRATA CON SCOPERTA UTENTI - COMPLETA - FIXED API URLS
 // Location: /map-service/frontend/src/App.js
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -134,7 +134,7 @@ function MapApp() {
     }
   }, []);
 
-  // NUOVE FUNZIONI PER GESTIONE UTENTI
+  // NUOVE FUNZIONI PER GESTIONE UTENTI - FIXED API URL
   const loadNearbyUsers = useCallback(async (lat, lng) => {
     if (!authToken) {
       console.warn('⚠️ Nessun token per caricare utenti');
@@ -148,7 +148,7 @@ function MapApp() {
       console.log(`🔍 Caricamento utenti vicino a: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
       
       const response = await fetch(
-        `/api/v1/users/nearby?latitude=${lat}&longitude=${lng}&radius=${searchRadius}`,
+        `${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001'}/api/v1/users/nearby?latitude=${lat}&longitude=${lng}&radius=${searchRadius}`,
         {
           headers: {
             'Authorization': `Bearer ${authToken}`,
@@ -176,11 +176,12 @@ function MapApp() {
     }
   }, [authToken, searchRadius]);
 
+  // FIXED API URL - updateUserLocation
   const updateUserLocation = useCallback(async (lat, lng) => {
     if (!authToken) return;
     
     try {
-      await fetch('/api/v1/users/location/update', {
+      await fetch(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001'}/api/v1/users/location/update`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -215,6 +216,7 @@ function MapApp() {
     }
   }, [mapMode, mapCenter, loadNearbyUsers]);
 
+  // FIXED API URL - handleUserClick
   const handleUserClick = useCallback(async (user) => {
     console.log('👤 Utente selezionato:', user.firstName);
     setSelectedUser(user);
@@ -222,7 +224,7 @@ function MapApp() {
     // Carica profilo dettagliato
     if (authToken) {
       try {
-        const response = await fetch(`/api/v1/users/${user.id}/profile`, {
+        const response = await fetch(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001'}/api/v1/users/${user.id}/profile`, {
           headers: {
             'Authorization': `Bearer ${authToken}`,
             'Content-Type': 'application/json'
@@ -276,6 +278,7 @@ function MapApp() {
     }
   }, [isSelectingPlace]);
 
+  // FIXED API URL - handleSendInvite
   const handleSendInvite = useCallback(async (inviteData) => {
     console.log('🚀 Invio invito:', inviteData);
     
@@ -285,7 +288,7 @@ function MapApp() {
     }
     
     try {
-      const response = await fetch('/api/v1/invites/send', {
+      const response = await fetch(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001'}/api/v1/invites/send`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

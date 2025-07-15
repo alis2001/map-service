@@ -128,42 +128,27 @@ class GooglePlacesService {
   // FIXED: Much more lenient validation that matches actual Google Places data
   validatePlaceData(place) {
     if (!place) {
-      console.log('❌ VALIDATION: Place is null/undefined');
+      console.log('❌ Place is null or undefined');
       return false;
     }
-
-    // Check essential fields only
-    const hasId = place.googlePlaceId && typeof place.googlePlaceId === 'string' && place.googlePlaceId.length > 5;
-    const hasName = place.name && typeof place.name === 'string' && place.name.trim().length > 0;
-    const hasValidLat = typeof place.latitude === 'number' && 
-                       !isNaN(place.latitude) && 
-                       place.latitude >= -90 && place.latitude <= 90;
-    const hasValidLng = typeof place.longitude === 'number' && 
-                       !isNaN(place.longitude) && 
-                       place.longitude >= -180 && place.longitude <= 180;
-
-    const isValid = hasId && hasName && hasValidLat && hasValidLng;
-
-    if (!isValid) {
-      console.log('🔍 VALIDATION FAILED:', {
-        placeId: place.googlePlaceId,
-        name: place.name,
-        hasId,
-        hasName,
-        hasValidLat,
-        hasValidLng,
-        latitude: place.latitude,
-        longitude: place.longitude
-      });
-    } else {
-      console.log('✅ VALIDATION PASSED:', {
-        placeId: place.googlePlaceId,
-        name: place.name,
-        coords: `${place.latitude}, ${place.longitude}`
-      });
+    
+    // Check for mapped place data structure (after transformation)
+    if (place.googlePlaceId && place.name && place.latitude && place.longitude) {
+      return true;
     }
-
-    return isValid;
+    
+    // Check for raw Google Places response structure (before transformation)
+    if (place.place_id && place.name && place.geometry && place.geometry.location) {
+      return true;
+    }
+    
+    console.log('❌ Invalid place data - missing required fields:', {
+      hasPlaceId: !!(place.place_id || place.googlePlaceId),
+      hasName: !!place.name,
+      hasGeometry: !!(place.geometry || (place.latitude && place.longitude))
+    });
+    
+    return false;
   }
 
   generatePhotoUrls(photos) {
