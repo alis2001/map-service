@@ -44,6 +44,46 @@ model Place {
   @@map("places")
 }
 
+// User live locations for discovery
+model UserLiveLocation {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  latitude  Float
+  longitude Float
+  isLive    Boolean  @default(true)
+  lastSeen  DateTime @default(now())
+  shareRadius Int    @default(1000) // meters
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("user_live_locations")
+}
+
+// Meetup invites between users
+model MeetupInvite {
+  id          String   @id @default(cuid())
+  fromUserId  String
+  toUserId    String
+  placeId     String?
+  placeName   String?
+  placeAddress String?
+  message     String?
+  status      InviteStatus @default(PENDING)
+  meetupTime  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("meetup_invites")
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELLED
+  EXPIRED
+}
+
 model CacheEntry {
   id        String   @id @default(cuid())
   key       String   @unique

@@ -17,6 +17,8 @@ dotenv.config();
 // Import database connection
 const { prisma, testConnection } = require('./config/prisma');
 const { connectRedis } = require('./config/redis');
+const { authenticateToken } = require('./middleware/auth');
+
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
@@ -213,6 +215,13 @@ app.get('/', (req, res) => {
     ready: serviceStatus.overall === 'OK' || serviceStatus.overall === 'DEGRADED'
   });
 });
+
+const usersRoutes = require('./routes/users');
+const invitesRoutes = require('./routes/invites');
+
+// Register new routes with authentication middleware
+app.use('/api/v1/users', authenticateToken, usersRoutes);
+app.use('/api/v1/invites', authenticateToken, invitesRoutes);
 
 // 404 handler
 app.use(notFound);

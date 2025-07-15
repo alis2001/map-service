@@ -12,9 +12,12 @@ const FullPageMap = ({
   center,
   zoom,
   cafes,
+  users, // NUOVO: array di utenti
   selectedCafe,
+  selectedUser, // NUOVO: utente selezionato
   userLocation,
   onCafeSelect,
+  onUserSelect, // NUOVO: callback selezione utenti
   onCenterChange,
   onClosePopup,
   loading,
@@ -33,12 +36,15 @@ const FullPageMap = ({
   onLocationRetry,
   onPreciseLocation,
   qualityText,
-  sourceText
+  sourceText,
+  mapMode, // NUOVO: 'people' o 'places'
+  isSelectingPlace // NUOVO: modalità selezione posto
 }) => {
 
   const mapRef = useRef(null);
   const googleMapRef = useRef(null);
-  const markersRef = useRef(new Map());
+  const markersRef = useRef(new Map()); // Markers per luoghi
+  const userMarkersRef = useRef(new Map()); // NUOVO: Markers per utenti
   const userMarkerRef = useRef(null);
   const radiusCircleRef = useRef(null);
   const activeMarkersRef = useRef(new Set());
@@ -56,6 +62,7 @@ const FullPageMap = ({
   // 🎬 ULTRA-SMOOTH INTERACTION STATES
   const [isMapInteracting, setIsMapInteracting] = useState(false);
   const [hoveredCafe, setHoveredCafe] = useState(null);
+  const [hoveredUser, setHoveredUser] = useState(null); // NUOVO: hover utente
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const [showTooltip, setShowTooltip] = useState(false);
   const hoverDelayRef = useRef(null);
@@ -67,6 +74,8 @@ const FullPageMap = ({
   const [zoomLevel, setZoomLevel] = useState(zoom || 15);
   const [isZoomingIn, setIsZoomingIn] = useState(false);
   const [isZoomingOut, setIsZoomingOut] = useState(false);
+  const [currentVisibleMarkers, setCurrentVisibleMarkers] = useState(new Set());
+
   
   // Movement detection refs
   const lastSearchLocationRef = useRef(null);
@@ -125,6 +134,113 @@ const FullPageMap = ({
     
     return Math.round(dynamicSize);
   };
+
+  // NUOVO: Funzione per creare marker utenti con foto profilo
+  const createUserMarker = useCallback((user) => {
+    if (!googleMapRef.current || !user) return null;
+
+    console.log('👤 Creazione marker utente:', user.firstName);
+
+    // Calcola stato online
+    const getStatusColor = () => {
+      if (user.isLive) {
+        const timeDiff = new Date() - new Date(user.lastSeen);
+        const minutesAgo = Math.floor(timeDiff / (1000 * 60));
+        
+        if (minutesAgo < 5) return '#22c55e'; // Verde - online ora
+        if (minutesAgo < 15) return '#eab308'; // Giallo - online di recente
+        return '#6b7280'; // Grigio - offline
+      }
+      return '#6b7280';
+    };
+
+    const statusColor = getStatusColor();
+    const markerSize = 48; // Dimensione fissa per utenti
+
+    // SVG per marker utente con foto profilo
+    const userMarkerSVG = `
+      <svg width="${markerSize + 20}" height="${markerSize + 20}" viewBox="0 0 ${markerSize + 20} ${markerSize + 20}" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <clipPath id="circleClip${user.id}">
+            <circle cx="${(markerSize + 20) / 2}" cy="${(markerSize + 20) / 2}" r="${markerSize / 2 - 3}"/>
+          </clipPath>
+          <filter id="glow${user.id}">
+            <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+            <feMerge>
+              <feMergeNode in="coloredBlur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+        
+        <!-- Bordo esterno bianco -->
+        <circle cx="${(markerSize + 20) / 2}" cy="${(markerSize + 20) / 2}" r="${markerSize / 2}" 
+                fill="white" stroke="${statusColor}" stroke-width="3" filter="url(#glow${user.id})"/>
+        
+        <!-- Foto profilo o placeholder -->
+        ${user.profilePic ? `
+          <image x="10" y="10" width="${markerSize}" height="${markerSize}" 
+                 href="${user.profilePic}" clip-path="url(#circleClip${user.id})"/>
+        ` : `
+          <circle cx="${(markerSize + 20) / 2}" cy="${(markerSize + 20) / 2}" r="${markerSize / 2 - 3}" 
+                  fill="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"/>
+          <text x="${(markerSize + 20) / 2}" y="${(markerSize + 20) / 2 + 6}" 
+                text-anchor="middle" font-size="18" font-weight="bold" fill="white">
+            ${user.firstName.charAt(0)}${user.lastName?.charAt(0) || ''}
+          </text>
+        `}
+        
+        <!-- Indicatore stato online -->
+        <circle cx="${markerSize + 5}" cy="15" r="6" fill="${statusColor}" stroke="white" stroke-width="2"/>
+        
+        ${user.isLive && statusColor === '#22c55e' ? `
+          <!-- Pulse animation per utenti online -->
+          <circle cx="${(markerSize + 20) / 2}" cy="${(markerSize + 20) / 2}" r="${markerSize / 2 + 5}" 
+                  fill="none" stroke="${statusColor}" stroke-width="2" opacity="0.6">
+            <animate attributeName="r" values="${markerSize / 2 + 5};${markerSize / 2 + 15};${markerSize / 2 + 5}" 
+                     dur="2s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0.6;0.2;0.6" dur="2s" repeatCount="indefinite"/>
+          </circle>
+        ` : ''}
+      </svg>
+    `;
+
+    const marker = new window.google.maps.Marker({
+      position: { lat: user.latitude, lng: user.longitude },
+      map: googleMapRef.current,
+      title: `${user.firstName} ${user.lastName}`,
+      icon: {
+        url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(userMarkerSVG)}`,
+        scaledSize: new window.google.maps.Size(markerSize + 20, markerSize + 20),
+        anchor: new window.google.maps.Point((markerSize + 20) / 2, (markerSize + 20) / 2),
+      },
+      zIndex: 1000,
+      optimized: false
+    });
+
+    // Eventi marker utente
+    marker.addListener('click', () => {
+      console.log('👤 Click su utente:', user.firstName);
+      if (onUserSelect) {
+        onUserSelect(user);
+      }
+    });
+
+    marker.addListener('mouseover', () => {
+      if (!isDragging && !isMapInteracting) {
+        setHoveredUser(user);
+        setShowTooltip(true);
+      }
+    });
+
+    marker.addListener('mouseout', () => {
+      setHoveredUser(null);
+      setShowTooltip(false);
+    });
+
+    return marker;
+  }, [onUserSelect, isDragging, isMapInteracting]);
+
   // 🎯 ULTRA-SMOOTH LOCATION NAVIGATION
   const handleGoToUserLocation = useCallback(() => {
     if (!userLocation || !googleMapRef.current) {
@@ -1234,150 +1350,115 @@ const FullPageMap = ({
     console.log('🎯 Enhanced user location marker updated');
   }, [userLocation, mapLoaded]);
 
-  // 🎨 STABLE MARKER UPDATES - No flickering during interactions
+  // 🎨 AGGIORNATO: Gestione markers per supportare sia cafes che users
   useEffect(() => {
     if (!googleMapRef.current || !mapLoaded) return;
 
-    console.log('☕ STABLE MARKER UPDATE:', {
-      totalCafes: cafes.length,
+    console.log('🗺️ DUAL MARKER UPDATE:', {
+      mapMode,
+      totalCafes: cafes?.length || 0,
+      totalUsers: users?.length || 0,
       selectedType: cafeType,
       zoomLevel,
       isDragging,
-      isMapInteracting,
-      allCafes: cafes.map(cafe => ({
-        name: cafe.name,
-        type: cafe.type,
-        placeType: cafe.placeType,
-        hasLocation: !!(cafe.location && cafe.location.latitude && cafe.location.longitude)
-      })),
-      rawCafesArray: cafes
+      isMapInteracting
     });
 
     currentFilterRef.current = cafeType;
 
-    // FIXED: Since useCafes already filters by type, use all provided cafes
-    const perfectlyFilteredCafes = cafes.filter(cafeItem => {
-      // Basic validation - ensure we have location data
-      return cafeItem.location && cafeItem.location.latitude && cafeItem.location.longitude;
-    });
-
-    // 🔧 STABILITY: Only update markers when NOT interacting
+    // 🔧 STABILITY: Solo aggiorna markers quando NON si sta interagendo
     if (isDragging || isMapInteracting || isZoomingIn || isZoomingOut) {
       console.log('🎬 STABLE: Preserving markers during interaction');
-      return; // Keep existing markers stable
-    }
-
-    // 🔧 SIMPLIFIED UPDATES: Allow all marker updates
-    const existingMarkerCount = markersRef.current.size;
-    const newMarkerCount = perfectlyFilteredCafes.length;
-
-    console.log(`🔧 UPDATE CHECK: ${newMarkerCount} new markers vs ${existingMarkerCount} existing`);
-
-    // Only skip if we have no new markers and no existing markers (avoid empty updates)
-    if (newMarkerCount === 0 && existingMarkerCount === 0) {
-      console.log('📍 SKIP: No markers to show');
       return;
     }
-
-    console.log(`🎯 STABLE UPDATE: ${perfectlyFilteredCafes.length} markers (was ${existingMarkerCount})`);
 
     // Clear existing markers efficiently
-    markersRef.current.forEach((marker) => {
-      if (marker && marker.setMap) {
-        marker.setMap(null);
-      }
-    });
+    markersRef.current.forEach(marker => marker.setMap(null));
     markersRef.current.clear();
+    
+    userMarkersRef.current.forEach(marker => marker.setMap(null));
+    userMarkersRef.current.clear();
+    
     activeMarkersRef.current.clear();
 
-    if (perfectlyFilteredCafes.length === 0) {
-      console.log('📍 No matches found');
-      return;
+    if (mapMode === 'places' && cafes && cafes.length > 0) {
+      // 🏪 GESTIONE MARKER LUOGHI
+      const validCafes = cafes.filter(cafeItem => {
+        return cafeItem.location && cafeItem.location.latitude && cafeItem.location.longitude;
+      });
+
+      console.log(`🏪 Creating ${validCafes.length} place markers`);
+
+      validCafes.forEach((cafe, index) => {
+        const position = {
+          lat: cafe.location.latitude,
+          lng: cafe.location.longitude
+        };
+
+        const cafeId = cafe.id || cafe.googlePlaceId;
+        const isHovered = !isDragging && !isMapInteracting && hoveredMarker === cafeId;
+        const isSearchMarker = cafe.source === 'search' || cafe.isSearchResult;
+        
+        const markerSVG = createEnhancedDarkMapMarker(cafe, index, currentFilterRef.current, isHovered, isSearchMarker);
+        const popularityScore = calculatePopularityScore(cafe);
+        const markerSize = getMarkerSizeFromPopularity(popularityScore, zoomLevel);
+
+        const marker = new window.google.maps.Marker({
+          position: position,
+          map: googleMapRef.current,
+          title: `${isSearchMarker ? '🔍 ' : ''}${cafe.emoji || (currentFilterRef.current === 'restaurant' ? '🍽️' : '☕')} ${cafe.name}`,
+          icon: {
+            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(markerSVG),
+            scaledSize: new window.google.maps.Size(markerSize + 24, markerSize + 24),
+            anchor: new window.google.maps.Point((markerSize + 24) / 2, (markerSize + 24) / 2)
+          },
+          zIndex: isSearchMarker ? 5000 : Math.round(popularityScore * 1000) + 100,
+          optimized: true,
+          visible: true
+        });
+
+        // Eventi marker luoghi
+        marker.addListener('click', () => {
+          handleSmoothMarkerClick(cafe);
+        });
+
+        marker.addListener('mouseover', () => {
+          handleMarkerHover(cafe, true);
+        });
+
+        marker.addListener('mouseout', () => {
+          handleMarkerHover(cafe, false);
+        });
+
+        markersRef.current.set(cafeId, marker);
+        activeMarkersRef.current.add(cafeId);
+      });
+
+      console.log(`✅ Created ${validCafes.length} place markers`);
+
+    } else if (mapMode === 'people' && users && users.length > 0) {
+      // 👥 GESTIONE MARKER UTENTI
+      console.log(`👥 Creating ${users.length} user markers`);
+
+      users.forEach(user => {
+        if (!user.latitude || !user.longitude) {
+          console.warn('⚠️ User missing location:', user.firstName);
+          return;
+        }
+
+        const marker = createUserMarker(user);
+        if (marker) {
+          userMarkersRef.current.set(user.id, marker);
+          activeMarkersRef.current.add(user.id);
+        }
+      });
+
+      console.log(`✅ Created ${userMarkersRef.current.size} user markers`);
     }
 
-    // 🚀 CREATE STABLE MARKERS
-    perfectlyFilteredCafes.forEach((cafe, index) => {
-      if (!cafe.location || !cafe.location.latitude || !cafe.location.longitude) {
-        return;
-      }
+    console.log(`🎉 DUAL MARKER UPDATE completed - Mode: ${mapMode}`);
 
-      const position = {
-        lat: cafe.location.latitude,
-        lng: cafe.location.longitude
-      };
-
-      const cafeId = cafe.id || cafe.googlePlaceId;
-      
-      // Use stable hover state (don't check real-time hover during creation)
-      const isHovered = !isDragging && !isMapInteracting && hoveredMarker === cafeId;
-
-      // Special handling for search result markers
-      const isSearchMarker = cafe.source === 'search' || cafe.isSearchResult;
-      const markerSVG = createEnhancedDarkMapMarker(cafe, index, currentFilterRef.current, isHovered, isSearchMarker);
-
-      const popularityScore = calculatePopularityScore(cafe);
-      const markerSize = getMarkerSizeFromPopularity(popularityScore, zoomLevel);
-
-      // Calculate z-index with special priority for search results
-      const baseZIndex = Math.round(popularityScore * 1000) + 100;
-      const hoverZIndex = isHovered ? 1000 : 0;
-      const searchZIndex = isSearchMarker ? 5000 : 0; // Highest priority for search results
-
-      const marker = new window.google.maps.Marker({
-        position: position,
-        map: googleMapRef.current,
-        title: `${isSearchMarker ? '🔍 ' : ''}${cafe.emoji || (currentFilterRef.current === 'restaurant' ? '🍽️' : '☕')} ${cafe.name}`,
-        icon: {
-          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(markerSVG),
-          scaledSize: new window.google.maps.Size(markerSize + 24, markerSize + 24),
-          anchor: new window.google.maps.Point((markerSize + 24) / 2, (markerSize + 24) / 2)
-        },
-        zIndex: baseZIndex + hoverZIndex + searchZIndex,
-        optimized: true, // Enable optimization for stability
-        visible: true
-      });
-
-      // Log search marker creation
-      if (isSearchMarker) {
-        console.log('🎯 Search marker created with highest priority:', {
-          name: cafe.name,
-          zIndex: baseZIndex + hoverZIndex + searchZIndex,
-          position: position
-        });
-      }
-
-      // ✨ ENHANCED: Add hover and click listeners with special handling for search markers
-      marker.addListener('click', () => {
-        if (isSearchMarker) {
-          console.log('🔍 Search marker clicked - triggering enhanced zoom:', cafe.name);
-        }
-        handleSmoothMarkerClick(cafe);
-      });
-
-      // Add mouseover listener for beautiful tooltip
-      marker.addListener('mouseover', () => {
-        handleMarkerHover(cafe, true);
-      });
-
-      // Add mouseout listener
-      marker.addListener('mouseout', () => {
-        handleMarkerHover(cafe, false);
-      });
-
-      // Track mouse movement for smooth tooltip following
-      marker.addListener('mousemove', (event) => {
-        if (event.domEvent) {
-          handleMouseMove(event.domEvent);
-        }
-      });
-
-      markersRef.current.set(cafeId, marker);
-      activeMarkersRef.current.add(cafeId);
-    });
-
-    console.log(`🎉 STABLE: ${perfectlyFilteredCafes.length} markers created successfully`);
-
-  }, [cafes, cafeType, mapLoaded, isDragging, isMapInteracting, isZoomingIn, isZoomingOut, handleSmoothMarkerClick, handleMarkerHover, zoomLevel]); // Removed hoveredMarker dependency
+  }, [cafes, users, mapMode, cafeType, mapLoaded, isDragging, isMapInteracting, isZoomingIn, isZoomingOut, handleSmoothMarkerClick, handleMarkerHover, zoomLevel, createUserMarker]);
 
   // 🎬 SMOOTH LOADING ANIMATIONS
   const SmoothLoader = ({ isVisible, message = "Caricamento..." }) => (
@@ -1472,6 +1553,45 @@ const FullPageMap = ({
     }
   `;
 
+  // CSS aggiuntivo per selezione posto
+  const additionalStyles = `
+    .selecting-place-indicator {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, #10B981, #059669);
+      color: white;
+      padding: 16px 24px;
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(16, 185, 129, 0.4);
+      z-index: 1000;
+      animation: pulseIndicator 2s infinite;
+      backdrop-filter: blur(10px);
+    }
+    
+    .selecting-place-content {
+      text-align: center;
+    }
+    
+    .selecting-place-content span {
+      display: block;
+      font-weight: 600;
+      font-size: 16px;
+      margin-bottom: 4px;
+    }
+    
+    .selecting-place-content small {
+      font-size: 13px;
+      opacity: 0.9;
+    }
+    
+    @keyframes pulseIndicator {
+      0%, 100% { transform: translateX(-50%) scale(1); }
+      50% { transform: translateX(-50%) scale(1.05); }
+    }
+  `;
+
   // Handle Google Maps loading error
   if (googleMapsError) {
     return (
@@ -1493,33 +1613,35 @@ const FullPageMap = ({
   return (
     <div className="full-page-map dark-map-theme">
       <style>{smoothStyles}</style>
+      <style>{additionalStyles}</style>
       
       {/* Zoom Indicator */}
       <div className="zoom-indicator">
         {isZoomingIn ? '🔍 Zoom In' : isZoomingOut ? '🔍 Zoom Out' : ''}
       </div>
       
-      {/* Smooth Loading Indicators - ONLY for map dragging */}
+      {/* Smooth Loading Indicators - AGGIORNATO per modalità duale */}
       <SmoothLoader 
         isVisible={isRefreshing && !error} 
-        message="🔄 Aggiornamento luoghi..." 
+        message={mapMode === 'people' ? "🔄 Aggiornamento utenti..." : "🔄 Aggiornamento luoghi..."} 
       />
 
       {/* Initial Loading Screen */}
       {(!hasInitialLoad && (!mapLoaded || !googleMapsReady || loading)) && (
         <LoadingScreen 
-          message="Caricamento mappa ultra-smooth..."
-          subMessage="Preparazione interazioni fluide"
+          message={mapMode === 'people' ? "Caricamento utenti..." : "Caricamento mappa ultra-smooth..."}
+          subMessage={mapMode === 'people' ? "Ricerca persone nelle vicinanze" : "Preparazione interazioni fluide"}
           progress={loadingProgress}
         />
       )}
 
-      {/* Map dragging/update loading - ONLY for normal map interactions */}
-      {(isRefreshing || (loading && !error)) && !selectedCafe && (
+      {/* Map dragging/update loading - AGGIORNATO per supportare entrambe le modalità */}
+      {(isRefreshing || (loading && !error)) && !selectedCafe && !selectedUser && (
         <MapUpdateLoader
           loading={true}
-          searchType={cafeType}
+          searchType={mapMode === 'people' ? 'people' : cafeType}
           forcefulMode={false}
+          message={mapMode === 'people' ? "Aggiornamento utenti..." : "Aggiornamento luoghi..."}
         />
       )}
 
@@ -1550,11 +1672,15 @@ const FullPageMap = ({
             onSearchChange={onSearchChange}
             onRefresh={onRefresh}
             hasUserLocation={!!userLocation}
-            cafes={cafes}
-            cafesCount={cafes.filter(cafeItem => {
-              const cafeType_normalized = (cafeItem.type || cafeItem.placeType || '').toLowerCase();
-              return cafeType_normalized === cafeType.toLowerCase();
-            }).length}
+            cafes={cafes || []}
+            users={users || []} // NUOVO: passa utenti
+            cafesCount={mapMode === 'places' ? 
+              (cafes || []).filter(cafeItem => {
+                const cafeType_normalized = (cafeItem.type || cafeItem.placeType || '').toLowerCase();
+                return cafeType_normalized === cafeType.toLowerCase();
+              }).length : 0
+            }
+            usersCount={mapMode === 'people' ? (users || []).length : 0} // NUOVO
             isEmbedMode={isEmbedMode}
             userLocation={userLocation}
             onLocationRetry={onLocationRetry}
@@ -1565,6 +1691,8 @@ const FullPageMap = ({
             detectionMethod={detectionMethod}
             qualityText={qualityText}
             sourceText={sourceText}
+            mapMode={mapMode} // NUOVO: passa modalità corrente
+            isSelectingPlace={isSelectingPlace} // NUOVO
           />
         </div>
       )}
@@ -1578,21 +1706,34 @@ const FullPageMap = ({
         />
       )}
 
-      {/* ✨ Beautiful Animated Hover Tooltip */}
+      {/* ✨ Beautiful Animated Hover Tooltip - Supporta utenti e luoghi */}
       <MarkerHoverTooltip
         cafe={hoveredCafe}
-        isVisible={showTooltip && hoveredCafe && !selectedCafe}
+        user={hoveredUser} // NUOVO: supporto utenti
+        isVisible={showTooltip && (hoveredCafe || hoveredUser) && !selectedCafe && !selectedUser}
         onClose={() => {
           setShowTooltip(false);
           setHoveredCafe(null);
+          setHoveredUser(null); // NUOVO
         }}
       />
 
+      {/* Dark Theme Error Message */}
       {/* Dark Theme Error Message */}
       {error && (
         <div className="map-error-toast dark-theme">
           <span>❌ {error.message || 'Error loading data'}</span>
           <button onClick={handleSmoothSearch}>Retry</button>
+        </div>
+      )}
+
+      {/* NUOVO: Indicatore modalità selezione posto */}
+      {isSelectingPlace && (
+        <div className="selecting-place-indicator">
+          <div className="selecting-place-content">
+            <span>📍 Seleziona un posto sulla mappa</span>
+            <small>Clicca su un marker per scegliere il luogo di incontro</small>
+          </div>
         </div>
       )}
     </div>
