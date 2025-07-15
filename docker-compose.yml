@@ -1,5 +1,15 @@
 version: '3.8'
 
+networks:
+  map-network:
+    driver: bridge
+
+volumes:
+  map_db_data:
+    driver: local
+  map_redis_data:
+    driver: local
+
 services:
   # PostgreSQL Database
   map-db:
@@ -51,7 +61,7 @@ services:
       NODE_ENV: development
       PORT: 5001
       HOST: 0.0.0.0
-      FRONTEND_URL: http://localhost:3001
+      FRONTEND_URL: http://localhost:3002
       DB_HOST: map-db
       DB_PORT: 5432
       DB_NAME: map_service
@@ -84,7 +94,7 @@ services:
       timeout: 10s
       retries: 3
 
-  # Frontend Service - DEVELOPMENT MODE WITH VOLUMES
+  # Frontend Widget Service - FIXED PORT
   map-frontend:
     build:
       context: ./frontend
@@ -106,27 +116,17 @@ services:
     environment:
       - CHOKIDAR_USEPOLLING=true
       - WATCHPACK_POLLING=true
-      - PORT=3001
+      - PORT=3002
     ports:
-      - "3001:3001"
+      - "3002:3002"
     volumes:
-      - ./frontend/src:/app/src                     # CRITICAL: Mount source code
-      - ./frontend/public:/app/public               # Mount public files  
-      - ./frontend/package.json:/app/package.json   # Mount package.json
-      - /app/node_modules                           # Preserve node_modules
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/package.json:/app/package.json
+      - /app/node_modules
     networks:
       - map-network
     depends_on:
       - map-backend
     stdin_open: true
     tty: true
-
-networks:
-  map-network:
-    driver: bridge
-
-volumes:
-  map_db_data:
-    driver: local
-  map_redis_data:
-    driver: local

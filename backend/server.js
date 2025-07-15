@@ -53,12 +53,15 @@ app.use(helmet({
 }));
 
 // CORS configuration
+// CORS configuration - FIXED to include all ports
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production' 
-    ? process.env.FRONTEND_URL 
-    : ['http://localhost:3001', 'http://localhost:3000'],
+  origin: process.env.FRONTEND_URL ? 
+    process.env.FRONTEND_URL.split(',').map(url => url.trim()) : 
+    ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'],
   credentials: true,
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 200,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 };
 app.use(cors(corsOptions));
 
