@@ -1,4 +1,4 @@
-// components/CafePopup.js - ENHANCED VERSION with Beautiful Animations
+// components/CafePopup.js - COMPLETE ENHANCED VERSION with Apple WWDC 2025 Design
 // Location: /map-service/frontend/src/components/CafePopup.js
 
 import React, { useState, useEffect } from 'react';
@@ -56,6 +56,70 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
   const handleBackdropClick = (e) => {
     if (e.target === e.currentTarget) {
       handleClose();
+    }
+  };
+
+  // ENHANCED: Enhanced venue info function with gradients and colors
+  const getEnhancedVenueInfo = (venue) => {
+    const type = venue.type || venue.placeType || 'cafe';
+    const name = (venue.name || '').toLowerCase();
+    
+    // Enhanced venue detection with Italian specialties
+    if (name.includes('gelateria') || name.includes('gelato')) {
+      return { 
+        type: 'gelateria', 
+        emoji: '🍦', 
+        gradient: 'linear-gradient(135deg, #FF6B9D, #C084FC)',
+        label: 'Gelateria',
+        color: '#FF6B9D'
+      };
+    }
+    if (name.includes('pizzeria') || name.includes('pizza')) {
+      return { 
+        type: 'pizzeria', 
+        emoji: '🍕', 
+        gradient: 'linear-gradient(135deg, #FF8C42, #F97316)',
+        label: 'Pizzeria',
+        color: '#FF8C42'
+      };
+    }
+    if (name.includes('pasticceria') || name.includes('dolc')) {
+      return { 
+        type: 'pasticceria', 
+        emoji: '🧁', 
+        gradient: 'linear-gradient(135deg, #FF69B4, #EC4899)',
+        label: 'Pasticceria',
+        color: '#FF69B4'
+      };
+    }
+    if (name.includes('panetteria') || name.includes('pane')) {
+      return { 
+        type: 'panetteria', 
+        emoji: '🥖', 
+        gradient: 'linear-gradient(135deg, #D2691E, #B45309)',
+        label: 'Panetteria',
+        color: '#D2691E'
+      };
+    }
+    
+    switch (type) {
+      case 'restaurant':
+        return { 
+          type: 'restaurant', 
+          emoji: '🍽️', 
+          gradient: 'linear-gradient(135deg, #EF4444, #DC2626)',
+          label: 'Ristorante',
+          color: '#EF4444'
+        };
+      case 'cafe':
+      default:
+        return { 
+          type: 'cafe', 
+          emoji: '☕', 
+          gradient: 'linear-gradient(135deg, #F97316, #EA580C)',
+          label: 'Caffetteria',
+          color: '#F97316'
+        };
     }
   };
 
@@ -327,112 +391,164 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
     }
   };
 
-  // 🎨 BEAUTIFUL ANIMATION FUNCTIONS
+  // 🎨 ENHANCED LIQUID GLASS POPUP STYLES
   const getPopupStyles = () => {
-    const baseTransition = 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
-    
+    const baseStyles = {
+      position: 'fixed',
+      top: '50%',
+      left: '50%',
+      zIndex: 10000,
+      maxWidth: '420px',
+      width: '90vw',
+      maxHeight: '85vh',
+      borderRadius: '28px',
+      overflow: 'hidden',
+      // ENHANCED LIQUID GLASS EFFECT - Apple WWDC 2025 Style
+      background: `
+        linear-gradient(135deg,
+          rgba(255, 255, 255, 0.95) 0%,
+          rgba(255, 255, 255, 0.92) 25%,
+          rgba(248, 250, 252, 0.95) 50%,
+          rgba(241, 245, 249, 0.92) 75%,
+          rgba(255, 255, 255, 0.95) 100%
+        )
+      `,
+      backdropFilter: 'blur(40px) saturate(180%) brightness(110%)',
+      WebkitBackdropFilter: 'blur(40px) saturate(180%) brightness(110%)',
+      border: '1px solid rgba(255, 255, 255, 0.5)',
+      // MULTI-LAYERED SHADOWS - Apple style depth
+      boxShadow: `
+        0 32px 64px rgba(0, 0, 0, 0.15),
+        0 16px 32px rgba(0, 0, 0, 0.10),
+        0 8px 16px rgba(0, 0, 0, 0.08),
+        0 4px 8px rgba(0, 0, 0, 0.05),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.4),
+        0 0 0 1px rgba(255, 255, 255, 0.2)
+      `,
+      // ENHANCED TRANSITIONS
+      transition: 'all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)'
+    };
+
+    // ENHANCED ANIMATION PHASES
     switch (animationPhase) {
       case 'entering':
         return {
-          transform: 'scale(0.3) rotateY(-20deg) translateY(80px)',
+          ...baseStyles,
+          transform: 'translate(-50%, -50%) scale(0.4) rotateX(-20deg) rotateY(15deg) rotateZ(-2deg)',
           opacity: 0,
-          filter: 'blur(8px)',
-          transition: baseTransition
+          filter: 'blur(15px) brightness(0.6) saturate(150%)',
+          backdropFilter: 'blur(0px)'
         };
       case 'phase1':
         return {
-          transform: 'scale(0.9) rotateY(-5deg) translateY(20px)',
-          opacity: 0.8,
-          filter: 'blur(2px)', 
-          transition: baseTransition
+          ...baseStyles,
+          transform: 'translate(-50%, -50%) scale(0.85) rotateX(-8deg) rotateY(4deg) rotateZ(-1deg)',
+          opacity: 0.7,
+          filter: 'blur(6px) brightness(0.85) saturate(140%)',
+          backdropFilter: 'blur(20px) saturate(140%)'
         };
       case 'phase2':
         return {
-          transform: 'scale(1.03) rotateY(2deg) translateY(-5px)',
+          ...baseStyles,
+          transform: 'translate(-50%, -50%) scale(1.03) rotateX(-2deg) rotateY(1deg) rotateZ(0deg)',
           opacity: 0.95,
-          filter: 'blur(0px)',
-          transition: baseTransition,
-          boxShadow: '0 20px 50px rgba(0,0,0,0.3)'
+          filter: 'blur(1px) brightness(1.05) saturate(120%)',
+          backdropFilter: 'blur(35px) saturate(160%)'
         };
       case 'visible':
-        return {
-          transform: 'scale(1) rotateY(0deg) translateY(0px)',
-          opacity: 1,
-          filter: 'blur(0px)',
-          transition: baseTransition,
-          boxShadow: '0 25px 60px rgba(0,0,0,0.4), 0 0 20px rgba(66,133,244,0.15)'
-        };
-      case 'exiting':
-        return {
-          transform: 'scale(0.8) rotateY(15deg) translateY(-30px)',
-          opacity: 0,
-          filter: 'blur(4px)',
-          transition: 'all 0.3s ease-in'
-        };
       default:
-        return { transition: baseTransition };
+        return {
+          ...baseStyles,
+          transform: 'translate(-50%, -50%) scale(1) rotateX(0deg) rotateY(0deg) rotateZ(0deg)',
+          opacity: 1,
+          filter: 'blur(0px) brightness(1) saturate(110%)',
+          backdropFilter: 'blur(40px) saturate(180%) brightness(110%)'
+        };
     }
   };
 
+  // 🌟 ENHANCED OVERLAY WITH DYNAMIC BLUR
   const getOverlayStyles = () => {
-    const baseTransition = 'all 0.4s ease-out';
-    
+    const baseStyles = {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      zIndex: 9999,
+      transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+    };
+
     switch (animationPhase) {
       case 'entering':
+        return {
+          ...baseStyles,
+          background: 'rgba(0, 0, 0, 0)',
+          backdropFilter: 'blur(0px)',
+          WebkitBackdropFilter: 'blur(0px)'
+        };
       case 'phase1':
         return {
-          backgroundColor: 'rgba(0,0,0,0)',
-          backdropFilter: 'blur(0px)',
-          transition: baseTransition
+          ...baseStyles,
+          background: 'rgba(0, 0, 0, 0.2)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)'
         };
       case 'phase2':
       case 'visible':
-        return {
-          backgroundColor: 'rgba(0,0,0,0.6)',
-          backdropFilter: 'blur(8px)',
-          transition: baseTransition
-        };
-      case 'exiting':
-        return {
-          backgroundColor: 'rgba(0,0,0,0)',
-          backdropFilter: 'blur(0px)',
-          transition: 'all 0.3s ease-in'
-        };
       default:
-        return { transition: baseTransition };
+        return {
+          ...baseStyles,
+          background: 'rgba(0, 0, 0, 0.4)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)'
+        };
     }
   };
 
+  // ✨ ENHANCED ELEMENT ANIMATIONS
   const getElementAnimation = (delay = 0, type = 'slideUp') => {
-    const isVisible = animationPhase === 'visible';
+    const isVisible = animationPhase === 'visible' || animationPhase === 'phase2';
     
     const animations = {
       slideUp: {
-        transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
+        transform: isVisible ? 'translateY(0px) scale(1)' : 'translateY(40px) scale(0.95)',
         opacity: isVisible ? 1 : 0
       },
       slideLeft: {
-        transform: isVisible ? 'translateX(0)' : 'translateX(-20px)',
+        transform: isVisible ? 'translateX(0px) scale(1)' : 'translateX(-30px) scale(0.95)',
+        opacity: isVisible ? 1 : 0
+      },
+      slideRight: {
+        transform: isVisible ? 'translateX(0px) scale(1)' : 'translateX(30px) scale(0.95)',
         opacity: isVisible ? 1 : 0
       },
       scale: {
-        transform: isVisible ? 'scale(1)' : 'scale(0.8)',
+        transform: isVisible ? 'scale(1) rotate(0deg)' : 'scale(0.8) rotate(-5deg)',
         opacity: isVisible ? 1 : 0
       },
       rotate: {
-        transform: isVisible ? 'rotate(0deg) scale(1)' : 'rotate(-180deg) scale(0.5)',
+        transform: isVisible ? 'rotate(0deg) scale(1)' : 'rotate(-15deg) scale(0.85)',
         opacity: isVisible ? 1 : 0
       },
       fadeIn: {
+        opacity: isVisible ? 1 : 0,
+        transform: isVisible ? 'scale(1)' : 'scale(0.95)'
+      },
+      bounce: {
+        transform: isVisible ? 'translateY(0px) scale(1)' : 'translateY(-20px) scale(0.9)',
         opacity: isVisible ? 1 : 0
       }
     };
     
     return {
       ...animations[type],
-      transition: `all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) ${delay}ms`
+      transition: `all 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) ${delay}ms`
     };
   };
+
+  const venueInfo = getEnhancedVenueInfo(placeData);
 
   return (
     <div 
@@ -445,123 +561,411 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
         style={getPopupStyles()}
       >
         
-        {/* Header */}
+        {/* 🎨 ENHANCED APPLE WWDC 2025 HEADER */}
         <div 
-          className="popup-header" 
-          data-venue-type={placeData.type || placeData.placeType}
-          style={getElementAnimation(100, 'slideUp')}
+          style={{
+            position: 'relative',
+            background: `
+              linear-gradient(135deg,
+                ${venueInfo.color}20 0%,
+                rgba(255, 255, 255, 0.95) 25%,
+                rgba(248, 250, 252, 0.98) 100%
+              )
+            `,
+            backdropFilter: 'blur(20px) saturate(150%)',
+            WebkitBackdropFilter: 'blur(20px) saturate(150%)',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.4)',
+            padding: '28px 24px',
+            overflow: 'hidden',
+            ...getElementAnimation(100, 'slideUp')
+          }}
         >
-          <div className="header-content">
-            <div 
-              className="cafe-emoji"
-              style={getElementAnimation(200, 'rotate')}
-            >
-              {getItalianVenueEmoji(placeData)}
-            </div>
-            <div className="header-text">
-              <h2 
-                className="cafe-name"
-                style={getElementAnimation(300, 'slideLeft')}
-              >
-                {placeData.name}
-              </h2>
+          {/* Animated Background Particles */}
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: `
+              radial-gradient(circle at 20% 30%, ${venueInfo.color}20 0%, transparent 50%),
+              radial-gradient(circle at 80% 70%, ${venueInfo.color}15 0%, transparent 50%)
+            `,
+            opacity: 0.6,
+            animation: 'headerParticles 8s ease-in-out infinite'
+          }} />
+
+          {/* Main Header Content */}
+          <div style={{
+            position: 'relative',
+            zIndex: 2,
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between'
+          }}>
+            
+            {/* Left Content */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flex: 1 }}>
+              
+              {/* Enhanced Emoji with Glass Effect */}
               <div 
-                className="cafe-meta"
-                style={getElementAnimation(400, 'slideLeft')}
+                style={{
+                  width: '80px',
+                  height: '80px',
+                  borderRadius: '24px',
+                  background: `
+                    linear-gradient(135deg,
+                      rgba(255, 255, 255, 0.9) 0%,
+                      rgba(255, 255, 255, 0.7) 100%
+                    )
+                  `,
+                  backdropFilter: 'blur(20px)',
+                  WebkitBackdropFilter: 'blur(20px)',
+                  border: '2px solid rgba(255, 255, 255, 0.5)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '36px',
+                  boxShadow: `
+                    0 16px 32px rgba(0, 0, 0, 0.1),
+                    0 8px 16px rgba(0, 0, 0, 0.08),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+                    0 0 0 1px rgba(255, 255, 255, 0.2)
+                  `,
+                  transform: 'translateZ(0)',
+                  ...getElementAnimation(200, 'rotate')
+                }}
               >
-                <span className="cafe-type">
-                  {getItalianVenueTypeDisplay(placeData.type || placeData.placeType)}
-                </span>
-                {placeData.distance && (
-                  <>
-                    <span className="meta-separator">•</span>
-                    <span className="cafe-distance">{placeData.formattedDistance}</span>
-                  </>
-                )}
+                {venueInfo.emoji}
+              </div>
+
+              {/* Text Content */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                
+                {/* Venue Name */}
+                <h2 
+                  style={{
+                    fontSize: '24px',
+                    fontWeight: '700',
+                    color: '#1F2937',
+                    margin: '0 0 8px 0',
+                    lineHeight: '1.2',
+                    background: `
+                      linear-gradient(135deg,
+                        #1F2937 0%,
+                        ${venueInfo.color} 100%
+                      )
+                    `,
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                    textShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                    ...getElementAnimation(300, 'slideLeft')
+                  }}
+                >
+                  {placeData.name}
+                </h2>
+
+                {/* Venue Meta */}
+                <div 
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    flexWrap: 'wrap',
+                    ...getElementAnimation(400, 'slideLeft')
+                  }}
+                >
+                  
+                  {/* Venue Type Badge */}
+                  <div style={{
+                    padding: '6px 12px',
+                    borderRadius: '12px',
+                    background: `
+                      linear-gradient(135deg,
+                        ${venueInfo.color}20 0%,
+                        ${venueInfo.color}10 100%
+                      )
+                    `,
+                    border: `1px solid ${venueInfo.color}30`,
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    color: venueInfo.color,
+                    backdropFilter: 'blur(10px)',
+                    WebkitBackdropFilter: 'blur(10px)'
+                  }}>
+                    {venueInfo.label}
+                  </div>
+
+                  {/* Distance Badge */}
+                  {placeData.distance && (
+                    <>
+                      <div style={{
+                        width: '4px',
+                        height: '4px',
+                        borderRadius: '50%',
+                        background: '#9CA3AF'
+                      }} />
+                      
+                      <div style={{
+                        padding: '6px 12px',
+                        borderRadius: '12px',
+                        background: 'rgba(59, 130, 246, 0.1)',
+                        border: '1px solid rgba(59, 130, 246, 0.2)',
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        color: '#3B82F6',
+                        backdropFilter: 'blur(10px)',
+                        WebkitBackdropFilter: 'blur(10px)'
+                      }}>
+                        📍 {placeData.formattedDistance || `${Math.round(placeData.distance)}m`}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
+
+            {/* Enhanced Close Button */}
+            <button 
+              onClick={handleClose}
+              style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '14px',
+                border: 'none',
+                background: `
+                  linear-gradient(135deg,
+                    rgba(255, 255, 255, 0.9) 0%,
+                    rgba(248, 250, 252, 0.8) 100%
+                  )
+                `,
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                color: '#6B7280',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '18px',
+                fontWeight: '600',
+                boxShadow: `
+                  0 8px 16px rgba(0, 0, 0, 0.1),
+                  0 4px 8px rgba(0, 0, 0, 0.06),
+                  inset 0 1px 0 rgba(255, 255, 255, 0.8)
+                `,
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                transform: 'translateZ(0)',
+                ...getElementAnimation(500, 'scale')
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.transform = 'scale(1.05) translateZ(0)';
+                e.target.style.background = 'linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(248, 250, 252, 0.9) 100%)';
+                e.target.style.color = '#EF4444';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.transform = 'scale(1) translateZ(0)';
+                e.target.style.background = 'linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.8) 100%)';
+                e.target.style.color = '#6B7280';
+              }}
+            >
+              ✕
+            </button>
           </div>
-          <button 
-            className="close-button" 
-            onClick={handleClose}
-            style={getElementAnimation(500, 'scale')}
-          >
-            ✕
-          </button>
         </div>
 
-        {/* Quick Stats with Dynamic Status */}
+        {/* 🎨 ENHANCED QUICK STATS */}
         <div 
-          className="quick-stats"
-          style={getElementAnimation(200, 'slideUp')}
+          style={{
+            display: 'flex',
+            gap: '16px',
+            padding: '20px 24px',
+            background: `
+              linear-gradient(135deg,
+                rgba(255, 255, 255, 0.8) 0%,
+                rgba(248, 250, 252, 0.9) 100%
+              )
+            `,
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.3)',
+            ...getElementAnimation(200, 'slideUp')
+          }}
         >
           {placeData.rating && (
             <div 
-              className="stat-item"
-              style={getElementAnimation(250, 'scale')}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '12px',
+                borderRadius: '16px',
+                background: 'rgba(255, 193, 7, 0.1)',
+                border: '1px solid rgba(255, 193, 7, 0.2)',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+                minWidth: '70px',
+                ...getElementAnimation(250, 'scale')
+              }}
             >
-              <span className="stat-icon">⭐</span>
-              <span className="stat-value">{placeData.rating}</span>
-              <span className="stat-label">rating</span>
+              <span style={{ fontSize: '20px' }}>⭐</span>
+              <span style={{ fontWeight: '700', fontSize: '16px', color: '#1F2937' }}>{placeData.rating}</span>
+              <span style={{ fontSize: '11px', color: '#6B7280', fontWeight: '600' }}>rating</span>
             </div>
           )}
           
           {placeData.priceLevel !== undefined && (
             <div 
-              className="stat-item"
-              style={getElementAnimation(300, 'scale')}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '12px',
+                borderRadius: '16px',
+                background: 'rgba(34, 197, 94, 0.1)',
+                border: '1px solid rgba(34, 197, 94, 0.2)',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+                minWidth: '70px',
+                ...getElementAnimation(300, 'scale')
+              }}
             >
-              <span className="stat-icon">💰</span>
-              <span className="stat-value">{'€'.repeat(placeData.priceLevel + 1)}</span>
-              <span className="stat-label">prezzo</span>
+              <span style={{ fontSize: '20px' }}>💰</span>
+              <span style={{ fontWeight: '700', fontSize: '16px', color: '#1F2937' }}>{'€'.repeat(placeData.priceLevel + 1)}</span>
+              <span style={{ fontSize: '11px', color: '#6B7280', fontWeight: '600' }}>prezzo</span>
             </div>
           )}
           
           {/* ENHANCED: Dynamic Opening Status */}
           <div 
-            className="stat-item dynamic-status"
-            style={getElementAnimation(350, 'scale')}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '12px',
+              borderRadius: '16px',
+              background: `rgba(${openingStatus.statusColor === '#10B981' ? '16, 185, 129' : openingStatus.statusColor === '#EF4444' ? '239, 68, 68' : '107, 114, 128'}, 0.1)`,
+              border: `1px solid ${openingStatus.statusColor}30`,
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
+              flex: 1,
+              minWidth: '100px',
+              ...getElementAnimation(350, 'scale')
+            }}
           >
-            <span 
-              className="status-dot" 
-              style={{ backgroundColor: openingStatus.statusColor }}
+            <div 
+              style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: openingStatus.statusColor,
+                animation: openingStatus.isOpen === true ? 'successPulse 1.5s ease-in-out infinite' : 'none'
+              }}
             />
             <span 
-              className="stat-value dynamic-status-text" 
-              style={{ color: openingStatus.statusColor }}
+              style={{
+                fontWeight: '700',
+                fontSize: '12px',
+                color: openingStatus.statusColor,
+                textAlign: 'center',
+                lineHeight: '1.2'
+              }}
             >
               {openingStatus.status}
             </span>
             {openingStatus.confidence === 'high' && (
-              <span className="status-confidence">✓</span>
+              <span style={{ color: '#10B981', fontSize: '10px', fontWeight: 'bold' }}>✓</span>
             )}
           </div>
         </div>
 
-        {/* Tabs */}
+        {/* 🎨 ENHANCED TABS */}
         <div 
-          className="popup-tabs"
-          style={getElementAnimation(300, 'slideUp')}
+          style={{
+            display: 'flex',
+            background: 'rgba(255, 255, 255, 0.6)',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.3)',
+            ...getElementAnimation(300, 'slideUp')
+          }}
         >
           <button 
-            className={`tab-button ${activeTab === 'info' ? 'active' : ''}`}
             onClick={() => setActiveTab('info')}
-            style={getElementAnimation(350, 'scale')}
+            style={{
+              flex: 1,
+              padding: '16px',
+              border: 'none',
+              background: activeTab === 'info' ? `
+                linear-gradient(135deg,
+                  ${venueInfo.color}15 0%,
+                  rgba(255, 255, 255, 0.9) 100%
+                )
+              ` : 'transparent',
+              color: activeTab === 'info' ? venueInfo.color : '#6B7280',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              borderBottom: activeTab === 'info' ? `2px solid ${venueInfo.color}` : '2px solid transparent',
+              backdropFilter: 'blur(5px)',
+              WebkitBackdropFilter: 'blur(5px)',
+              ...getElementAnimation(350, 'scale')
+            }}
           >
             📍 Info
           </button>
           <button 
-            className={`tab-button ${activeTab === 'hours' ? 'active' : ''}`}
             onClick={() => setActiveTab('hours')}
-            style={getElementAnimation(400, 'scale')}
+            style={{
+              flex: 1,
+              padding: '16px',
+              border: 'none',
+              background: activeTab === 'hours' ? `
+                linear-gradient(135deg,
+                  ${venueInfo.color}15 0%,
+                  rgba(255, 255, 255, 0.9) 100%
+                )
+              ` : 'transparent',
+              color: activeTab === 'hours' ? venueInfo.color : '#6B7280',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              borderBottom: activeTab === 'hours' ? `2px solid ${venueInfo.color}` : '2px solid transparent',
+              backdropFilter: 'blur(5px)',
+              WebkitBackdropFilter: 'blur(5px)',
+              ...getElementAnimation(400, 'scale')
+            }}
           >
             🕒 Orari
           </button>
           {placeData.photos && placeData.photos.length > 0 && (
             <button 
-              className={`tab-button ${activeTab === 'photos' ? 'active' : ''}`}
               onClick={() => setActiveTab('photos')}
-              style={getElementAnimation(450, 'scale')}
+              style={{
+                flex: 1,
+                padding: '16px',
+                border: 'none',
+                background: activeTab === 'photos' ? `
+                  linear-gradient(135deg,
+                    ${venueInfo.color}15 0%,
+                    rgba(255, 255, 255, 0.9) 100%
+                  )
+                ` : 'transparent',
+                color: activeTab === 'photos' ? venueInfo.color : '#6B7280',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                borderBottom: activeTab === 'photos' ? `2px solid ${venueInfo.color}` : '2px solid transparent',
+                backdropFilter: 'blur(5px)',
+                WebkitBackdropFilter: 'blur(5px)',
+                ...getElementAnimation(450, 'scale')
+              }}
             >
               📸 Foto
             </button>
@@ -570,76 +974,156 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
 
         {/* Content */}
         <div 
-          className="popup-content"
-          style={getElementAnimation(400, 'slideUp')}
+          style={{
+            maxHeight: '400px',
+            overflowY: 'auto',
+            padding: '24px',
+            ...getElementAnimation(400, 'slideUp')
+          }}
         >
           
           {/* Info Tab */}
           {activeTab === 'info' && (
-            <div className="info-content">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div 
-                className="info-item"
-                style={getElementAnimation(450, 'slideLeft')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '16px',
+                  padding: '16px',
+                  borderRadius: '16px',
+                  background: 'rgba(255, 255, 255, 0.5)',
+                  backdropFilter: 'blur(10px)',
+                  WebkitBackdropFilter: 'blur(10px)',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  transition: 'all 0.3s ease',
+                  cursor: 'default',
+                  ...getElementAnimation(450, 'slideLeft')
+                }}
               >
-                <div className="info-icon">📍</div>
-                <div className="info-text">
-                  <div className="info-label">Indirizzo</div>
-                  <div className="info-value">{placeData.address}</div>
+                <div style={{ fontSize: '24px', flexShrink: 0, marginTop: '2px' }}>📍</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '12px', color: '#6B7280', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Indirizzo</div>
+                  <div style={{ fontSize: '15px', color: '#1F2937', fontWeight: '500', lineHeight: '1.4' }}>{placeData.address}</div>
                 </div>
               </div>
 
               {placeData.phoneNumber && (
                 <div 
-                  className="info-item clickable" 
                   onClick={handleCall}
-                  style={getElementAnimation(500, 'slideLeft')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '16px',
+                    padding: '16px',
+                    borderRadius: '16px',
+                    background: 'rgba(59, 130, 246, 0.05)',
+                    backdropFilter: 'blur(10px)',
+                    WebkitBackdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(59, 130, 246, 0.2)',
+                    transition: 'all 0.3s ease',
+                    cursor: 'pointer',
+                    ...getElementAnimation(500, 'slideLeft')
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.background = 'rgba(59, 130, 246, 0.05)';
+                  }}
                 >
-                  <div className="info-icon">📞</div>
-                  <div className="info-text">
-                    <div className="info-label">Telefono</div>
-                    <div className="info-value phone-number">{placeData.phoneNumber}</div>
+                  <div style={{ fontSize: '24px', flexShrink: 0, marginTop: '2px' }}>📞</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '12px', color: '#6B7280', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Telefono</div>
+                    <div style={{ fontSize: '15px', color: '#3B82F6', fontWeight: '500', lineHeight: '1.4' }}>{placeData.phoneNumber}</div>
                   </div>
                 </div>
               )}
 
               {placeData.website && (
                 <div 
-                  className="info-item clickable" 
                   onClick={handleWebsite}
-                  style={getElementAnimation(550, 'slideLeft')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '16px',
+                    padding: '16px',
+                    borderRadius: '16px',
+                    background: 'rgba(34, 197, 94, 0.05)',
+                    backdropFilter: 'blur(10px)',
+                    WebkitBackdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(34, 197, 94, 0.2)',
+                    transition: 'all 0.3s ease',
+                    cursor: 'pointer',
+                    ...getElementAnimation(550, 'slideLeft')
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.background = 'rgba(34, 197, 94, 0.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.background = 'rgba(34, 197, 94, 0.05)';
+                  }}
                 >
-                  <div className="info-icon">🌐</div>
-                  <div className="info-text">
-                    <div className="info-label">Sito web</div>
-                    <div className="info-value website-link">Visita sito</div>
+                  <div style={{ fontSize: '24px', flexShrink: 0, marginTop: '2px' }}>🌐</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '12px', color: '#6B7280', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Sito web</div>
+                    <div style={{ fontSize: '15px', color: '#22C55E', fontWeight: '500', lineHeight: '1.4' }}>Visita sito</div>
                   </div>
                 </div>
               )}
 
               {placeData.priceLevel !== undefined && (
                 <div 
-                  className="info-item"
-                  style={getElementAnimation(600, 'slideLeft')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '16px',
+                    padding: '16px',
+                    borderRadius: '16px',
+                    background: 'rgba(255, 255, 255, 0.5)',
+                    backdropFilter: 'blur(10px)',
+                    WebkitBackdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    transition: 'all 0.3s ease',
+                    cursor: 'default',
+                    ...getElementAnimation(600, 'slideLeft')
+                  }}
                 >
-                  <div className="info-icon">💰</div>
-                  <div className="info-text">
-                    <div className="info-label">Fascia di prezzo</div>
-                    <div className="info-value">{getPriceLevelText(placeData.priceLevel)}</div>
+                  <div style={{ fontSize: '24px', flexShrink: 0, marginTop: '2px' }}>💰</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '12px', color: '#6B7280', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Fascia di prezzo</div>
+                    <div style={{ fontSize: '15px', color: '#1F2937', fontWeight: '500', lineHeight: '1.4' }}>{getPriceLevelText(placeData.priceLevel)}</div>
                   </div>
                 </div>
               )}
 
               <div 
-                className="info-item"
-                style={getElementAnimation(650, 'slideLeft')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '16px',
+                  padding: '16px',
+                  borderRadius: '16px',
+                  background: `rgba(${venueInfo.color.replace('#', '')}, 0.05)`.replace('rgba(', 'rgba(').replace(', 0.05)', ', 0.05)'),
+                  backdropFilter: 'blur(10px)',
+                  WebkitBackdropFilter: 'blur(10px)',
+                  border: `1px solid ${venueInfo.color}30`,
+                  transition: 'all 0.3s ease',
+                  cursor: 'default',
+                  ...getElementAnimation(650, 'slideLeft')
+                }}
               >
-                <div className="info-icon">
-                  {getItalianVenueEmoji(placeData)}
+                <div style={{ fontSize: '24px', flexShrink: 0, marginTop: '2px' }}>
+                  {venueInfo.emoji}
                 </div>
-                <div className="info-text">
-                  <div className="info-label">Tipo di locale</div>
-                  <div className="info-value">
-                    {getItalianVenueTypeDisplay(placeData.type || placeData.placeType)}
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '12px', color: '#6B7280', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Tipo di locale</div>
+                  <div style={{ fontSize: '15px', color: venueInfo.color, fontWeight: '500', lineHeight: '1.4' }}>
+                    {venueInfo.label}
                   </div>
                 </div>
               </div>
@@ -648,31 +1132,52 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
 
           {/* ENHANCED Hours Tab with Dynamic Status */}
           {activeTab === 'hours' && (
-            <div className="hours-content">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               
               {/* Dynamic Status Header */}
               <div 
-                className={`dynamic-status-header ${openingStatus.isOpen ? 'open' : 'closed'}`}
-                style={getElementAnimation(450, 'scale')}
+                style={{
+                  background: `rgba(${openingStatus.statusColor === '#10B981' ? '16, 185, 129' : openingStatus.statusColor === '#EF4444' ? '239, 68, 68' : '107, 114, 128'}, 0.1)`,
+                  borderRadius: '16px',
+                  padding: '20px',
+                  border: `2px solid ${openingStatus.statusColor}30`,
+                  backdropFilter: 'blur(10px)',
+                  WebkitBackdropFilter: 'blur(10px)',
+                  ...getElementAnimation(450, 'scale')
+                }}
               >
-                <div className="status-main">
-                  <span className="status-icon">
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  marginBottom: '12px',
+                  fontSize: '18px',
+                  fontWeight: '600'
+                }}>
+                  <span style={{ fontSize: '24px' }}>
                     {openingStatus.isOpen === null ? '❓' : 
                      openingStatus.isOpen ? '🟢' : '🔴'}
                   </span>
-                  <span className="status-text">{openingStatus.status}</span>
+                  <span style={{ color: openingStatus.statusColor }}>{openingStatus.status}</span>
                 </div>
                 
                 {openingStatus.nextChange && (
-                  <div className="next-change">
-                    <span className="next-change-text">
-                      {openingStatus.nextChange.action === 'closes' ? 
-                        'Chiude' : 'Apre'} {openingStatus.nextChange.timeText || openingStatus.nextChange.time}
-                    </span>
+                  <div style={{
+                    fontSize: '14px',
+                    color: '#6B7280',
+                    marginBottom: '8px',
+                    fontWeight: '500'
+                  }}>
+                    {openingStatus.nextChange.action === 'closes' ? 
+                      'Chiude' : 'Apre'} {openingStatus.nextChange.timeText || openingStatus.nextChange.time}
                   </div>
                 )}
                 
-                <div className="last-updated">
+                <div style={{
+                  fontSize: '11px',
+                  color: '#9CA3AF',
+                  fontStyle: 'italic'
+                }}>
                   Aggiornato: {currentTime.toLocaleTimeString('it-IT', { 
                     hour: '2-digit', 
                     minute: '2-digit' 
@@ -682,25 +1187,56 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
               
               {detailsLoading ? (
                 <div 
-                  className="loading-hours"
-                  style={getElementAnimation(500, 'fadeIn')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '12px',
+                    padding: '20px',
+                    ...getElementAnimation(500, 'fadeIn')
+                  }}
                 >
-                  <div className="loading-spinner-small"></div>
-                  <span>Caricamento orari...</span>
+                  <div style={{
+                    width: '20px',
+                    height: '20px',
+                    border: '2px solid #E5E7EB',
+                    borderTop: '2px solid #3B82F6',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite'
+                  }} />
+                  <span style={{ color: '#6B7280', fontSize: '14px' }}>Caricamento orari...</span>
                 </div>
               ) : (
                 <div 
-                  className="hours-list"
-                  style={getElementAnimation(500, 'slideUp')}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                    ...getElementAnimation(500, 'slideUp')
+                  }}
                 >
                   {formatOpeningHours(placeData.openingHours).map((day, index) => (
                     <div 
-                      key={index} 
-                      className="hours-item"
-                      style={getElementAnimation(550 + (index * 50), 'slideLeft')}
+                      key={index}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '12px 16px',
+                        borderRadius: '12px',
+                        background: 'rgba(255, 255, 255, 0.5)',
+                        backdropFilter: 'blur(10px)',
+                        WebkitBackdropFilter: 'blur(10px)',
+                        border: '1px solid rgba(255, 255, 255, 0.3)',
+                        ...getElementAnimation(550 + (index * 50), 'slideLeft')
+                      }}
                     >
-                      <span className="day-name">{day.split(':')[0]}</span>
-                      <span className="day-hours">{day.split(':').slice(1).join(':')}</span>
+                      <span style={{ fontWeight: '600', color: '#1F2937', fontSize: '14px' }}>
+                        {day.split(':')[0]}
+                      </span>
+                      <span style={{ color: '#6B7280', fontSize: '14px' }}>
+                        {day.split(':').slice(1).join(':')}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -710,30 +1246,59 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
 
           {/* Photos Tab */}
           {activeTab === 'photos' && placeData.photos && (
-            <div className="photos-content">
+            <div>
               {detailsLoading ? (
                 <div 
-                  className="loading-photos"
-                  style={getElementAnimation(450, 'fadeIn')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '12px',
+                    padding: '20px',
+                    ...getElementAnimation(450, 'fadeIn')
+                  }}
                 >
-                  <div className="loading-spinner-small"></div>
-                  <span>Caricamento foto...</span>
+                  <div style={{
+                    width: '20px',
+                    height: '20px',
+                    border: '2px solid #E5E7EB',
+                    borderTop: '2px solid #3B82F6',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite'
+                  }} />
+                  <span style={{ color: '#6B7280', fontSize: '14px' }}>Caricamento foto...</span>
                 </div>
               ) : (
                 <div 
-                  className="photos-grid"
-                  style={getElementAnimation(450, 'slideUp')}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+                    gap: '12px',
+                    ...getElementAnimation(450, 'slideUp')
+                  }}
                 >
                   {placeData.photoUrls?.medium?.slice(0, 6).map((photoUrl, index) => (
                     <div 
-                      key={index} 
-                      className="photo-item"
-                      style={getElementAnimation(500 + (index * 100), 'scale')}
+                      key={index}
+                      style={{
+                        borderRadius: '16px',
+                        overflow: 'hidden',
+                        aspectRatio: '1',
+                        background: 'rgba(255, 255, 255, 0.5)',
+                        backdropFilter: 'blur(10px)',
+                        WebkitBackdropFilter: 'blur(10px)',
+                        border: '1px solid rgba(255, 255, 255, 0.3)',
+                        ...getElementAnimation(500 + (index * 100), 'scale')
+                      }}
                     >
                       <img 
                         src={photoUrl} 
                         alt={`${placeData.name} - Foto ${index + 1}`}
-                        className="photo-image"
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover'
+                        }}
                         loading="lazy"
                         onError={(e) => {
                           e.target.style.display = 'none';
@@ -742,10 +1307,17 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
                     </div>
                   )) || (
                     <div 
-                      className="no-photos"
-                      style={getElementAnimation(500, 'fadeIn')}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '40px',
+                        color: '#6B7280',
+                        fontSize: '14px',
+                        ...getElementAnimation(500, 'fadeIn')
+                      }}
                     >
-                      <span>📸 Foto non disponibili</span>
+                      📸 Foto non disponibili
                     </div>
                   )}
                 </div>
@@ -754,25 +1326,79 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
           )}
         </div>
 
-        {/* Action Buttons */}
+        {/* 🎨 ENHANCED ACTION BUTTONS */}
         <div 
-          className="popup-actions" 
-          data-venue-type={placeData.type || placeData.placeType}
-          style={getElementAnimation(500, 'slideUp')}
+          style={{
+            display: 'flex',
+            gap: '12px',
+            padding: '24px',
+            background: `
+              linear-gradient(135deg,
+                rgba(255, 255, 255, 0.8) 0%,
+                rgba(248, 250, 252, 0.9) 100%
+              )
+            `,
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            borderTop: '1px solid rgba(255, 255, 255, 0.3)',
+            ...getElementAnimation(500, 'slideUp')
+          }}
         >
           <button 
-            className="action-btn primary"
             onClick={handleDirections}
-            style={getElementAnimation(550, 'scale')}
+            style={{
+              flex: 1,
+              padding: '16px 20px',
+              borderRadius: '16px',
+              border: 'none',
+              background: venueInfo.gradient,
+              color: 'white',
+              fontSize: '15px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              boxShadow: `0 8px 16px ${venueInfo.color}40`,
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              ...getElementAnimation(550, 'scale')
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.transform = 'translateY(-2px) scale(1.02)';
+              e.target.style.boxShadow = `0 12px 24px ${venueInfo.color}50`;
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.transform = 'translateY(0) scale(1)';
+              e.target.style.boxShadow = `0 8px 16px ${venueInfo.color}40`;
+            }}
           >
             🧭 Indicazioni
           </button>
           
           {placeData.phoneNumber && (
             <button 
-              className="action-btn secondary"
               onClick={handleCall}
-              style={getElementAnimation(600, 'scale')}
+              style={{
+                padding: '16px 20px',
+                borderRadius: '16px',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                background: 'rgba(255, 255, 255, 0.8)',
+                color: '#374151',
+                fontSize: '15px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                ...getElementAnimation(600, 'scale')
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.transform = 'translateY(-2px)';
+                e.target.style.background = 'rgba(59, 130, 246, 0.1)';
+                e.target.style.color = '#3B82F6';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.transform = 'translateY(0)';
+                e.target.style.background = 'rgba(255, 255, 255, 0.8)';
+                e.target.style.color = '#374151';
+              }}
             >
               📞 Chiama
             </button>
@@ -780,9 +1406,31 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
           
           {placeData.website && (
             <button 
-              className="action-btn secondary"
               onClick={handleWebsite}
-              style={getElementAnimation(650, 'scale')}
+              style={{
+                padding: '16px 20px',
+                borderRadius: '16px',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                background: 'rgba(255, 255, 255, 0.8)',
+                color: '#374151',
+                fontSize: '15px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                ...getElementAnimation(650, 'scale')
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.transform = 'translateY(-2px)';
+                e.target.style.background = 'rgba(34, 197, 94, 0.1)';
+                e.target.style.color = '#22C55E';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.transform = 'translateY(0)';
+                e.target.style.background = 'rgba(255, 255, 255, 0.8)';
+                e.target.style.color = '#374151';
+              }}
             >
               🌐 Sito
             </button>
@@ -791,18 +1439,20 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
 
         {/* Italian venue tips */}
         <div 
-          className="venue-tips" 
           style={{
-            background: 'rgba(79, 70, 229, 0.05)',
-            margin: '0 20px 20px 20px',
-            padding: '12px',
-            borderRadius: '12px',
-            fontSize: '12px',
+            background: `rgba(${venueInfo.color.slice(1).match(/.{2}/g).map(hex => parseInt(hex, 16)).join(', ')}, 0.05)`,
+            margin: '0 24px 24px 24px',
+            padding: '16px',
+            borderRadius: '16px',
+            fontSize: '13px',
             color: '#6B7280',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            border: `1px solid ${venueInfo.color}20`,
             ...getElementAnimation(600, 'slideUp')
           }}
         >
-          <div style={{ fontWeight: '600', marginBottom: '4px', color: '#4F46E5' }}>
+          <div style={{ fontWeight: '700', marginBottom: '8px', color: venueInfo.color, display: 'flex', alignItems: 'center', gap: '8px' }}>
             💡 Consiglio locale
           </div>
           {(placeData.type || placeData.placeType) === 'cafe' && 
@@ -811,75 +1461,171 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
           {(placeData.type || placeData.placeType) === 'restaurant' && 
             'I ristoranti italiani spesso aprono alle 19:30 per cena.'
           }
+          {venueInfo.type === 'gelateria' && 
+            'Le gelaterie italiane offrono gelato artigianale fresco ogni giorno.'
+          }
+          {venueInfo.type === 'pizzeria' && 
+            'Le pizzerie napoletane servono pizza autentica con ingredienti freschi.'
+          }
+          {venueInfo.type === 'pasticceria' && 
+            'Le pasticcerie italiane preparano dolci freschi ogni mattina.'
+          }
         </div>
       </div>
 
-      {/* Enhanced CSS for dynamic status */}
+      {/* Enhanced CSS Animations */}
       <style jsx>{`
-        .dynamic-status {
-          flex-direction: column !important;
-          align-items: center !important;
-          gap: 2px !important;
+        @keyframes headerParticles {
+          0%, 100% { 
+            transform: translateY(0px) rotate(0deg);
+            opacity: 0.6;
+          }
+          33% { 
+            transform: translateY(-10px) rotate(2deg);
+            opacity: 0.8;
+          }
+          66% { 
+            transform: translateY(5px) rotate(-1deg);
+            opacity: 0.4;
+          }
         }
 
-        .dynamic-status-text {
-          font-size: 11px !important;
-          font-weight: 600 !important;
-          text-align: center !important;
-          line-height: 1.2 !important;
+        @keyframes successPulse {
+          0%, 100% { 
+            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+          }
+          50% { 
+            box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+          }
         }
 
-        .status-confidence {
-          color: #10B981;
-          font-size: 10px;
-          font-weight: bold;
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
         }
 
-        .dynamic-status-header {
-          background: rgba(255, 255, 255, 0.8);
-          border-radius: 12px;
-          padding: 16px;
-          margin-bottom: 16px;
-          border: 2px solid transparent;
+        /* Custom scrollbar for content area */
+        div::-webkit-scrollbar {
+          width: 6px;
         }
 
-        .dynamic-status-header.open {
-          border-color: #10B981;
-          background: rgba(16, 185, 129, 0.05);
+        div::-webkit-scrollbar-track {
+          background: rgba(255, 255, 255, 0.1);
+          border-radius: 3px;
         }
 
-        .dynamic-status-header.closed {
-          border-color: #EF4444;
-          background: rgba(239, 68, 68, 0.05);
+        div::-webkit-scrollbar-thumb {
+          background: rgba(0, 0, 0, 0.2);
+          border-radius: 3px;
         }
 
-        .status-main {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          margin-bottom: 8px;
-          font-size: 16px;
-          font-weight: 600;
+        div::-webkit-scrollbar-thumb:hover {
+          background: rgba(0, 0, 0, 0.3);
         }
 
-        .status-icon {
-          font-size: 20px;
+        /* Enhanced button hover effects */
+        button {
+          position: relative;
+          overflow: hidden;
         }
 
-        .next-change {
-          font-size: 14px;
-          color: #6B7280;
-          margin-bottom: 4px;
+        button::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: -100%;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+          transition: left 0.5s ease;
         }
 
-        .next-change-text {
-          font-weight: 500;
+        button:hover::before {
+          left: 100%;
         }
 
-        .last-updated {
-          font-size: 11px;
-          color: #9CA3AF;
-          font-style: italic;
+        /* Glass morphism effects */
+        .glass-effect {
+          backdrop-filter: blur(20px) saturate(180%) brightness(110%);
+          -webkit-backdrop-filter: blur(20px) saturate(180%) brightness(110%);
+          background: linear-gradient(135deg,
+            rgba(255, 255, 255, 0.9) 0%,
+            rgba(255, 255, 255, 0.7) 100%
+          );
+          border: 1px solid rgba(255, 255, 255, 0.5);
+          box-shadow: 
+            0 8px 32px rgba(0, 0, 0, 0.1),
+            inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        }
+
+        /* Enhanced focus states for accessibility */
+        button:focus {
+          outline: 2px solid rgba(59, 130, 246, 0.5);
+          outline-offset: 2px;
+        }
+
+        /* Mobile responsive adjustments */
+        @media (max-width: 480px) {
+          .popup-content {
+            padding: 16px;
+          }
+          
+          .enhanced-header {
+            padding: 20px 16px;
+          }
+          
+          .venue-emoji {
+            width: 60px;
+            height: 60px;
+            font-size: 28px;
+          }
+          
+          .venue-name {
+            font-size: 20px;
+          }
+          
+          .action-buttons {
+            flex-direction: column;
+          }
+          
+          .action-button {
+            width: 100%;
+          }
+        }
+
+        /* Dark mode support */
+        @media (prefers-color-scheme: dark) {
+          .popup-overlay {
+            background: rgba(0, 0, 0, 0.6);
+          }
+          
+          .glass-effect {
+            background: linear-gradient(135deg,
+              rgba(31, 41, 55, 0.9) 0%,
+              rgba(31, 41, 55, 0.7) 100%
+            );
+            border: 1px solid rgba(255, 255, 255, 0.1);
+          }
+        }
+
+        /* High contrast mode support */
+        @media (prefers-contrast: high) {
+          .popup-card {
+            border: 2px solid currentColor;
+          }
+          
+          .venue-badge {
+            border: 1px solid currentColor;
+          }
+        }
+
+        /* Reduced motion support */
+        @media (prefers-reduced-motion: reduce) {
+          *, *::before, *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+          }
         }
       `}</style>
     </div>
