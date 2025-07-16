@@ -11,11 +11,11 @@ import { useGeolocation } from './hooks/useGeolocation';
 import { useCafes } from './hooks/useCafes';
 import { healthAPI } from './services/apiService';
 import AdvancedSearchPanel from './components/AdvancedSearchPanel';
+import PeopleDiscoveryPanel from './components/PeopleDiscoveryPanel';
 
 // USER DISCOVERY COMPONENTS
 import UserMarker from './components/UserMarker';
 import UserInfoCard from './components/UserInfoCard';
-import MapModeToggle from './components/MapModeToggle';
 import InviteModal from './components/InviteModal';
 
 import './styles/App.css';
@@ -523,8 +523,10 @@ function MapApp() {
     }
   }, []);
 
-  // ENHANCED: App initialization
   useEffect(() => {
+    // Prevent multiple initializations
+    if (appReady) return;
+    
     console.log('🚀 Starting app initialization...');
     setLoadingStage('initializing');
     setLoadingProgress(0);
@@ -540,7 +542,7 @@ function MapApp() {
         setAppReady(true);
         
         // Load initial cities
-        loadAvailableCities();
+        setTimeout(() => loadAvailableCities(), 1000); // Delay to prevent rate limit
       } else {
         console.log('⚡ App ready with degraded backend');
         setLoadingProgress(30);
@@ -553,7 +555,7 @@ function MapApp() {
     };
 
     initializeApp();
-  }, [checkBackendHealth, loadAvailableCities]);
+  }, []); // Remove dependencies to prevent multiple calls
 
   // Location stage management
   useEffect(() => {
@@ -579,7 +581,6 @@ function MapApp() {
     }
   }, [locationLoading, userLocation, hasLocation]);
 
-  // ENHANCED: Map center update with user location sync
   useEffect(() => {
     if (userLocation && hasLocation && !locationLoading) {
       console.log('📍 Setting map center to user location:', {
@@ -592,21 +593,27 @@ function MapApp() {
         lng: userLocation.longitude
       });
       
-      // Update user location in backend
-      updateUserLocation(userLocation.latitude, userLocation.longitude);
+      // Debounce location updates to prevent rate limiting
+      const updateTimer = setTimeout(() => {
+        updateUserLocation(userLocation.latitude, userLocation.longitude);
+      }, 2000);
       
-      // Load appropriate data based on mode
+      // Load appropriate data based on mode with delay
       if (mapMode === 'people') {
-        loadUsersByCity('Current Location', {
-          lat: userLocation.latitude,
-          lng: userLocation.longitude
-        });
+        setTimeout(() => {
+          loadUsersByCity('Current Location', {
+            lat: userLocation.latitude,
+            lng: userLocation.longitude
+          });
+        }, 3000);
       }
       
       setLoadingStage('map');
       setLoadingProgress(90);
+      
+      return () => clearTimeout(updateTimer);
     }
-  }, [userLocation, hasLocation, locationLoading, updateUserLocation, mapMode, loadUsersByCity]);
+  }, [userLocation?.latitude, userLocation?.longitude, hasLocation, locationLoading, mapMode]);
 
   // Final readiness check
   useEffect(() => {
@@ -876,17 +883,23 @@ function MapApp() {
   // ENHANCED: Main app with user discovery
   return (
     <div className="map-app">
-      {/* ENHANCED: Mode toggle with stats */}
-      <MapModeToggle
-        currentMode={mapMode}
-        onModeChange={handleModeChange}
-        userCount={nearbyUsers.length}
-        placeCount={cafes?.length || 0}
-        currentCity={currentCity?.name}
-        isLoading={mapMode === 'people' ? usersLoading : cafesLoading}
-      />
+      {/* Simple mode toggle - top left */}
+      <div className="simple-mode-toggle">
+        <button 
+          className={`mode-btn ${mapMode === 'places' ? 'active' : ''}`}
+          onClick={() => handleModeChange('places')}
+        >
+          🏪 Luoghi ({cafes?.length || 0})
+        </button>
+        <button 
+          className={`mode-btn ${mapMode === 'people' ? 'active' : ''}`}
+          onClick={() => handleModeChange('people')}
+        >
+          👥 Persone ({nearbyUsers.length})
+        </button>
+      </div>
 
-      {/* ENHANCED: Search panel with city selection */}
+      {/* ENHANCED: Search panel - only visible in places mode */}
       {mapMode === 'places' && (
         <AdvancedSearchPanel
           onPlaceSelect={handleSearchPlaceSelect}
@@ -907,7 +920,30 @@ function MapApp() {
         />
       )}
 
-      {/* ENHANCED: Full page map with user discovery */}
+      {/* ENHANCED: People Discovery Panel - only visible in people mode */}
+      {mapMode === 'people' && (
+        <PeopleDiscoveryPanel
+          users={nearbyUsers}
+          currentCity={currentCity}
+          userLocation={userLocation}
+          onUserSelect={handleUserClick}
+          isLoading={usersLoading}
+          searchRadius={searchRadius}
+          onRadiusChange={(newRadius) => {
+            setSearchRadius(newRadius);
+            // Reload users with new radius
+            if (currentCity && currentCity.name !== 'Current Location') {
+              loadUsersByCity(currentCity.name, currentCity.coordinates);
+            } else if (mapCenter) {
+              loadNearbyUsers(mapCenter.lat, mapCenter.lng);
+            }
+          }}
+          totalOnline={userDiscoveryStats?.platform?.online_now || 0}
+          className="z-50"
+        />
+      )}
+
+      {/* ENHANCED: Full page map with conditional controls */}
       <FullPageMap
         center={mapCenter}
         zoom={zoom}
@@ -950,7 +986,7 @@ function MapApp() {
         error={mapMode === 'places' ? cafesError : usersError}
         searchRadius={searchRadius}
         cafeType={cafeType}
-        showControls={showControls}
+        showControls={mapMode === 'places'} // Only show controls in places mode
         isEmbedMode={isEmbedMode}
         onSearchChange={handleSearchChange}
         onRefresh={mapMode === 'places' ? refetchCafes : () => {
@@ -1019,6 +1055,62 @@ function MapApp() {
           ⚠️ {backendError}
         </div>
       )}
+
+      {/* Simple mode toggle styles */}
+      <style jsx>{`
+        .simple-mode-toggle {
+          position: absolute;
+          top: 20px;
+          left: 20px;
+          background: rgba(255, 255, 255, 0.95);
+          backdrop-filter: blur(20px);
+          border-radius: 16px;
+          padding: 6px;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+          border: 1px solid rgba(255, 255, 255, 0.3);
+          z-index: 2000;
+          display: flex;
+          gap: 4px;
+        }
+
+        .mode-btn {
+          padding: 10px 16px;
+          border: none;
+          border-radius: 12px;
+          font-weight: 600;
+          font-size: 13px;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          background: transparent;
+          color: #6b7280;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .mode-btn.active {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .mode-btn:hover:not(.active) {
+          background: rgba(102, 126, 234, 0.1);
+          color: #667eea;
+        }
+
+        @media (max-width: 768px) {
+          .simple-mode-toggle {
+            left: 10px;
+            top: 10px;
+          }
+          
+          .mode-btn {
+            padding: 8px 12px;
+            font-size: 12px;
+          }
+        }
+      `}</style>
 
       {/* ENHANCED: Development debug panel */}
       {process.env.REACT_APP_DEBUG_MODE === 'true' && (

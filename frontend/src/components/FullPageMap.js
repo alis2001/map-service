@@ -1,4 +1,4 @@
-// components/FullPageMap.js - PRODUCTION READY DUAL MODE MAP
+// components/FullPageMap.js - PRODUCTION READY DUAL MODE MAP - FIXED VERSION
 // Location: /frontend/src/components/FullPageMap.js
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
@@ -1059,22 +1059,26 @@ const FullPageMap = ({
     };
   }, [checkGoogleMapsAvailability, googleMapsReady]);
 
-  // ENHANCED: Map initialization
+  // FIXED: Map initialization with proper dependency array
   useEffect(() => {
-    console.log('🗺️ Enhanced dual-mode map initialization:', {
-      googleMapsReady,
-      center,
-      mapInitialized,
-      mapRefCurrent: !!mapRef.current,
-      mapMode
-    });
-
-    if (!googleMapsReady || !center || mapInitialized || !mapRef.current) {
-      return;
-    }
-
+    // Prevent multiple initializations with stricter checks
+    if (googleMapsReady || mapInitialized || !mapRef.current) return;
+    
+    console.log('🔄 Loading Google Maps API...');
+    
     const initMap = async () => {
       try {
+        if (!window.google || !window.google.maps) {
+          console.log('⚠️ Google Maps API not loaded');
+          return;
+        }
+        
+        console.log('✅ Google Maps API fully available');
+        setGoogleMapsReady(true);
+        
+        // Add a small delay to prevent rapid re-initialization
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
         console.log(`🗺️ Initializing enhanced ${mapMode} map...`);
         
         if (!window.google || !window.google.maps || !window.google.maps.MapTypeId) {
@@ -1212,32 +1216,23 @@ const FullPageMap = ({
     };
 
     initMap();
-  }, [googleMapsReady, center, mapInitialized, zoom, isEmbedMode, handleDragStart, handleDragEnd, handleZoomChanged, isDragging, selectedCafe, selectedUser, handleSmoothPopupClose, mapMode]);
+  }, [center.lat, center.lng]); // FIXED: Remove googleMapsReady and mapInitialized from dependencies
   
   // Update map center for external changes
   useEffect(() => {
     if (googleMapRef.current && mapLoaded && mapInitialized && !isUserDraggingRef.current) {
       const currentCenter = googleMapRef.current.getCenter();
-      const currentZoom = googleMapRef.current.getZoom();
       
-      const newCenter = { lat: center.lat, lng: center.lng };
+      const latDiff = Math.abs(currentCenter.lat() - center.lat);
+      const lngDiff = Math.abs(currentCenter.lng() - center.lng);
       
-      const isExternalChange = !lastSearchLocationRef.current || 
-        (Math.abs(currentCenter?.lat() - newCenter.lat) > 0.001 || 
-         Math.abs(currentCenter?.lng() - newCenter.lng) > 0.001);
-      
-      if (isExternalChange) {
-        console.log(`🗺️ Updating ${mapMode} map center:`, newCenter);
-        googleMapRef.current.setCenter(newCenter);
-        lastSearchLocationRef.current = newCenter;
-        
-        if (Math.abs(currentZoom - zoom) > 1) {
-          console.log(`🗺️ Updating ${mapMode} map zoom:`, zoom);
-          googleMapRef.current.setZoom(zoom);
-        }
+      // Only update if there's a significant difference (avoid micro-updates)
+      if (latDiff > 0.0001 || lngDiff > 0.0001) {
+        console.log('📍 Updating map center externally');
+        googleMapRef.current.setCenter(center);
       }
     }
-  }, [center.lat, center.lng, zoom, mapLoaded, mapInitialized, mapMode]);
+  }, [center.lat, center.lng, mapLoaded, mapInitialized]);
 
   // ENHANCED: User location marker
   useEffect(() => {
@@ -1580,7 +1575,7 @@ const FullPageMap = ({
       padding: 12px 20px;
       border-radius: 12px;
       display: flex;
-      align-items: center;
+      alignItems: center;
       gap: 12px;
       backdrop-filter: blur(8px);
       z-index: 1000;
