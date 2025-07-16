@@ -372,6 +372,7 @@ const FullPageMap = ({
         setTimeout(() => {
           console.log(`🔍 Refreshing ${mapMode} around user location`);
           if (onRefresh) {
+            console.log(`🔄 Calling refresh for ${mapMode} mode`);
             onRefresh();
           }
         }, 200);
@@ -1167,10 +1168,11 @@ const FullPageMap = ({
                   if (smoothSearchTimeoutRef.current) {
                     clearTimeout(smoothSearchTimeoutRef.current);
                   }
-                  
+
                   const delay = mapMode === 'people' ? 400 : (zoomLevel >= 16 ? 300 : 600);
                   smoothSearchTimeoutRef.current = setTimeout(() => {
                     if (onRefresh) {
+                      console.log(`🔄 Auto-refresh triggered for ${mapMode} mode`);
                       onRefresh();
                     }
                   }, delay);

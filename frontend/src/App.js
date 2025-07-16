@@ -158,6 +158,55 @@ function MapApp() {
     initializeAuth();
   }, []);
 
+  // ENHANCED: Sync user profile to map service
+  const syncProfileToMapService = useCallback(async (userProfile, syncReason = 'update') => {
+    if (!authToken || !userProfile) {
+      console.warn('⚠️ Cannot sync profile - missing token or profile data');
+      return false;
+    }
+    
+    try {
+      console.log(`🔄 Syncing profile to map service (${syncReason}):`, userProfile.firstName);
+      
+      const syncData = {
+        firstName: userProfile.firstName || '',
+        lastName: userProfile.lastName || '',
+        username: userProfile.username || '',
+        bio: userProfile.bio || '',
+        profilePic: userProfile.profilePic || null,
+        interests: userProfile.interests || [],
+        ageRange: userProfile.ageRange || '',
+        coffeePersonality: userProfile.coffeePersonality || '',
+        conversationTopics: userProfile.conversationTopics || '',
+        socialGoals: userProfile.socialGoals || ''
+      };
+      
+      console.log('📤 Sync data:', syncData);
+      
+      const response = await fetch(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001'}/api/v1/users/sync-profile`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(syncData)
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`✅ Profile synced to map service (${syncReason}):`, data.message);
+        return true;
+      } else {
+        const errorData = await response.json();
+        console.warn('⚠️ Failed to sync profile to map service:', errorData);
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Error syncing profile to map service:', error);
+      return false;
+    }
+  }, [authToken]);
+
   // ENHANCED: User profile fetching
   const fetchUserProfile = useCallback(async (token) => {
     try {
@@ -172,13 +221,16 @@ function MapApp() {
         const data = await response.json();
         setAuthUser(data.user);
         console.log('👤 User profile loaded:', data.user.firstName);
+        
+        // Automatically sync profile to map service on login
+        await syncProfileToMapService(data.user, 'login');
       } else {
         console.warn('⚠️ Failed to fetch user profile');
       }
     } catch (error) {
       console.error('❌ Error fetching user profile:', error);
     }
-  }, []);
+  }, [syncProfileToMapService]);
 
   const loadUsersByCity = useCallback(async (cityName, coordinates) => {
     setUsersLoading(true);
@@ -195,8 +247,18 @@ function MapApp() {
         throw new Error('Coordinates required');
       }
       
+      if (!authToken) {
+        throw new Error('Authentication required');
+      }
+      
       const response = await fetch(
-        `${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001'}/api/v1/user/search?lat=${lat}&lng=${lng}&radius=${searchRadius}&limit=50`
+        `${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001'}/api/v1/user/search?lat=${lat}&lng=${lng}&radius=${searchRadius}&limit=50`,
+        {
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json'
+          }
+        }
       );
       
       if (response.ok) {
@@ -214,7 +276,7 @@ function MapApp() {
     } finally {
       setUsersLoading(false);
     }
-  }, [searchRadius, mapCenter]);
+  }, [searchRadius, mapCenter, authToken]);
 
   const loadNearbyUsers = useCallback(async (lat, lng) => {
     setUsersLoading(true);
@@ -223,8 +285,18 @@ function MapApp() {
     try {
       console.log(`🔍 Loading users near: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
       
+      if (!authToken) {
+        throw new Error('Authentication required');
+      }
+      
       const response = await fetch(
-        `${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001'}/api/v1/user/search?lat=${lat}&lng=${lng}&radius=${searchRadius}&limit=50`
+        `${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001'}/api/v1/user/search?lat=${lat}&lng=${lng}&radius=${searchRadius}&limit=50`,
+        {
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json'
+          }
+        }
       );
       
       if (response.ok) {
@@ -241,7 +313,7 @@ function MapApp() {
     } finally {
       setUsersLoading(false);
     }
-  }, [searchRadius]);
+  }, [searchRadius, authToken]);
 
   // ENHANCED: Location update with city detection
   const updateUserLocation = useCallback(async (lat, lng) => {
@@ -328,27 +400,58 @@ function MapApp() {
     }
   }, [authToken]);
 
-  // ENHANCED: Mode change with intelligent data loading
-  const handleModeChange = useCallback((mode) => {
-    console.log(`🔄 Switching map mode: ${mapMode} → ${mode}`);
-    setMapMode(mode);
+  // ENHANCED: Mode change handler with proper search control
+  const handleModeChange = useCallback((newMode) => {
+    console.log(`🔄 Switching map mode from ${mapMode} to ${newMode}`);
     
-    // Reset selections
-    setSelectedUser(null);
+    // Prevent unnecessary changes
+    if (mapMode === newMode) return;
+    
+    // Clear current selections and states
     setSelectedCafe(null);
+    setSelectedUser(null);
     setShowUserCard(false);
+    setSelectedSearchPlace(null);
     setIsSelectingPlace(false);
     
-    // Load appropriate data
-    if (mode === 'people' && mapCenter) {
-      if (currentCity && currentCity.name !== 'Current Location') {
-        loadUsersByCity(currentCity.name, currentCity.coordinates);
-      } else {
-        loadNearbyUsers(mapCenter.lat, mapCenter.lng);
+    setUsersError(null);
+    
+    // Stop any ongoing API calls by setting loading states
+    if (newMode === 'places') {
+      // Stop user searches and prepare for place searches
+      console.log('🏪 Switching to places mode - stopping user API calls');
+      setUsersLoading(false);
+      setUsersError(null);
+      setNearbyUsers([]); // Clear users to stop any rendering
+      
+      // Update mode
+      setMapMode(newMode);
+      
+      // Load places data if location is available
+      if (mapCenter && refetchCafes) {
+        console.log('📍 Loading cafes for places mode');
+        setTimeout(() => refetchCafes(), 300); // Small delay to ensure mode is set
       }
-      loadDiscoveryStats();
+    } else if (newMode === 'people') {
+      // Stop place searches and prepare for user searches
+      console.log('👥 Switching to people mode - stopping places API calls');
+      
+      // Update mode first
+      setMapMode(newMode);
+      
+      // Load users data if location is available
+      if (mapCenter) {
+        console.log('📍 Loading users for people mode');
+        if (currentCity && currentCity.name !== 'Current Location') {
+          setTimeout(() => loadUsersByCity(currentCity.name, currentCity.coordinates), 300);
+        } else {
+          setTimeout(() => loadNearbyUsers(mapCenter.lat, mapCenter.lng), 300);
+        }
+        // Load discovery stats
+        setTimeout(() => loadDiscoveryStats(), 500);
+      }
     }
-  }, [mapMode, mapCenter, currentCity, loadUsersByCity, loadNearbyUsers, loadDiscoveryStats]);
+  }, [mapMode, mapCenter, currentCity, refetchCafes, loadUsersByCity, loadNearbyUsers, loadDiscoveryStats]);
 
   // ENHANCED: User profile fetching with caching
   const handleUserClick = useCallback(async (user) => {
@@ -665,7 +768,7 @@ function MapApp() {
       refreshLocation();
     }
   }, [refreshLocation]);
-
+  
   // ENHANCED: Search place selection
   const handleSearchPlaceSelect = useCallback(async (place) => {
     console.log('🔍 Search place selected:', place);
@@ -916,7 +1019,7 @@ function MapApp() {
             console.log('🔄 Search panel changed cafe type to:', newType);
             setCafeType(newType);
           }}
-          className="z-50"
+          className="z-50 advanced-search-panel search-panel-container"
         />
       )}
 
@@ -939,7 +1042,7 @@ function MapApp() {
             }
           }}
           totalOnline={userDiscoveryStats?.platform?.online_now || 0}
-          className="z-50"
+          className="z-50 people-discovery-panel search-panel-container"
         />
       )}
 
@@ -1060,7 +1163,7 @@ function MapApp() {
       <style jsx>{`
         .simple-mode-toggle {
           position: absolute;
-          top: 20px;
+          top: 80px;
           left: 20px;
           background: rgba(255, 255, 255, 0.95);
           backdrop-filter: blur(20px);

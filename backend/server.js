@@ -299,52 +299,144 @@ app.get("/api/v1/cities", async (req, res) => {
   }
 });
 
-// Public user search endpoint
-app.get("/api/v1/user/search", async (req, res) => {
+app.get("/api/v1/user/search", authenticateToken, async (req, res) => {
   try {
     const { lat, lng, radius = 15000, limit = 10 } = req.query;
+    const currentUserId = req.user?.id;
     
     if (!lat || !lng) {
       return res.status(400).json({ error: "Latitude and longitude required" });
     }
 
-    console.log(`👥 Searching for users near ${lat}, ${lng} within ${radius}m`);
+    console.log(`👥 Searching for users near ${lat}, ${lng} within ${radius}m (excluding user: ${currentUserId})`);
 
-    const nearbyUsers = await prisma.$queryRaw`
-      SELECT 
-        "userId",
-        latitude,
-        longitude,
-        city,
-        "isLive",
-        "lastSeen"
-      FROM user_live_locations
-      WHERE "isLive" = true 
-        AND "lastSeen" > NOW() - INTERVAL '30 minutes'
-      LIMIT ${parseInt(limit)}
-    `;
+    // First, get nearby users from location table
+    const nearbyUsers = await prisma.userLiveLocation.findMany({
+      where: {
+        AND: [
+          { isLive: true },
+          { NOT: { userId: currentUserId } },
+          {
+            lastSeen: {
+              gte: new Date(Date.now() - 30 * 60 * 1000) // 30 minutes ago
+            }
+          }
+        ]
+      },
+      take: parseInt(limit) * 2, // Get more to filter by distance
+      orderBy: { lastSeen: 'desc' }
+    });
 
-    const users = nearbyUsers.map(user => ({
-      userId: user.userId,
-      firstName: `User ${user.userId.slice(0, 8)}`,
-      lastName: '***',
-      city: user.city,
-      isOnline: user.isLive,
-      lastSeen: user.lastSeen
-    }));
+    console.log(`📍 Found ${nearbyUsers.length} live users before distance filtering`);
+
+    // Calculate distances and filter
+    const usersWithDistance = nearbyUsers.map(user => {
+      const distance = calculateDistance(
+        parseFloat(lat),
+        parseFloat(lng),
+        user.latitude,
+        user.longitude
+      );
+      return { ...user, distance };
+    }).filter(user => user.distance <= parseInt(radius))
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, parseInt(limit));
+
+    console.log(`📍 Found ${usersWithDistance.length} users within ${radius}m`);
+
+    // Get user profiles for those users
+    const userIds = usersWithDistance.map(u => u.userId);
+    const profiles = await prisma.userProfile.findMany({
+      where: { userId: { in: userIds } }
+    });
+
+    console.log(`👤 Found ${profiles.length} user profiles`);
+
+    // Update the getUserStatus function in your user search endpoint
+    const getUserStatus = (lastSeen) => {
+      if (!lastSeen) return 'offline';
+      
+      const now = new Date();
+      const lastSeenDate = new Date(lastSeen);
+      const diffMinutes = Math.floor((now - lastSeenDate) / (1000 * 60));
+      
+      console.log(`👤 Status check - Last seen: ${lastSeenDate}, Now: ${now}, Diff: ${diffMinutes} minutes`);
+      
+      if (diffMinutes < 2) return 'online';
+      if (diffMinutes < 5) return 'active';
+      if (diffMinutes < 15) return 'recent';
+      if (diffMinutes < 30) return 'away';
+      return 'offline';
+    };
+
+    const formatDistance = (distanceInMeters) => {
+      if (distanceInMeters < 1000) {
+        return `${Math.round(distanceInMeters)}m`;
+      } else {
+        return `${(distanceInMeters / 1000).toFixed(1)}km`;
+      }
+    };
+
+    // In the users mapping section, replace the existing code with:
+    const users = usersWithDistance.map(locationUser => {
+      const profile = profiles.find(p => p.userId === locationUser.userId);
+      
+      console.log(`👤 Processing user ${profile?.firstName || 'Unknown'} - Distance: ${locationUser.distance}m, LastSeen: ${locationUser.lastSeen}`);
+      
+      return {
+        userId: locationUser.userId,
+        firstName: profile?.firstName || 'Anonymous',
+        lastName: profile?.lastName || 'User',
+        username: profile?.username || `User ${locationUser.userId.slice(0, 8)}`,
+        profilePic: profile?.profilePic,
+        bio: profile?.bio,
+        city: locationUser.city,
+        distance: Math.round(locationUser.distance || 0),
+        formattedDistance: formatDistance(locationUser.distance || 0),
+        isOnline: locationUser.isLive,
+        status: getUserStatus(locationUser.lastSeen),
+        lastSeen: locationUser.lastSeen,
+        joinedAt: profile?.createdAt || locationUser.createdAt,
+        latitude: locationUser.latitude,
+        longitude: locationUser.longitude
+      };
+    });
+
+    console.log(`✅ Returning ${users.length} formatted users`);
 
     res.json({
       success: true,
       users,
       count: users.length,
-      searchRadius: parseInt(radius)
+      searchRadius: parseInt(radius),
+      excludedCurrentUser: currentUserId
     });
 
   } catch (error) {
-    console.error('User search error:', error);
-    res.status(500).json({ error: 'Failed to search users' });
+    console.error('❌ User search error:', error);
+    res.status(500).json({ 
+      error: 'Failed to search users',
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
+
+// Helper function for distance calculation
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371000; // Earth's radius in meters
+  const φ1 = lat1 * Math.PI / 180;
+  const φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c; // Distance in meters
+}
 
 try {
   app.use('/api/v1/search', searchRoutes);

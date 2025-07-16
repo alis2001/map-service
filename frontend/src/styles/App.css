@@ -3152,3 +3152,103 @@ html, body, #root {
     justify-content: center;
   }
 }
+
+/* Update the map-mode-toggle positioning */
+.map-mode-toggle {
+  position: absolute;
+  top: 80px; /* Move down to below search panel */
+  left: 20px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border-radius: 16px;
+  padding: 6px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  z-index: 999; /* Lower than search panel */
+  display: flex;
+  gap: 4px;
+}
+
+/* ============================================
+   SMOOTH PANEL TRANSITIONS FOR MODE TOGGLE
+   ============================================ */
+
+/* Smooth transitions for search panels */
+.search-panel-container {
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: top left;
+}
+
+.search-panel-enter {
+  opacity: 0;
+  transform: translateY(-20px) scale(0.95);
+}
+
+.search-panel-enter-active {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.search-panel-exit {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.search-panel-exit-active {
+  opacity: 0;
+  transform: translateY(-20px) scale(0.95);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Smooth mode toggle transitions */
+.simple-mode-toggle {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mode-btn {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateY(0);
+}
+
+.mode-btn:hover {
+  transform: translateY(-2px);
+}
+
+.mode-btn.active {
+  transform: translateY(-1px);
+}
+
+/* Panel-specific animations */
+.advanced-search-panel {
+  animation: slideInFromTop 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.people-discovery-panel {
+  animation: slideInFromTop 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slideInFromTop {
+  from {
+    opacity: 0;
+    transform: translateY(-30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Ensure panels don't overlap during transition */
+.z-50 {
+  z-index: 50;
+}
+
+/* Smooth map transitions during mode changes */
+.map-canvas {
+  transition: filter 0.3s ease;
+}
+
+.map-canvas.mode-switching {
+  filter: blur(1px);
+}
