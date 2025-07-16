@@ -1,6 +1,6 @@
 // prisma/schema.prisma
 // Location: /backend/prisma/schema.prisma
-// SIMPLIFIED - No Authentication Required
+// Complete Map Service Database Schema
 
 generator client {
   provider = "prisma-client-js"
@@ -11,6 +11,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Places for location selection
 model Place {
   id              String   @id @default(cuid())
   googlePlaceId   String   @unique
@@ -27,63 +28,156 @@ model Place {
   photos          Json?
   businessStatus  String?  @default("OPERATIONAL")
   isActive        Boolean  @default(true)
-  
-  // ✅ NEW: Add review count field for popularity scoring
   userRatingsTotal Int?    @default(0)
-  
   lastUpdated     DateTime @default(now())
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  // Add indexes for better performance including new popularity fields
   @@index([latitude, longitude])
   @@index([placeType])
   @@index([rating])
-  @@index([userRatingsTotal]) // ✅ NEW: Index for review count queries
-  @@index([rating, userRatingsTotal]) // ✅ NEW: Composite index for popularity queries
+  @@index([userRatingsTotal])
+  @@index([rating, userRatingsTotal])
   @@map("places")
 }
 
-// User live locations for discovery
-model UserLiveLocation {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  latitude  Float
-  longitude Float
-  isLive    Boolean  @default(true)
-  lastSeen  DateTime @default(now())
-  shareRadius Int    @default(1000) // meters
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("user_live_locations")
+// Cache user profiles from main app for performance
+model UserProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  firstName   String
+  lastName    String
+  username    String?
+  bio         String?
+  profilePic  String?
+  interests   String?  // JSON string array
+  ageRange    String?
+  coffeePersonality String?
+  conversationTopics String?
+  socialGoals String?
+  city        String?  // User's primary city
+  isActive    Boolean  @default(true)
+  lastUpdated DateTime @default(now())
+  createdAt   DateTime @default(now())
+  
+  @@index([city])
+  @@index([isActive])
+  @@index([lastUpdated])
+  @@map("user_profiles")
 }
 
-// Meetup invites between users
-model MeetupInvite {
+// Live locations for real-time user discovery
+model UserLiveLocation {
   id          String   @id @default(cuid())
-  fromUserId  String
-  toUserId    String
-  placeId     String?
-  placeName   String?
-  placeAddress String?
-  message     String?
-  status      InviteStatus @default(PENDING)
-  meetupTime  DateTime?
+  userId      String   @unique
+  latitude    Float
+  longitude   Float
+  city        String   // City name for grouping
+  isLive      Boolean  @default(true)
+  lastSeen    DateTime @default(now())
+  shareRadius Int      @default(15000) // meters
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  @@index([latitude, longitude])
+  @@index([city])
+  @@index([isLive])
+  @@index([userId])
+  @@index([lastSeen])
+  @@map("user_live_locations")
+}
+
+// Meetup invitations between users
+model MeetupInvite {
+  id           String   @id @default(cuid())
+  fromUserId   String
+  toUserId     String
+  status       InviteStatus @default(PENDING)
+  message      String?
+  inviteType   String   @default("COFFEE") // COFFEE, DRINK, MEAL
+  city         String   // City where meetup will happen
+  placeId      String?  // Selected place ID
+  placeName    String?
+  placeAddress String?
+  meetupTime   DateTime?
+  expiresAt    DateTime? // Auto-expire invitations
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  locationSuggestions LocationSuggestion[]
+  participants        MeetupParticipant[]
+
+  @@index([fromUserId])
+  @@index([toUserId])
+  @@index([status])
+  @@index([city])
+  @@index([expiresAt])
   @@map("meetup_invites")
 }
 
-enum InviteStatus {
-  PENDING
-  ACCEPTED
-  DECLINED
-  CANCELLED
-  EXPIRED
+// Location suggestions for meetups
+model LocationSuggestion {
+  id              String   @id @default(cuid())
+  meetupInviteId  String
+  suggestedBy     String   // User ID who suggested
+  placeId         String   // Google Place ID
+  placeName       String
+  placeAddress    String
+  latitude        Float
+  longitude       Float
+  status          SuggestionStatus @default(SUGGESTED)
+  votes           Int      @default(0)
+  reason          String?  // Why this place was suggested
+  createdAt       DateTime @default(now())
+  
+  meetupInvite    MeetupInvite @relation(fields: [meetupInviteId], references: [id], onDelete: Cascade)
+  
+  @@index([meetupInviteId])
+  @@index([suggestedBy])
+  @@index([status])
+  @@index([votes])
+  @@map("location_suggestions")
 }
 
+// Group participants for meetups (up to 4 people)
+model MeetupParticipant {
+  id              String   @id @default(cuid())
+  meetupInviteId  String
+  userId          String
+  role            ParticipantRole @default(INVITEE)
+  status          ParticipantStatus @default(PENDING)
+  joinedAt        DateTime @default(now())
+  respondedAt     DateTime?
+  
+  meetupInvite    MeetupInvite @relation(fields: [meetupInviteId], references: [id], onDelete: Cascade)
+  
+  @@unique([meetupInviteId, userId])
+  @@index([meetupInviteId])
+  @@index([userId])
+  @@index([status])
+  @@map("meetup_participants")
+}
+
+// Cities configuration for discovery
+model City {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  displayName String
+  country     String  @default("Italy")
+  latitude    Float
+  longitude   Float
+  radius      Int     // Discovery radius in meters
+  isActive    Boolean @default(true)
+  timezone    String  @default("Europe/Rome")
+  createdAt   DateTime @default(now())
+  
+  @@index([isActive])
+  @@index([country])
+  @@map("cities")
+}
+
+// Cache for performance optimization
 model CacheEntry {
   id        String   @id @default(cuid())
   key       String   @unique
@@ -92,5 +186,34 @@ model CacheEntry {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([key])
+  @@index([expiresAt])
   @@map("cache_entries")
+}
+
+// Enums
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELLED
+  EXPIRED
+}
+
+enum SuggestionStatus {
+  SUGGESTED
+  ACCEPTED
+  DECLINED
+  VOTED
+}
+
+enum ParticipantRole {
+  ORGANIZER
+  INVITEE
+}
+
+enum ParticipantStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
 }
