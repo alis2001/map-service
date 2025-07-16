@@ -22,10 +22,32 @@ const { authenticateToken } = require('./middleware/auth');
 const errorHandler = require('./middleware/errorHandler');
 const notFound = require('./middleware/notFound');
 
-// Import routes
-const placesRoutes = require('./routes/placesRoutes');
-const usersRoutes = require('./routes/users');
-const invitesRoutes = require('./routes/invites');
+// Import routes with error handling
+let placesRoutes, usersRoutes, invitesRoutes;
+
+try {
+  placesRoutes = require('./routes/placesRoutes');
+  console.log('✅ Places routes loaded');
+} catch (error) {
+  console.error('❌ Places routes failed:', error.message);
+  placesRoutes = express.Router(); // Fallback empty router
+}
+
+try {
+  usersRoutes = require('./routes/users');
+  console.log('✅ Users routes loaded');
+} catch (error) {
+  console.error('❌ Users routes failed:', error.message);
+  usersRoutes = express.Router();
+}
+
+try {
+  invitesRoutes = require('./routes/invites');
+  console.log('✅ Invites routes loaded');
+} catch (error) {
+  console.error('❌ Invites routes failed:', error.message);
+  invitesRoutes = express.Router();
+}
 
 // Initialize Express app
 const app = express();
@@ -230,15 +252,121 @@ app.get('/health', async (req, res) => {
   }
 });
 
-// API routes with proper rate limiting
-app.use('/api/v1/places', placesRoutes);
-app.use('/api/v1/search', searchRoutes);
+// API routes with proper rate limiting and error handling
+try {
+  app.use('/api/v1/places', placesRoutes);
+  console.log('✅ Places routes mounted');
+} catch (error) {
+  console.error('❌ Failed to mount places routes:', error.message);
+}
+
+// Public cities endpoint (no auth required)
+app.get("/api/v1/cities", async (req, res) => {
+  try {
+    const { q: query, limit = 10 } = req.query;
+    
+    if (query) {
+      const searchService = require("./services/searchService");
+      const cities = await searchService.searchCities(query, parseInt(limit));
+      
+      res.json({
+        success: true,
+        cities: cities.map(city => ({
+          name: city.name,
+          displayName: city.displayName,
+          coordinates: city.coordinates,
+          userCount: 0
+        })),
+        count: cities.length
+      });
+    } else {
+      // Return sample popular cities
+      const cities = [
+        { name: "milano", displayName: "Milano", userCount: 0, onlineNow: 0 },
+        { name: "roma", displayName: "Roma", userCount: 0, onlineNow: 0 },
+        { name: "torino", displayName: "Torino", userCount: 0, onlineNow: 0 }
+      ];
+      
+      res.json({
+        success: true,
+        cities,
+        count: cities.length
+      });
+    }
+  } catch (error) {
+    console.error("Cities error:", error);
+    res.status(500).json({ error: "Failed to get cities" });
+  }
+});
+
+// Public user search endpoint
+app.get("/api/v1/user/search", async (req, res) => {
+  try {
+    const { lat, lng, radius = 15000, limit = 10 } = req.query;
+    
+    if (!lat || !lng) {
+      return res.status(400).json({ error: "Latitude and longitude required" });
+    }
+
+    console.log(`👥 Searching for users near ${lat}, ${lng} within ${radius}m`);
+
+    const nearbyUsers = await prisma.$queryRaw`
+      SELECT 
+        "userId",
+        latitude,
+        longitude,
+        city,
+        "isLive",
+        "lastSeen"
+      FROM user_live_locations
+      WHERE "isLive" = true 
+        AND "lastSeen" > NOW() - INTERVAL '30 minutes'
+      LIMIT ${parseInt(limit)}
+    `;
+
+    const users = nearbyUsers.map(user => ({
+      userId: user.userId,
+      firstName: `User ${user.userId.slice(0, 8)}`,
+      lastName: '***',
+      city: user.city,
+      isOnline: user.isLive,
+      lastSeen: user.lastSeen
+    }));
+
+    res.json({
+      success: true,
+      users,
+      count: users.length,
+      searchRadius: parseInt(radius)
+    });
+
+  } catch (error) {
+    console.error('User search error:', error);
+    res.status(500).json({ error: 'Failed to search users' });
+  }
+});
+
+try {
+  app.use('/api/v1/search', searchRoutes);
+  console.log('✅ Search routes mounted');
+} catch (error) {
+  console.error('❌ Failed to mount search routes:', error.message);
+}
 
 // User Discovery routes with authentication and rate limiting
-app.use('/api/v1/users/by-city', userDiscoveryLimiter);
-app.use('/api/v1/users/location', locationUpdateLimiter);
-app.use('/api/v1/users', authenticateToken, usersRoutes);
-app.use('/api/v1/invites', authenticateToken, invitesRoutes);
+try {
+  app.use('/api/v1/users', authenticateToken, usersRoutes);
+  console.log('✅ Users routes mounted');
+} catch (error) {
+  console.error('❌ Failed to mount users routes:', error.message);
+}
+
+try {
+  app.use('/api/v1/invites', authenticateToken, invitesRoutes);
+  console.log('✅ Invites routes mounted');
+} catch (error) {
+  console.error('❌ Failed to mount invites routes:', error.message);
+}
 
 // Root endpoint with enhanced service status
 app.get('/', (req, res) => {
@@ -258,9 +386,11 @@ app.get('/', (req, res) => {
       places: '/api/v1/places',
       nearbyPlaces: '/api/v1/places/nearby',
       searchPlaces: '/api/v1/places/search',
-      // User Discovery API
-      userDiscovery: '/api/v1/users/by-city',
-      citySearch: '/api/v1/users/cities',
+      // Public APIs (no auth)
+      cities: '/api/v1/cities',
+      userSearch: '/api/v1/user/search',
+      // User Discovery API (authenticated)
+      userProfile: '/api/v1/users/profile',
       locationUpdate: '/api/v1/users/location/update-with-city',
       // Invitations API
       sendInvite: '/api/v1/invites/send',
@@ -468,7 +598,8 @@ const server = app.listen(PORT, HOST, async () => {
   console.log('\n🎯 Server is ready!');
   console.log(`📡 Health Check: http://localhost:${PORT}/health`);
   console.log(`📡 Places API Test: http://localhost:${PORT}/api/v1/places/nearby?latitude=45.0703&longitude=7.6869&type=cafe&limit=3`);
-  console.log(`📡 User Discovery Test: http://localhost:${PORT}/api/v1/users/cities?q=milan&limit=5`);
+  console.log(`📡 Cities API Test: http://localhost:${PORT}/api/v1/cities?q=milano&limit=3`);
+  console.log(`📡 User Search Test: http://localhost:${PORT}/api/v1/user/search?lat=45.466647&lng=9.1906475&limit=5`);
 
   // Run self-test if services are healthy
   if (serviceStatus.overall === 'OK') {

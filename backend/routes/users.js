@@ -770,3 +770,78 @@ async function getCityUserCount(lat, lng, radius = 15000) {
 }
 
 module.exports = router;
+// Get current user profile (REQUIRED by frontend)
+router.get('/profile', async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    res.json({
+      success: true,
+      user: {
+        id: userId,
+        firstName: req.user.firstName || '',
+        lastName: req.user.lastName || ''
+      }
+    });
+  } catch (error) {
+    console.error('Error getting profile:', error);
+    res.status(500).json({ error: 'Failed to get profile' });
+  }
+});
+
+// Get dynamic cities with active users (USES EXISTING searchService)
+router.get('/cities', async (req, res) => {
+  try {
+    const { q: query, limit = 10 } = req.query;
+    
+    if (query) {
+      // Use existing searchService for dynamic city search
+      const searchService = require('../services/searchService');
+      const cities = await searchService.searchCities(query, parseInt(limit));
+      
+      // Add real user counts for each city
+      const citiesWithUsers = await Promise.all(cities.map(async (city) => {
+        const userCount = await getCityUserCount(city.coordinates.lat, city.coordinates.lng);
+        return {
+          ...city,
+          userCount,
+          onlineNow: Math.floor(userCount * 0.3) // Estimate 30% online
+        };
+      }));
+      
+      res.json({
+        success: true,
+        cities: citiesWithUsers,
+        count: citiesWithUsers.length
+      });
+    } else {
+      // Return cities with most active users
+      const activeCities = await prisma.$queryRaw`
+        SELECT 
+          city,
+          COUNT(*) as user_count,
+          COUNT(CASE WHEN "lastSeen" > NOW() - INTERVAL '30 minutes' THEN 1 END) as online_now
+        FROM user_live_locations 
+        WHERE "isLive" = true AND city != 'unknown'
+        GROUP BY city 
+        ORDER BY user_count DESC 
+        LIMIT ${parseInt(limit)}
+      `;
+      
+      res.json({
+        success: true,
+        cities: activeCities.map(city => ({
+          name: city.city,
+          displayName: city.city.charAt(0).toUpperCase() + city.city.slice(1),
+          userCount: parseInt(city.user_count),
+          onlineNow: parseInt(city.online_now)
+        })),
+        count: activeCities.length
+      });
+    }
+  } catch (error) {
+    console.error('Error getting cities:', error);
+    res.status(500).json({ error: 'Failed to get cities' });
+  }
+});
+

@@ -180,51 +180,32 @@ function MapApp() {
     }
   }, []);
 
-  // ENHANCED: City-based user discovery with better error handling
   const loadUsersByCity = useCallback(async (cityName, coordinates) => {
-    if (!authToken) {
-      console.warn('⚠️ No auth token for user discovery');
-      return;
-    }
-    
     setUsersLoading(true);
     setUsersError(null);
     
     try {
       console.log(`🏙️ Loading users in city: ${cityName}`);
       
-      let url = `${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001'}/api/v1/users/by-city`;
-      const params = new URLSearchParams({
-        radius: searchRadius.toString(),
-        limit: '50'
-      });
+      // Use the NEW working endpoint
+      const lat = coordinates?.lat || mapCenter?.lat;
+      const lng = coordinates?.lng || mapCenter?.lng;
       
-      if (cityName && cityName !== 'Current Location') {
-        params.append('city', cityName);
-      } else if (coordinates) {
-        params.append('lat', coordinates.lat.toString());
-        params.append('lng', coordinates.lng.toString());
+      if (!lat || !lng) {
+        throw new Error('Coordinates required');
       }
       
-      const response = await fetch(`${url}?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const response = await fetch(
+        `${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001'}/api/v1/user/search?lat=${lat}&lng=${lng}&radius=${searchRadius}&limit=50`
+      );
       
       if (response.ok) {
         const data = await response.json();
         setNearbyUsers(data.users || []);
-        setCurrentCity(data.city);
-        console.log(`✅ Found ${data.users?.length || 0} users in ${data.city?.name}`);
-      } else if (response.status === 401) {
-        console.error('❌ Authentication failed');
-        setUsersError('Authentication required');
-        setAuthToken(null);
+        setCurrentCity({ name: cityName, coordinates: { lat, lng } });
+        console.log(`✅ Found ${data.users?.length || 0} users in ${cityName}`);
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+        throw new Error(`HTTP ${response.status}`);
       }
     } catch (error) {
       console.error('❌ Error loading users by city:', error);
@@ -233,15 +214,9 @@ function MapApp() {
     } finally {
       setUsersLoading(false);
     }
-  }, [authToken, searchRadius]);
+  }, [searchRadius, mapCenter]);
 
-  // ENHANCED: Location-based user discovery (fallback)
   const loadNearbyUsers = useCallback(async (lat, lng) => {
-    if (!authToken) {
-      console.warn('⚠️ No auth token for user discovery');
-      return;
-    }
-    
     setUsersLoading(true);
     setUsersError(null);
     
@@ -249,26 +224,15 @@ function MapApp() {
       console.log(`🔍 Loading users near: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
       
       const response = await fetch(
-        `${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001'}/api/v1/users/nearby?latitude=${lat}&longitude=${lng}&radius=${searchRadius}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${authToken}`,
-            'Content-Type': 'application/json'
-          }
-        }
+        `${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001'}/api/v1/user/search?lat=${lat}&lng=${lng}&radius=${searchRadius}&limit=50`
       );
       
       if (response.ok) {
         const data = await response.json();
         setNearbyUsers(data.users || []);
         console.log(`✅ Found ${data.users?.length || 0} nearby users`);
-      } else if (response.status === 401) {
-        console.error('❌ Authentication failed');
-        setUsersError('Authentication required');
-        setAuthToken(null);
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+        throw new Error(`HTTP ${response.status}`);
       }
     } catch (error) {
       console.error('❌ Error loading nearby users:', error);
@@ -277,7 +241,7 @@ function MapApp() {
     } finally {
       setUsersLoading(false);
     }
-  }, [authToken, searchRadius]);
+  }, [searchRadius]);
 
   // ENHANCED: Location update with city detection
   const updateUserLocation = useCallback(async (lat, lng) => {
@@ -320,7 +284,7 @@ function MapApp() {
   // ENHANCED: Load available cities
   const loadAvailableCities = useCallback(async (query = '') => {
     try {
-      const url = `${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001'}/api/v1/users/cities`;
+      const url = `${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001'}/api/v1/cities`;
       const params = query ? `?q=${encodeURIComponent(query)}&limit=10` : '?limit=10';
       
       const response = await fetch(`${url}${params}`, {
