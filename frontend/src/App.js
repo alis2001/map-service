@@ -1,4 +1,4 @@
-// App.js - VERSIONE INTEGRATA CON SCOPERTA UTENTI - COMPLETA - FIXED API URLS
+// App.js - ENHANCED USER DISCOVERY SYSTEM - PRODUCTION READY
 // Location: /map-service/frontend/src/App.js
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -12,7 +12,7 @@ import { useCafes } from './hooks/useCafes';
 import { healthAPI } from './services/apiService';
 import AdvancedSearchPanel from './components/AdvancedSearchPanel';
 
-// NUOVI COMPONENTI PER SCOPERTA UTENTI
+// USER DISCOVERY COMPONENTS
 import UserMarker from './components/UserMarker';
 import UserInfoCard from './components/UserInfoCard';
 import MapModeToggle from './components/MapModeToggle';
@@ -47,8 +47,9 @@ function MapApp() {
   const [backendError, setBackendError] = useState(null);
   const [appReady, setAppReady] = useState(false);
 
-  // NUOVO: Modalità mappa (persone vs luoghi)
-  const [mapMode, setMapMode] = useState('places'); // 'people' o 'places'
+  // Map mode state (enhanced with city discovery)
+  const [mapMode, setMapMode] = useState('places'); // 'people' | 'places'
+  const [currentCity, setCurrentCity] = useState(null);
 
   // Search panel state
   const [searchPanelResults, setSearchPanelResults] = useState([]);
@@ -56,7 +57,7 @@ function MapApp() {
   
   // App state management
   const [selectedCafe, setSelectedCafe] = useState(null);
-  const [mapCenter, setMapCenter] = useState(null); // No default center
+  const [mapCenter, setMapCenter] = useState(null);
   const [zoom, setZoom] = useState(15);
   const [searchRadius, setSearchRadius] = useState(2000);
   const [cafeType, setCafeType] = useState('cafe');
@@ -73,23 +74,30 @@ function MapApp() {
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [isFullyReady, setIsFullyReady] = useState(false);
 
-  // NUOVI STATI PER GESTIONE UTENTI
+  // ENHANCED USER DISCOVERY STATES
   const [nearbyUsers, setNearbyUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [showUserCard, setShowUserCard] = useState(false);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersError, setUsersError] = useState(null);
+  const [userDiscoveryStats, setUserDiscoveryStats] = useState(null);
 
-  // NUOVI STATI PER SISTEMA INVITI
+  // ENHANCED INVITATION SYSTEM STATES
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteSelectedUser, setInviteSelectedUser] = useState(null);
   const [inviteSelectedPlace, setInviteSelectedPlace] = useState(null);
   const [isSelectingPlace, setIsSelectingPlace] = useState(false);
+  const [invitationLoading, setInvitationLoading] = useState(false);
 
-  // NUOVO: Token autenticazione
+  // ENHANCED AUTHENTICATION
   const [authToken, setAuthToken] = useState(null);
+  const [authUser, setAuthUser] = useState(null);
 
-  // 🚀 **ULTRA-FAST GEOLOCATION HOOK**
+  // ENHANCED CITY DISCOVERY
+  const [availableCities, setAvailableCities] = useState([]);
+  const [selectedCity, setSelectedCity] = useState(null);
+
+  // ENHANCED: Geolocation hook
   const { 
     location: userLocation, 
     loading: locationLoading, 
@@ -104,13 +112,13 @@ function MapApp() {
     getPreciseLocation
   } = useGeolocation();
 
-  // Only fetch cafes when we have a real user location
+  // Enhanced cafes hook with better error handling
   const {
     cafes,
     loading: cafesLoading,
     error: cafesError,
     refetch: refetchCafes,
-    isRefreshing // from enhanced useCafes hook
+    isRefreshing
   } = useCafes(
     mapCenter?.lat, 
     mapCenter?.lng, 
@@ -118,26 +126,64 @@ function MapApp() {
     cafeType
   );
 
-  // NUOVA FUNZIONE: Inizializzazione token
+  // ENHANCED: Authentication initialization with better token management
   useEffect(() => {
-    // Ottieni token dall'URL o localStorage
-    const urlParams = new URLSearchParams(window.location.search);
-    const tokenFromUrl = urlParams.get('token');
-    const tokenFromStorage = localStorage.getItem('caffis_auth_token');
-    
-    const token = tokenFromUrl || tokenFromStorage;
-    if (token) {
-      setAuthToken(token);
-      console.log('🔑 Token autenticazione trovato');
-    } else {
-      console.warn('⚠️ Nessun token di autenticazione trovato');
+    const initializeAuth = () => {
+      // Check multiple sources for auth token
+      const urlParams = new URLSearchParams(window.location.search);
+      const tokenFromUrl = urlParams.get('token');
+      const tokenFromStorage = localStorage.getItem('caffis_auth_token') || localStorage.getItem('token');
+      
+      const token = tokenFromUrl || tokenFromStorage;
+      
+      if (token) {
+        setAuthToken(token);
+        console.log('🔑 Authentication token found');
+        
+        // Clean URL if token was in URL
+        if (tokenFromUrl) {
+          const newUrl = window.location.pathname + window.location.search.replace(/[?&]token=[^&]+/, '').replace(/^&/, '?');
+          window.history.replaceState({}, '', newUrl);
+          localStorage.setItem('caffis_auth_token', token);
+        }
+        
+        // Fetch user profile
+        fetchUserProfile(token);
+      } else {
+        console.warn('⚠️ No authentication token found');
+        setAuthUser(null);
+      }
+    };
+
+    initializeAuth();
+  }, []);
+
+  // ENHANCED: User profile fetching
+  const fetchUserProfile = useCallback(async (token) => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001'}/api/v1/users/profile`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setAuthUser(data.user);
+        console.log('👤 User profile loaded:', data.user.firstName);
+      } else {
+        console.warn('⚠️ Failed to fetch user profile');
+      }
+    } catch (error) {
+      console.error('❌ Error fetching user profile:', error);
     }
   }, []);
 
-  // NUOVE FUNZIONI PER GESTIONE UTENTI - FIXED API URL
-  const loadNearbyUsers = useCallback(async (lat, lng) => {
+  // ENHANCED: City-based user discovery with better error handling
+  const loadUsersByCity = useCallback(async (cityName, coordinates) => {
     if (!authToken) {
-      console.warn('⚠️ Nessun token per caricare utenti');
+      console.warn('⚠️ No auth token for user discovery');
       return;
     }
     
@@ -145,7 +191,62 @@ function MapApp() {
     setUsersError(null);
     
     try {
-      console.log(`🔍 Caricamento utenti vicino a: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+      console.log(`🏙️ Loading users in city: ${cityName}`);
+      
+      let url = `${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001'}/api/v1/users/by-city`;
+      const params = new URLSearchParams({
+        radius: searchRadius.toString(),
+        limit: '50'
+      });
+      
+      if (cityName && cityName !== 'Current Location') {
+        params.append('city', cityName);
+      } else if (coordinates) {
+        params.append('lat', coordinates.lat.toString());
+        params.append('lng', coordinates.lng.toString());
+      }
+      
+      const response = await fetch(`${url}?${params}`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setNearbyUsers(data.users || []);
+        setCurrentCity(data.city);
+        console.log(`✅ Found ${data.users?.length || 0} users in ${data.city?.name}`);
+      } else if (response.status === 401) {
+        console.error('❌ Authentication failed');
+        setUsersError('Authentication required');
+        setAuthToken(null);
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
+    } catch (error) {
+      console.error('❌ Error loading users by city:', error);
+      setUsersError(error.message);
+      setNearbyUsers([]);
+    } finally {
+      setUsersLoading(false);
+    }
+  }, [authToken, searchRadius]);
+
+  // ENHANCED: Location-based user discovery (fallback)
+  const loadNearbyUsers = useCallback(async (lat, lng) => {
+    if (!authToken) {
+      console.warn('⚠️ No auth token for user discovery');
+      return;
+    }
+    
+    setUsersLoading(true);
+    setUsersError(null);
+    
+    try {
+      console.log(`🔍 Loading users near: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
       
       const response = await fetch(
         `${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001'}/api/v1/users/nearby?latitude=${lat}&longitude=${lng}&radius=${searchRadius}`,
@@ -160,15 +261,17 @@ function MapApp() {
       if (response.ok) {
         const data = await response.json();
         setNearbyUsers(data.users || []);
-        console.log(`✅ Trovati ${data.users?.length || 0} utenti nelle vicinanze`);
+        console.log(`✅ Found ${data.users?.length || 0} nearby users`);
       } else if (response.status === 401) {
-        console.error('❌ Token di autenticazione non valido');
-        setUsersError('Autenticazione richiesta');
+        console.error('❌ Authentication failed');
+        setUsersError('Authentication required');
+        setAuthToken(null);
       } else {
-        throw new Error(`Errore HTTP: ${response.status}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP ${response.status}`);
       }
     } catch (error) {
-      console.error('❌ Errore caricamento utenti:', error);
+      console.error('❌ Error loading nearby users:', error);
       setUsersError(error.message);
       setNearbyUsers([]);
     } finally {
@@ -176,12 +279,12 @@ function MapApp() {
     }
   }, [authToken, searchRadius]);
 
-  // FIXED API URL - updateUserLocation
+  // ENHANCED: Location update with city detection
   const updateUserLocation = useCallback(async (lat, lng) => {
     if (!authToken) return;
     
     try {
-      await fetch(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001'}/api/v1/users/location/update`, {
+      const response = await fetch(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001'}/api/v1/users/location/update-with-city`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -194,37 +297,104 @@ function MapApp() {
           shareRadius: searchRadius
         })
       });
-      console.log('📍 Posizione utente aggiornata nel backend');
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('📍 Location updated:', data.cityDisplayName || 'Unknown');
+        
+        // Update current city if detected
+        if (data.cityDisplayName) {
+          setCurrentCity({
+            name: data.cityDisplayName,
+            coordinates: { lat, lng }
+          });
+        }
+      } else {
+        console.warn('⚠️ Failed to update location');
+      }
     } catch (error) {
-      console.error('❌ Errore aggiornamento posizione:', error);
+      console.error('❌ Error updating location:', error);
     }
   }, [authToken, searchRadius]);
 
-  // NUOVI GESTORI EVENTI
+  // ENHANCED: Load available cities
+  const loadAvailableCities = useCallback(async (query = '') => {
+    try {
+      const url = `${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001'}/api/v1/users/cities`;
+      const params = query ? `?q=${encodeURIComponent(query)}&limit=10` : '?limit=10';
+      
+      const response = await fetch(`${url}${params}`, {
+        headers: authToken ? {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        } : {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableCities(data.cities || []);
+        return data.cities || [];
+      }
+    } catch (error) {
+      console.error('❌ Error loading cities:', error);
+    }
+    return [];
+  }, [authToken]);
+
+  // ENHANCED: Load discovery stats
+  const loadDiscoveryStats = useCallback(async () => {
+    if (!authToken) return;
+    
+    try {
+      const response = await fetch(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001'}/api/v1/users/discovery/stats`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setUserDiscoveryStats(data.stats);
+      }
+    } catch (error) {
+      console.error('❌ Error loading discovery stats:', error);
+    }
+  }, [authToken]);
+
+  // ENHANCED: Mode change with intelligent data loading
   const handleModeChange = useCallback((mode) => {
-    console.log(`🔄 Cambio modalità mappa: ${mapMode} → ${mode}`);
+    console.log(`🔄 Switching map mode: ${mapMode} → ${mode}`);
     setMapMode(mode);
     
-    // Reset selezioni
+    // Reset selections
     setSelectedUser(null);
     setSelectedCafe(null);
     setShowUserCard(false);
+    setIsSelectingPlace(false);
     
-    // Carica dati appropriati
+    // Load appropriate data
     if (mode === 'people' && mapCenter) {
-      loadNearbyUsers(mapCenter.lat, mapCenter.lng);
+      if (currentCity && currentCity.name !== 'Current Location') {
+        loadUsersByCity(currentCity.name, currentCity.coordinates);
+      } else {
+        loadNearbyUsers(mapCenter.lat, mapCenter.lng);
+      }
+      loadDiscoveryStats();
     }
-  }, [mapMode, mapCenter, loadNearbyUsers]);
+  }, [mapMode, mapCenter, currentCity, loadUsersByCity, loadNearbyUsers, loadDiscoveryStats]);
 
-  // FIXED API URL - handleUserClick
+  // ENHANCED: User profile fetching with caching
   const handleUserClick = useCallback(async (user) => {
-    console.log('👤 Utente selezionato:', user.firstName);
+    console.log('👤 User selected:', user.firstName);
     setSelectedUser(user);
     
-    // Carica profilo dettagliato
-    if (authToken) {
+    // Load detailed profile if not already loaded
+    if (authToken && (!user.bio || !user.interests)) {
       try {
-        const response = await fetch(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001'}/api/v1/users/${user.id}/profile`, {
+        const response = await fetch(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001'}/api/v1/users/${user.userId}/profile`, {
           headers: {
             'Authorization': `Bearer ${authToken}`,
             'Content-Type': 'application/json'
@@ -234,58 +404,55 @@ function MapApp() {
         if (response.ok) {
           const data = await response.json();
           setSelectedUser(data.profile);
-          setShowUserCard(true);
-        } else {
-          // Mostra comunque la card con dati base
-          setShowUserCard(true);
         }
       } catch (error) {
-        console.error('❌ Errore caricamento profilo:', error);
-        setShowUserCard(true);
+        console.error('❌ Error loading user profile:', error);
       }
-    } else {
-      setShowUserCard(true);
     }
+    
+    setShowUserCard(true);
   }, [authToken]);
 
+  // ENHANCED: Invitation system
   const handleInviteUser = useCallback((user) => {
-    console.log('☕ Avvio invito per:', user.firstName);
+    console.log('☕ Starting invitation for:', user.firstName);
     setInviteSelectedUser(user);
     setShowUserCard(false);
     setShowInviteModal(true);
   }, []);
 
   const handleSelectPlace = useCallback(() => {
-    console.log('📍 Modalità selezione posto attivata');
+    console.log('📍 Place selection mode activated');
     setIsSelectingPlace(true);
-    setMapMode('places'); // Passa alla visualizzazione luoghi
+    setMapMode('places');
   }, []);
 
   const handlePlaceClick = useCallback((place) => {
     if (isSelectingPlace) {
-      // Modalità selezione per invito
-      console.log('✅ Posto selezionato per invito:', place.name);
+      console.log('✅ Place selected for invitation:', place.name);
       setInviteSelectedPlace({
         id: place.place_id || place.googlePlaceId || place.id,
         name: place.name,
-        address: place.address || place.vicinity
+        address: place.address || place.vicinity || place.formatted_address,
+        type: place.placeType || place.type || 'cafe'
       });
       setIsSelectingPlace(false);
-      setMapMode('people'); // Torna alla visualizzazione persone
+      setMapMode('people');
     } else {
-      // Visualizzazione normale
       setSelectedCafe(place);
     }
   }, [isSelectingPlace]);
 
-  // FIXED API URL - handleSendInvite
+  // ENHANCED: Send invitation with better error handling
   const handleSendInvite = useCallback(async (inviteData) => {
-    console.log('🚀 Invio invito:', inviteData);
+    console.log('🚀 Sending invitation:', inviteData);
     
     if (!authToken) {
-      alert('Token di autenticazione mancante');
+      alert('Authentication required');
       return;
     }
+    
+    setInvitationLoading(true);
     
     try {
       const response = await fetch(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001'}/api/v1/invites/send`, {
@@ -295,7 +462,7 @@ function MapApp() {
           'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({
-          toUserId: inviteData.user.id,
+          toUserId: inviteData.user.userId || inviteData.user.id,
           placeId: inviteData.place.id,
           placeName: inviteData.place.name,
           placeAddress: inviteData.place.address,
@@ -306,26 +473,46 @@ function MapApp() {
       
       if (response.ok) {
         const data = await response.json();
-        alert(data.message);
+        alert(data.message || 'Invitation sent successfully! ☕');
         
-        // Reset stati
+        // Reset states
         setShowInviteModal(false);
         setInviteSelectedUser(null);
         setInviteSelectedPlace(null);
       } else {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Errore nell\'invio');
+        throw new Error(errorData.error || 'Failed to send invitation');
       }
     } catch (error) {
-      console.error('❌ Errore invio invito:', error);
-      alert(`Errore nell'invio dell'invito: ${error.message}`);
+      console.error('❌ Error sending invitation:', error);
+      alert(`Error sending invitation: ${error.message}`);
+    } finally {
+      setInvitationLoading(false);
     }
   }, [authToken]);
 
-  // Rate limit detection - ONLY for confirmed API errors
+  // ENHANCED: City selection handler
+  const handleCitySelect = useCallback((city) => {
+    console.log('🏙️ City selected:', city.displayName);
+    setSelectedCity(city);
+    setCurrentCity({
+      name: city.displayName,
+      coordinates: city.coordinates
+    });
+    
+    // Update map center
+    setMapCenter(city.coordinates);
+    setZoom(13);
+    
+    // Load users if in people mode
+    if (mapMode === 'people') {
+      loadUsersByCity(city.displayName, city.coordinates);
+    }
+  }, [mapMode, loadUsersByCity]);
+
+  // Rate limit detection - enhanced
   useEffect(() => {
     if (cafesError && cafesError.message) {
-      // VERY PRECISE detection - only trigger on confirmed rate limit message
       const isConfirmedRateLimit = 
         cafesError.message.includes('RATE_LIMIT_CONFIRMED:') ||
         cafesError.message.includes('troppe richieste') ||
@@ -334,12 +521,11 @@ function MapApp() {
         (cafesError.status === 429);
       
       if (isConfirmedRateLimit && !isRateLimitRecovery) {
-        console.log('🚫 CONFIRMED Rate limit detected:', cafesError.message);
+        console.log('🚫 Rate limit detected:', cafesError.message);
         setIsRateLimitRecovery(true);
         
-        // Auto-recovery after 8 seconds
         const recoveryTimer = setTimeout(() => {
-          console.log('✅ Rate limit recovery completed, reloading...');
+          console.log('✅ Rate limit recovery completed');
           setIsRateLimitRecovery(false);
           window.location.reload();
         }, 8000);
@@ -347,12 +533,11 @@ function MapApp() {
         return () => clearTimeout(recoveryTimer);
       }
     } else {
-      // Clear rate limit recovery if error is resolved
       setIsRateLimitRecovery(false);
     }
   }, [cafesError, isRateLimitRecovery]);
 
-  // 🏥 **BACKEND HEALTH CHECK**
+  // ENHANCED: Backend health check
   const checkBackendHealth = useCallback(async () => {
     try {
       console.log('🔍 Checking backend health...');
@@ -374,7 +559,7 @@ function MapApp() {
     }
   }, []);
 
-  // 🚀 **APP INITIALIZATION WITH LOADING STAGES**
+  // ENHANCED: App initialization
   useEffect(() => {
     console.log('🚀 Starting app initialization...');
     setLoadingStage('initializing');
@@ -389,8 +574,10 @@ function MapApp() {
         console.log('✅ Backend ready');
         setLoadingProgress(40);
         setAppReady(true);
+        
+        // Load initial cities
+        loadAvailableCities();
       } else {
-        // Continue with degraded mode
         console.log('⚡ App ready with degraded backend');
         setLoadingProgress(30);
         setAppReady(true);
@@ -402,9 +589,9 @@ function MapApp() {
     };
 
     initializeApp();
-  }, [checkBackendHealth]);
+  }, [checkBackendHealth, loadAvailableCities]);
 
-  // 📍 **LOCATION STAGE MANAGEMENT**
+  // Location stage management
   useEffect(() => {
     if (appReady && !locationRequested && !userLocation && !locationLoading) {
       console.log('📍 Auto-requesting location...');
@@ -418,7 +605,7 @@ function MapApp() {
     }
   }, [appReady, locationRequested, userLocation, locationLoading, refreshLocation]);
 
-  // 📍 **LOCATION PROGRESS TRACKING**
+  // Location progress tracking
   useEffect(() => {
     if (locationLoading) {
       setLoadingStage('location');
@@ -428,7 +615,7 @@ function MapApp() {
     }
   }, [locationLoading, userLocation, hasLocation]);
 
-  // 🗺️ **MAP CENTER UPDATE AND STAGE PROGRESSION**
+  // ENHANCED: Map center update with user location sync
   useEffect(() => {
     if (userLocation && hasLocation && !locationLoading) {
       console.log('📍 Setting map center to user location:', {
@@ -441,24 +628,25 @@ function MapApp() {
         lng: userLocation.longitude
       });
       
-      // NUOVO: Aggiorna posizione nel backend e carica utenti se necessario
+      // Update user location in backend
       updateUserLocation(userLocation.latitude, userLocation.longitude);
       
+      // Load appropriate data based on mode
       if (mapMode === 'people') {
-        loadNearbyUsers(userLocation.latitude, userLocation.longitude);
+        loadUsersByCity('Current Location', {
+          lat: userLocation.latitude,
+          lng: userLocation.longitude
+        });
       }
       
-      // Move to map stage
       setLoadingStage('map');
       setLoadingProgress(90);
     }
-  }, [userLocation, hasLocation, locationLoading, updateUserLocation, loadNearbyUsers, mapMode]);
+  }, [userLocation, hasLocation, locationLoading, updateUserLocation, mapMode, loadUsersByCity]);
 
-  // 🗺️ **FINAL READINESS CHECK**
+  // Final readiness check
   useEffect(() => {
-    // App is fully ready when we have a map center and not in rate limit recovery
     if (appReady && mapCenter && !isRateLimitRecovery) {
-      // Small delay to ensure everything is settled
       const timer = setTimeout(() => {
         setLoadingStage('ready');
         setLoadingProgress(100);
@@ -470,7 +658,7 @@ function MapApp() {
     }
   }, [appReady, mapCenter, isRateLimitRecovery]);
 
-  // 🔄 **SEARCH CHANGE HANDLER**
+  // ENHANCED: Search change handler
   const handleSearchChange = useCallback((changes) => {
     console.log('🔍 Search parameters changed:', changes);
     
@@ -488,13 +676,17 @@ function MapApp() {
         console.log('🔄 Auto-refetching with new search params');
         refetchCafes();
       } else if (mapCenter && mapMode === 'people') {
-        loadNearbyUsers(mapCenter.lat, mapCenter.lng);
+        if (currentCity && currentCity.name !== 'Current Location') {
+          loadUsersByCity(currentCity.name, currentCity.coordinates);
+        } else {
+          loadNearbyUsers(mapCenter.lat, mapCenter.lng);
+        }
       }
     }, 300);
     
-  }, [refetchCafes, mapCenter, mapMode, loadNearbyUsers]);
+  }, [refetchCafes, mapCenter, mapMode, currentCity, loadUsersByCity, loadNearbyUsers]);
 
-  // 📍 **LOCATION HANDLERS**
+  // Location handlers
   const handleLocationRetry = useCallback(() => {
     console.log('🔄 Retrying location detection...');
     setLocationRequested(false);
@@ -503,24 +695,20 @@ function MapApp() {
     }
   }, [refreshLocation]);
 
+  // ENHANCED: Search place selection
   const handleSearchPlaceSelect = useCallback(async (place) => {
     console.log('🔍 Search place selected:', place);
-    console.log('🔍 Raw place object:', JSON.stringify(place, null, 2));
     
     // Helper function to continue processing after getting coordinates
     const continueWithCoordinates = (lat, lng) => {
       console.log('📍 Final extracted coordinates:', { lat, lng });
-      console.log('📍 Coordinates valid?', { 
-        lat: !isNaN(lat) && lat !== null && lat !== undefined,
-        lng: !isNaN(lng) && lng !== null && lng !== undefined
-      });
       
       if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
         console.error('❌ Invalid coordinates, cannot proceed');
         return;
       }
       
-      // Format the place data to match the existing cafe structure
+      // Format the place data
       const formattedPlace = {
         id: place.id || place.googlePlaceId || `search_${Date.now()}`,
         googlePlaceId: place.id || place.googlePlaceId,
@@ -539,11 +727,10 @@ function MapApp() {
         location: {
           latitude: lat,
           longitude: lng,
-          lat: lat,      // Keep both formats for compatibility
+          lat: lat,
           lng: lng
         },
         source: 'search',
-        // Add marker-specific fields
         emoji: place.types?.includes('restaurant') ? '🍽️' : '☕',
         type: place.types?.includes('restaurant') ? 'restaurant' : 'cafe',
         placeType: place.types?.includes('restaurant') ? 'restaurant' : 'cafe',
@@ -552,55 +739,30 @@ function MapApp() {
       
       console.log('🎯 Formatted place for map:', formattedPlace);
       
-      // IMPORTANT: Set selected cafe FIRST
       if (isSelectingPlace) {
         handlePlaceClick(formattedPlace);
       } else {
         setSelectedCafe(formattedPlace);
         setSelectedSearchPlace(formattedPlace);
 
-        // Add the search result to cafe markers
-        console.log('🎯 Adding search result to cafe markers');
-        
-        // Then update map center with a slight delay to ensure state updates
         setTimeout(() => {
-          console.log('📍 Setting map center to exact search coordinates:', { lat, lng });
-          setMapCenter({
-            lat: lat,
-            lng: lng
-          });
-          
-          // Force high zoom for search results
+          console.log('📍 Setting map center to search coordinates:', { lat, lng });
+          setMapCenter({ lat: lat, lng: lng });
           setZoom(18);
           
-          // Force a refresh of the cafes to ensure the marker appears
           setTimeout(() => {
             if (refetchCafes) {
-              console.log('🔄 Refreshing cafes to show search result marker');
+              console.log('🔄 Refreshing cafes to show search result');
               refetchCafes();
             }
           }, 100);
-          
-          // Additional: Force map to pan to exact location after everything loads
-          setTimeout(() => {
-            console.log('🎯 Final positioning to search result coordinates');
-            setMapCenter({
-              lat: lat,
-              lng: lng
-            });
-          }, 500);
         }, 50);
       }
-      
-      console.log('✅ Search place integration completed');
     };
 
-    // More robust coordinate extraction - check all possible formats
+    // Coordinate extraction logic
     let lat, lng;
     
-    console.log('🔍 Getting exact coordinates for place:', place.name);
-
-    // If we have the place ID, use Google Places API to get exact coordinates
     if (place.id && window.google && window.google.maps && window.google.maps.places) {
       try {
         const service = new window.google.maps.places.PlacesService(document.createElement('div'));
@@ -613,11 +775,9 @@ function MapApp() {
             lat = placeResult.geometry.location.lat();
             lng = placeResult.geometry.location.lng();
             console.log('📍 Using Google Places API coordinates:', { lat, lng });
-            
-            // Continue with the rest of the function
             continueWithCoordinates(lat, lng);
           } else {
-            console.log('⚠️ Google Places API failed, using city coordinates');
+            console.log('⚠️ Google Places API failed, using fallback coordinates');
             if (place.city && place.city.coordinates) {
               lat = parseFloat(place.city.coordinates.lat);
               lng = parseFloat(place.city.coordinates.lng);
@@ -625,39 +785,27 @@ function MapApp() {
             }
           }
         });
-        return; // Exit early, continue in callback
+        return;
       } catch (error) {
         console.log('⚠️ Google Places API error:', error);
       }
     }
 
-    // Try different coordinate formats from search results (if Google Places API not available)
+    // Fallback coordinate extraction
     if (place.coordinates && place.coordinates.lat && place.coordinates.lng) {
       lat = parseFloat(place.coordinates.lat);
       lng = parseFloat(place.coordinates.lng);
-      console.log('📍 Using coordinates object (primary):', { lat, lng });
     } else if (place.latitude && place.longitude) {
       lat = parseFloat(place.latitude);
       lng = parseFloat(place.longitude);
-      console.log('📍 Using direct lat/lng:', { lat, lng });
     } else if (place.location && place.location.lat && place.location.lng) {
       lat = parseFloat(place.location.lat);
       lng = parseFloat(place.location.lng);
-      console.log('📍 Using location object:', { lat, lng });
-    } else if (place.location && place.location.latitude && place.location.longitude) {
-      lat = parseFloat(place.location.latitude);
-      lng = parseFloat(place.location.longitude);
-      console.log('📍 Using location object (lat/long format):', { lat, lng });
-    } else {
-      console.log('⚠️ No place coordinates found, using city coordinates as fallback');
-      if (place.city && place.city.coordinates) {
-        lat = parseFloat(place.city.coordinates.lat);
-        lng = parseFloat(place.city.coordinates.lng);
-        console.log('📍 Using city coordinates as fallback:', { lat, lng });
-      }
+    } else if (place.city && place.city.coordinates) {
+      lat = parseFloat(place.city.coordinates.lat);
+      lng = parseFloat(place.city.coordinates.lng);
     }
 
-    // Continue with extracted coordinates
     continueWithCoordinates(lat, lng);
   }, [refetchCafes, isSelectingPlace, handlePlaceClick]);
 
@@ -672,7 +820,7 @@ function MapApp() {
     }
   }, [getPreciseLocation]);
 
-  // Go to user location handler with smooth animation
+  // Go to user location with smart data loading
   const handleGoToUserLocation = useCallback(() => {
     if (!userLocation) {
       console.log('❌ No user location available');
@@ -684,53 +832,54 @@ function MapApp() {
     
     console.log('📍 Navigating to user location:', userLocation);
     
-    // Update map center to user location
     setMapCenter({
       lat: userLocation.latitude,
       lng: userLocation.longitude
     });
     
-    // Trigger a refresh based on current mode
     setTimeout(() => {
       if (mapMode === 'places' && refetchCafes) {
         refetchCafes();
       } else if (mapMode === 'people') {
-        loadNearbyUsers(userLocation.latitude, userLocation.longitude);
+        loadUsersByCity('Current Location', {
+          lat: userLocation.latitude,
+          lng: userLocation.longitude
+        });
       }
-    }, 500); // Small delay to ensure map center is updated
+    }, 500);
     
-  }, [userLocation, refreshLocation, refetchCafes, mapMode, loadNearbyUsers]);
+  }, [userLocation, refreshLocation, refetchCafes, mapMode, loadUsersByCity]);
 
-  // 1. Rate limit recovery screen (highest priority) - ONLY for confirmed API errors
+  // ENHANCED: Rate limit recovery screen
   if (isRateLimitRecovery) {
     return (
       <LoadingScreen 
-        message="Troppo veloce!"
-        subMessage="Sto ricaricando l'applicazione per tornare operativo..."
+        message="Too fast!"
+        subMessage="Reloading the application to get back online..."
         progress={100}
         isRateLimitRecovery={true}
       />
     );
   }
 
-  // 2. Creative startup loading screen (before map is ready)
+  // ENHANCED: Startup loading screen
   if (!isFullyReady) {
     const getMessage = () => {
       switch (loadingStage) {
-        case 'initializing': return 'Avvio applicazione...';
-        case 'location': return 'Rilevamento posizione...';
-        case 'map': return 'Preparazione mappa...';
-        case 'ready': return 'Finalizzazione...';
-        default: return 'Caricamento...';
+        case 'initializing': return 'Starting application...';
+        case 'location': return 'Detecting location...';
+        case 'map': return 'Preparing map...';
+        case 'ready': return 'Finalizing...';
+        default: return 'Loading...';
       }
     };
 
     const getSubMessage = () => {
       switch (loadingStage) {
-        case 'initializing': return 'Controllo servizi backend';
-        case 'location': return qualityText && sourceText ? `${qualityText} • ${sourceText}` : 'Attivazione GPS';
-        case 'map': return 'Configurazione interfaccia mappa';
-        case 'ready': return 'Caricamento dati locali';
+        case 'initializing': return 'Checking backend services';
+        case 'location': return qualityText && sourceText ? `${qualityText} • ${sourceText}` : 'Activating GPS';
+        case 'map': return 'Configuring map interface';
+        case 'ready': return 'Loading local data';
         default: return '';
       }
     };
@@ -747,81 +896,40 @@ function MapApp() {
     );
   }
 
-  // 3. Location error state (if location failed and no map center)
+  // Location error state
   if (!mapCenter && locationError && !locationLoading && appReady) {
     return (
       <StartupLoadingScreen
         stage="location"
         progress={50}
-        message="Posizione richiesta"
-        subMessage="Per trovare i migliori locali nelle vicinanze"
+        message="Location required"
+        subMessage="To find the best nearby places"
         onLocationRetry={handleLocationRetry}
       />
     );
   }
 
-  // ❌ **FALLBACK ERROR STATE**
-  if (!mapCenter && locationError && !locationLoading) {
-    return (
-      <div className="map-app">
-        <div style={{
-          position: 'fixed',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          textAlign: 'center',
-          background: 'rgba(255, 255, 255, 0.95)',
-          padding: '32px',
-          borderRadius: '16px',
-          boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
-          maxWidth: '400px',
-          width: '90%'
-        }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>📍</div>
-          <h3 style={{ marginBottom: '12px', color: '#1F2937' }}>Posizione richiesta</h3>
-          <p style={{ color: '#6B7280', marginBottom: '24px', lineHeight: '1.5' }}>
-            Per trovare i migliori locali nelle vicinanze, abbiamo bisogno della tua posizione.
-          </p>
-          <button
-            onClick={handleLocationRetry}
-            style={{
-              background: 'linear-gradient(135deg, #667eea, #764ba2)',
-              color: 'white',
-              border: 'none',
-              padding: '12px 24px',
-              borderRadius: '12px',
-              fontSize: '16px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              boxShadow: '0 4px 15px rgba(102, 126, 234, 0.3)'
-            }}
-          >
-            📍 Consenti Posizione
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // 🗺️ **MAIN APP WITH MAP**
+  // ENHANCED: Main app with user discovery
   return (
     <div className="map-app">
-      {/* NUOVO: Toggle modalità mappa */}
+      {/* ENHANCED: Mode toggle with stats */}
       <MapModeToggle
         currentMode={mapMode}
         onModeChange={handleModeChange}
         userCount={nearbyUsers.length}
         placeCount={cafes?.length || 0}
+        currentCity={currentCity?.name}
+        isLoading={mapMode === 'people' ? usersLoading : cafesLoading}
       />
 
-      {/* Pannello ricerca - solo in modalità luoghi */}
+      {/* ENHANCED: Search panel with city selection */}
       {mapMode === 'places' && (
         <AdvancedSearchPanel
           onPlaceSelect={handleSearchPlaceSelect}
           onCityChange={(cityCoordinates) => {
-            console.log('🏙️ City changed, updating map center:', cityCoordinates);
+            console.log('🏙️ City changed from search panel:', cityCoordinates);
             setMapCenter(cityCoordinates);
-            setZoom(13); // City-level zoom
+            setZoom(13);
           }}
           onResultsUpdate={handleSearchResultsUpdate}
           userLocation={userLocation}
@@ -835,30 +943,27 @@ function MapApp() {
         />
       )}
 
+      {/* ENHANCED: Full page map with user discovery */}
       <FullPageMap
         center={mapCenter}
         zoom={zoom}
-        // MODIFICATO: Cafes solo in modalità places
+        // Enhanced cafes with search results
         cafes={mapMode === 'places' ? (() => {
           const baseCafes = cafes || [];
           if (selectedSearchPlace) {
-            // Remove any existing search results to avoid duplicates
             const filteredCafes = baseCafes.filter(cafe => cafe.source !== 'search');
-            // Add the new search result with proper marker structure
             const searchWithMarkerData = {
               ...selectedSearchPlace,
-              // Ensure all required marker fields are present
               emoji: selectedSearchPlace.types?.includes('restaurant') ? '🍽️' : '☕',
               type: selectedSearchPlace.types?.includes('restaurant') ? 'restaurant' : 'cafe',
               placeType: selectedSearchPlace.types?.includes('restaurant') ? 'restaurant' : 'cafe',
               isSearchResult: true
             };
-            console.log('🎯 Adding search marker to map:', searchWithMarkerData.name);
             return [...filteredCafes, searchWithMarkerData];
           }
           return baseCafes;
         })() : []}
-        // NUOVO: Aggiungi utenti
+        // Enhanced users
         users={mapMode === 'people' ? nearbyUsers : []}
         selectedCafe={selectedCafe}
         selectedUser={selectedUser}
@@ -870,7 +975,6 @@ function MapApp() {
             setSelectedCafe(cafe);
           }
         }}
-        // NUOVO: Gestore selezione utenti
         onUserSelect={handleUserClick}
         onCenterChange={setMapCenter}
         onClosePopup={() => {
@@ -885,7 +989,13 @@ function MapApp() {
         showControls={showControls}
         isEmbedMode={isEmbedMode}
         onSearchChange={handleSearchChange}
-        onRefresh={mapMode === 'places' ? refetchCafes : () => loadNearbyUsers(mapCenter.lat, mapCenter.lng)}
+        onRefresh={mapMode === 'places' ? refetchCafes : () => {
+          if (currentCity && currentCity.name !== 'Current Location') {
+            loadUsersByCity(currentCity.name, currentCity.coordinates);
+          } else if (mapCenter) {
+            loadNearbyUsers(mapCenter.lat, mapCenter.lng);
+          }
+        }}
         onGoToUserLocation={handleGoToUserLocation}
         locationLoading={locationLoading}
         locationError={locationError}
@@ -895,22 +1005,22 @@ function MapApp() {
         onPreciseLocation={handlePreciseLocation}
         qualityText={qualityText || 'good'}
         sourceText={sourceText || 'GPS'}
-        // NUOVO: Passa modalità mappa e stato selezione
         mapMode={mapMode}
         isSelectingPlace={isSelectingPlace}
       />
 
-      {/* NUOVO: Card informazioni utente */}
+      {/* ENHANCED: User info card */}
       {showUserCard && selectedUser && (
         <UserInfoCard
           user={selectedUser}
           visible={showUserCard}
           onClose={() => setShowUserCard(false)}
           onInvite={handleInviteUser}
+          currentUser={authUser}
         />
       )}
 
-      {/* NUOVO: Modal invito */}
+      {/* ENHANCED: Invite modal */}
       {showInviteModal && (
         <InviteModal
           visible={showInviteModal}
@@ -924,10 +1034,11 @@ function MapApp() {
           }}
           onSendInvite={handleSendInvite}
           onSelectPlace={handleSelectPlace}
+          isLoading={invitationLoading}
         />
       )}
 
-      {/* 🏥 Backend Status Toast */}
+      {/* Backend status notification */}
       {backendError && (
         <div style={{
           position: 'fixed',
@@ -945,7 +1056,7 @@ function MapApp() {
         </div>
       )}
 
-      {/* NUOVO: Debug info per sviluppo */}
+      {/* ENHANCED: Development debug panel */}
       {process.env.REACT_APP_DEBUG_MODE === 'true' && (
         <div style={{
           position: 'fixed',
@@ -956,13 +1067,20 @@ function MapApp() {
           padding: '10px',
           borderRadius: '8px',
           fontSize: '12px',
-          zIndex: 10000
+          zIndex: 10000,
+          maxWidth: '250px'
         }}>
-          <div>Modalità: {mapMode}</div>
-          <div>Utenti: {nearbyUsers.length}</div>
-          <div>Luoghi: {cafes?.length || 0}</div>
-          <div>Selezione: {isSelectingPlace ? 'Posto' : 'Normale'}</div>
-          <div>Token: {authToken ? '✅' : '❌'}</div>
+          <div><strong>Debug Info</strong></div>
+          <div>Mode: {mapMode}</div>
+          <div>Users: {nearbyUsers.length}</div>
+          <div>Places: {cafes?.length || 0}</div>
+          <div>City: {currentCity?.name || 'None'}</div>
+          <div>Selecting: {isSelectingPlace ? 'Place' : 'Normal'}</div>
+          <div>Auth: {authToken ? '✅' : '❌'}</div>
+          <div>User: {authUser?.firstName || 'None'}</div>
+          {userDiscoveryStats && (
+            <div>Stats: {userDiscoveryStats.platform?.online_now || 0} online</div>
+          )}
         </div>
       )}
     </div>

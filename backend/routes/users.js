@@ -5,7 +5,7 @@ const redis = require('../config/redis');
 
 const prisma = new PrismaClient();
 
-// =============== EXISTING FUNCTIONALITY (UNCHANGED) ===============
+// =============== EXISTING FUNCTIONALITY (ENHANCED) ===============
 
 // Get nearby users who are live and sharing location
 router.get('/nearby', async (req, res) => {
@@ -56,10 +56,21 @@ router.get('/nearby', async (req, res) => {
       LIMIT 50
     `;
 
+    // Format user data with enhanced status
+    const formattedUsers = nearbyUsers.map(user => ({
+      ...user,
+      interests: user.interests ? JSON.parse(user.interests) : [],
+      distance: Math.round(user.distance),
+      status: getUserStatus(user.lastSeen),
+      isLive: user.isLive
+    }));
+
     res.json({
       success: true,
-      users: nearbyUsers,
-      count: nearbyUsers.length
+      users: formattedUsers,
+      count: formattedUsers.length,
+      searchRadius: parseInt(radius),
+      timestamp: new Date().toISOString()
     });
 
   } catch (error) {
@@ -74,6 +85,10 @@ router.post('/location/update', async (req, res) => {
     const { latitude, longitude, isLive = true, shareRadius = 1000 } = req.body;
     const userId = req.user.id;
 
+    if (!latitude || !longitude) {
+      return res.status(400).json({ error: 'Latitude and longitude required' });
+    }
+
     const location = await prisma.userLiveLocation.upsert({
       where: { userId },
       update: {
@@ -81,23 +96,29 @@ router.post('/location/update', async (req, res) => {
         longitude: parseFloat(longitude),
         isLive,
         shareRadius: parseInt(shareRadius),
-        lastSeen: new Date()
+        lastSeen: new Date(),
+        updatedAt: new Date()
       },
       create: {
         userId,
         latitude: parseFloat(latitude),
         longitude: parseFloat(longitude),
         isLive,
-        shareRadius: parseInt(shareRadius)
+        shareRadius: parseInt(shareRadius),
+        city: 'unknown' // Will be updated by city detection
       }
     });
 
     // Cache in Redis for faster access
-    await redis.setex(
-      `user_location:${userId}`, 
-      300, // 5 minutes
-      JSON.stringify(location)
-    );
+    try {
+      await redis.setex(
+        `user_location:${userId}`, 
+        300, // 5 minutes
+        JSON.stringify(location)
+      );
+    } catch (cacheError) {
+      console.warn('Cache write failed:', cacheError.message);
+    }
 
     res.json({ success: true, location });
 
@@ -128,7 +149,8 @@ router.get('/:userId/profile', async (req, res) => {
         cup.relationshipGoals,
         cup.activities,
         ull.lastSeen,
-        ull.isLive
+        ull.isLive,
+        ull.city
       FROM caffis_users cu
       LEFT JOIN caffis_user_preferences cup ON cu.id = cup.userId
       LEFT JOIN user_live_locations ull ON cu.id = ull.userId
@@ -164,7 +186,9 @@ router.get('/:userId/profile', async (req, res) => {
         ...profile,
         interests: JSON.parse(profile.interests || '[]'),
         activities: JSON.parse(profile.activities || '[]'),
-        commonInterests
+        commonInterests,
+        status: getUserStatus(profile.lastSeen),
+        isOnline: profile.isLive && getUserStatus(profile.lastSeen) !== 'offline'
       }
     });
 
@@ -184,13 +208,13 @@ router.get('/cities', async (req, res) => {
     if (!query) {
       // Return popular Italian cities if no query
       const popularCities = [
-        { name: 'torino', displayName: 'Torino', coordinates: { lat: 45.0703, lng: 7.6869 } },
-        { name: 'milano', displayName: 'Milano', coordinates: { lat: 45.4642, lng: 9.1900 } },
-        { name: 'roma', displayName: 'Roma', coordinates: { lat: 41.9028, lng: 12.4964 } },
-        { name: 'firenze', displayName: 'Firenze', coordinates: { lat: 43.7696, lng: 11.2558 } },
-        { name: 'napoli', displayName: 'Napoli', coordinates: { lat: 40.8518, lng: 14.2681 } },
-        { name: 'bologna', displayName: 'Bologna', coordinates: { lat: 44.4949, lng: 11.3426 } },
-        { name: 'venezia', displayName: 'Venezia', coordinates: { lat: 45.4408, lng: 12.3155 } }
+        { name: 'torino', displayName: 'Torino', coordinates: { lat: 45.0703, lng: 7.6869 }, userCount: await getCityUserCount(45.0703, 7.6869) },
+        { name: 'milano', displayName: 'Milano', coordinates: { lat: 45.4642, lng: 9.1900 }, userCount: await getCityUserCount(45.4642, 9.1900) },
+        { name: 'roma', displayName: 'Roma', coordinates: { lat: 41.9028, lng: 12.4964 }, userCount: await getCityUserCount(41.9028, 12.4964) },
+        { name: 'firenze', displayName: 'Firenze', coordinates: { lat: 43.7696, lng: 11.2558 }, userCount: await getCityUserCount(43.7696, 11.2558) },
+        { name: 'napoli', displayName: 'Napoli', coordinates: { lat: 40.8518, lng: 14.2681 }, userCount: await getCityUserCount(40.8518, 14.2681) },
+        { name: 'bologna', displayName: 'Bologna', coordinates: { lat: 44.4949, lng: 11.3426 }, userCount: await getCityUserCount(44.4949, 11.3426) },
+        { name: 'venezia', displayName: 'Venezia', coordinates: { lat: 45.4408, lng: 12.3155 }, userCount: await getCityUserCount(45.4408, 12.3155) }
       ];
 
       return res.json({
@@ -206,14 +230,15 @@ router.get('/cities', async (req, res) => {
       const searchService = require('../services/searchService');
       const cities = await searchService.searchCities(query, parseInt(limit));
       
-      // Format for frontend consumption
-      const formattedCities = cities.map(city => ({
+      // Format for frontend consumption with user counts
+      const formattedCities = await Promise.all(cities.map(async city => ({
         name: city.name.toLowerCase().replace(/\s+/g, ''),
         displayName: city.displayName || city.name,
         province: city.province,
         coordinates: city.coordinates,
-        isCapital: city.isCapital
-      }));
+        isCapital: city.isCapital,
+        userCount: await getCityUserCount(city.coordinates.lat, city.coordinates.lng)
+      })));
 
       res.json({
         success: true,
@@ -307,7 +332,8 @@ router.get('/by-city', async (req, res) => {
           city: { name: cityName, coordinates: cityCoordinates },
           users: cachedUsers,
           count: cachedUsers.length,
-          cached: true
+          cached: true,
+          timestamp: new Date().toISOString()
         });
       }
     } catch (cacheError) {
@@ -325,6 +351,8 @@ router.get('/by-city', async (req, res) => {
         cu.bio,
         cup.interests,
         cup.ageRange,
+        cup.coffeePersonality,
+        cup.conversationTopics,
         (
           6371000 * acos(
             cos(radians(${cityCoordinates.lat})) * 
@@ -353,14 +381,27 @@ router.get('/by-city', async (req, res) => {
       LIMIT ${parseInt(limit)}
     `;
     
-    // Process and format user data
+    // Process and format user data with enhanced information
     const formattedUsers = nearbyUsers.map(user => ({
-      ...user,
+      userId: user.userId,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      username: user.username,
+      profilePic: user.profilePic,
+      bio: user.bio,
       interests: user.interests ? JSON.parse(user.interests) : [],
+      ageRange: user.ageRange,
+      coffeePersonality: user.coffeePersonality,
+      conversationTopics: user.conversationTopics ? JSON.parse(user.conversationTopics) : [],
       distance: Math.round(user.distance),
       isLive: user.isLive,
+      lastSeen: user.lastSeen,
       status: getUserStatus(user.lastSeen),
-      city: cityName
+      city: cityName,
+      shareRadius: user.shareRadius,
+      // Enhanced status info
+      isOnline: user.isLive && getUserStatus(user.lastSeen) === 'online',
+      minutesAgo: Math.floor((new Date() - new Date(user.lastSeen)) / (1000 * 60))
     }));
     
     // Cache for 1 minute
@@ -378,7 +419,8 @@ router.get('/by-city', async (req, res) => {
       users: formattedUsers,
       count: formattedUsers.length,
       searchRadius,
-      cached: false
+      cached: false,
+      timestamp: new Date().toISOString()
     });
     
   } catch (error) {
@@ -404,12 +446,15 @@ router.post('/location/update-with-city', async (req, res) => {
 
     // Try to detect city using Google Places API for reverse geocoding
     let detectedCity = 'unknown';
+    let cityDisplayName = 'Unknown Location';
+    
     try {
       const googlePlacesService = require('../services/googlePlacesService');
       if (googlePlacesService.reverseGeocode) {
         const geocodeResult = await googlePlacesService.reverseGeocode(lat, lng);
         if (geocodeResult.city) {
           detectedCity = geocodeResult.city.toLowerCase().replace(/\s+/g, '');
+          cityDisplayName = geocodeResult.city;
           console.log(`🏙️ Detected city: ${geocodeResult.city}`);
         }
       }
@@ -417,12 +462,13 @@ router.post('/location/update-with-city', async (req, res) => {
       console.warn('⚠️ City detection failed, using coordinates only:', error.message);
     }
 
-    // Update location (using existing logic but with city info)
+    // Update location with city information
     const location = await prisma.userLiveLocation.upsert({
       where: { userId },
       update: {
         latitude: lat,
         longitude: lng,
+        city: detectedCity,
         isLive,
         shareRadius: parseInt(shareRadius),
         lastSeen: new Date(),
@@ -432,15 +478,18 @@ router.post('/location/update-with-city', async (req, res) => {
         userId,
         latitude: lat,
         longitude: lng,
+        city: detectedCity,
         isLive,
         shareRadius: parseInt(shareRadius)
       }
     });
 
-    // Clear relevant caches
+    // Clear relevant caches to ensure fresh data
     try {
-      const cachePattern = `city_users:*`;
-      await redis.del(cachePattern);
+      const cacheKeys = await redis.keys('city_users:*');
+      if (cacheKeys.length > 0) {
+        await redis.del(...cacheKeys);
+      }
     } catch (cacheError) {
       console.warn('Cache clear failed:', cacheError.message);
     }
@@ -452,7 +501,8 @@ router.post('/location/update-with-city', async (req, res) => {
         300, // 5 minutes
         JSON.stringify({
           ...location,
-          detectedCity
+          detectedCity,
+          cityDisplayName
         })
       );
     } catch (cacheError) {
@@ -461,8 +511,13 @@ router.post('/location/update-with-city', async (req, res) => {
 
     res.json({ 
       success: true, 
-      location,
-      detectedCity
+      location: {
+        ...location,
+        cityDisplayName
+      },
+      detectedCity,
+      cityDisplayName,
+      message: `Location updated in ${cityDisplayName}`
     });
 
   } catch (error) {
@@ -471,7 +526,7 @@ router.post('/location/update-with-city', async (req, res) => {
   }
 });
 
-// Sync user profile from main app (for profile caching)
+// Sync user profile from main app (enhanced with user_profiles table support)
 router.post('/sync-profile', async (req, res) => {
   try {
     const userId = req.user.id;
@@ -490,26 +545,79 @@ router.post('/sync-profile', async (req, res) => {
     
     console.log(`👤 Syncing profile for user ${firstName} ${lastName}`);
     
-    // For now, we'll just acknowledge the sync since we don't have user_profiles table yet
-    // This endpoint is ready for when the user_profiles table is added
-    
-    res.json({ 
-      success: true, 
-      message: 'Profile sync acknowledged (user_profiles table not yet implemented)',
-      userId,
-      data: {
-        firstName,
-        lastName,
-        username,
-        bio,
-        profilePic,
-        interests,
-        ageRange,
-        coffeePersonality,
-        conversationTopics,
-        socialGoals
-      }
-    });
+    // Try to sync to user_profiles table if it exists
+    try {
+      await prisma.userProfile.upsert({
+        where: { userId },
+        update: {
+          firstName: firstName || '',
+          lastName: lastName || '',
+          username,
+          bio,
+          profilePic,
+          interests: interests ? JSON.stringify(interests) : null,
+          ageRange,
+          coffeePersonality,
+          conversationTopics: conversationTopics ? JSON.stringify(conversationTopics) : null,
+          socialGoals,
+          lastUpdated: new Date()
+        },
+        create: {
+          userId,
+          firstName: firstName || '',
+          lastName: lastName || '',
+          username,
+          bio,
+          profilePic,
+          interests: interests ? JSON.stringify(interests) : null,
+          ageRange,
+          coffeePersonality,
+          conversationTopics: conversationTopics ? JSON.stringify(conversationTopics) : null,
+          socialGoals
+        }
+      });
+      
+      console.log(`✅ Profile synced successfully for ${firstName} ${lastName}`);
+      
+      res.json({ 
+        success: true, 
+        message: 'Profile synced successfully',
+        userId,
+        profileData: {
+          firstName,
+          lastName,
+          username,
+          bio,
+          profilePic,
+          interests,
+          ageRange,
+          coffeePersonality,
+          conversationTopics,
+          socialGoals
+        }
+      });
+      
+    } catch (tableError) {
+      console.warn('user_profiles table not available, acknowledging sync:', tableError.message);
+      
+      res.json({ 
+        success: true, 
+        message: 'Profile sync acknowledged (user_profiles table not yet implemented)',
+        userId,
+        data: {
+          firstName,
+          lastName,
+          username,
+          bio,
+          profilePic,
+          interests,
+          ageRange,
+          coffeePersonality,
+          conversationTopics,
+          socialGoals
+        }
+      });
+    }
     
   } catch (error) {
     console.error('Error syncing user profile:', error);
@@ -517,10 +625,114 @@ router.post('/sync-profile', async (req, res) => {
   }
 });
 
+// =============== NEW ENDPOINTS FOR ENHANCED FUNCTIONALITY ===============
+
+// Get user discovery stats for dashboard
+router.get('/discovery/stats', async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Get user's current location for city stats
+    const userLocation = await prisma.userLiveLocation.findUnique({
+      where: { userId }
+    });
+    
+    let cityStats = null;
+    if (userLocation) {
+      const nearbyCount = await prisma.$queryRaw`
+        SELECT COUNT(*) as nearby_users
+        FROM user_live_locations ull
+        WHERE ull.isLive = true 
+          AND ull.userId != ${userId}
+          AND ull.lastSeen > NOW() - INTERVAL '30 minutes'
+          AND (
+            6371000 * acos(
+              cos(radians(${userLocation.latitude})) * 
+              cos(radians(ull.latitude)) * 
+              cos(radians(ull.longitude) - radians(${userLocation.longitude})) + 
+              sin(radians(${userLocation.latitude})) * 
+              sin(radians(ull.latitude))
+            )
+          ) <= 15000
+      `;
+      
+      cityStats = {
+        currentCity: userLocation.city,
+        nearbyUsers: parseInt(nearbyCount[0].nearby_users),
+        lastUpdated: userLocation.updatedAt
+      };
+    }
+    
+    // Get overall platform stats
+    const platformStats = await prisma.$queryRaw`
+      SELECT 
+        COUNT(*) as total_active_users,
+        COUNT(CASE WHEN lastSeen > NOW() - INTERVAL '5 minutes' THEN 1 END) as online_now,
+        COUNT(CASE WHEN lastSeen > NOW() - INTERVAL '15 minutes' THEN 1 END) as active_recently,
+        COUNT(DISTINCT city) as active_cities
+      FROM user_live_locations
+      WHERE isLive = true
+    `;
+    
+    res.json({
+      success: true,
+      stats: {
+        platform: platformStats[0],
+        city: cityStats,
+        timestamp: new Date().toISOString()
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error getting discovery stats:', error);
+    res.status(500).json({ error: 'Failed to get discovery stats' });
+  }
+});
+
+// Get active cities with user counts
+router.get('/cities/active', async (req, res) => {
+  try {
+    const activeCities = await prisma.$queryRaw`
+      SELECT 
+        city,
+        COUNT(*) as user_count,
+        COUNT(CASE WHEN lastSeen > NOW() - INTERVAL '5 minutes' THEN 1 END) as online_now,
+        MAX(lastSeen) as last_activity
+      FROM user_live_locations
+      WHERE isLive = true 
+        AND city != 'unknown'
+        AND lastSeen > NOW() - INTERVAL '2 hours'
+      GROUP BY city
+      HAVING COUNT(*) > 0
+      ORDER BY user_count DESC, last_activity DESC
+      LIMIT 20
+    `;
+    
+    res.json({
+      success: true,
+      cities: activeCities.map(city => ({
+        name: city.city,
+        displayName: city.city.charAt(0).toUpperCase() + city.city.slice(1),
+        userCount: parseInt(city.user_count),
+        onlineNow: parseInt(city.online_now),
+        lastActivity: city.last_activity
+      })),
+      count: activeCities.length,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Error getting active cities:', error);
+    res.status(500).json({ error: 'Failed to get active cities' });
+  }
+});
+
 // =============== HELPER FUNCTIONS ===============
 
 // Helper function to determine user status based on last seen time
 function getUserStatus(lastSeen) {
+  if (!lastSeen) return 'offline';
+  
   const now = new Date();
   const lastSeenDate = new Date(lastSeen);
   const minutesAgo = Math.floor((now - lastSeenDate) / (1000 * 60));
@@ -529,6 +741,32 @@ function getUserStatus(lastSeen) {
   if (minutesAgo < 15) return 'recent';
   if (minutesAgo < 30) return 'away';
   return 'offline';
+}
+
+// Helper function to get user count for a city
+async function getCityUserCount(lat, lng, radius = 15000) {
+  try {
+    const result = await prisma.$queryRaw`
+      SELECT COUNT(*) as user_count
+      FROM user_live_locations ull
+      WHERE ull.isLive = true 
+        AND ull.lastSeen > NOW() - INTERVAL '30 minutes'
+        AND (
+          6371000 * acos(
+            cos(radians(${lat})) * 
+            cos(radians(ull.latitude)) * 
+            cos(radians(ull.longitude) - radians(${lng})) + 
+            sin(radians(${lat})) * 
+            sin(radians(ull.latitude))
+          )
+        ) <= ${radius}
+    `;
+    
+    return parseInt(result[0].user_count) || 0;
+  } catch (error) {
+    console.warn('Error getting city user count:', error.message);
+    return 0;
+  }
 }
 
 module.exports = router;

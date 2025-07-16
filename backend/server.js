@@ -1,4 +1,4 @@
-// server.js - UPDATED VERSION with Enhanced Service Initialization
+// server.js - UPDATED VERSION with User Discovery System Integration
 // Location: /backend/server.js
 
 const express = require('express');
@@ -10,7 +10,6 @@ const morgan = require('morgan');
 const dotenv = require('dotenv');
 const searchRoutes = require('./routes/searchRoutes');
 
-
 // Load environment variables
 dotenv.config();
 
@@ -19,13 +18,14 @@ const { prisma, testConnection } = require('./config/prisma');
 const { connectRedis } = require('./config/redis');
 const { authenticateToken } = require('./middleware/auth');
 
-
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
 const notFound = require('./middleware/notFound');
 
-// Import routes (only places - no auth needed)
+// Import routes
 const placesRoutes = require('./routes/placesRoutes');
+const usersRoutes = require('./routes/users');
+const invitesRoutes = require('./routes/invites');
 
 // Initialize Express app
 const app = express();
@@ -35,6 +35,7 @@ let serviceStatus = {
   database: { status: 'initializing', connectedAt: null, error: null },
   redis: { status: 'initializing', connectedAt: null, error: null },
   googlePlaces: { status: 'initializing', initializedAt: null, error: null },
+  userDiscovery: { status: 'initializing', enabledAt: null, error: null },
   server: { status: 'starting', startedAt: null },
   overall: 'initializing'
 };
@@ -67,13 +68,26 @@ app.use(cors(corsOptions));
 // Add preflight handling
 app.options('*', cors(corsOptions));
 
-// Rate limiting
-const limiter = rateLimit({
+// Rate limiting with different limits for different endpoints
+const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // limit each IP to 100 requests per windowMs
   message: 'Too many requests from this IP, please try again later.'
 });
-app.use('/api/', limiter);
+
+const userDiscoveryLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 30, // 30 requests per minute for user discovery
+  message: 'Too many user discovery requests, please slow down.'
+});
+
+const locationUpdateLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute  
+  max: 10, // 10 location updates per minute
+  message: 'Too many location updates, please wait.'
+});
+
+app.use('/api/', generalLimiter);
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -131,12 +145,26 @@ app.get('/health', async (req, res) => {
       serviceStatus.googlePlaces.error = placesError.message;
     }
 
+    // Test User Discovery system
+    let userDiscoveryHealthy = false;
+    try {
+      // Test if we can query user tables
+      await prisma.$queryRaw`SELECT COUNT(*) as user_count FROM user_live_locations WHERE "isLive" = true`;
+      userDiscoveryHealthy = true;
+      serviceStatus.userDiscovery.status = 'healthy';
+      serviceStatus.userDiscovery.error = null;
+    } catch (userError) {
+      console.warn('⚠️ User Discovery health check failed:', userError.message);
+      serviceStatus.userDiscovery.status = 'degraded';
+      serviceStatus.userDiscovery.error = userError.message;
+    }
+
     // Determine overall status
     let overallStatus = 'OK';
     if (!dbHealthy) {
       overallStatus = 'CRITICAL'; // Database is critical
-    } else if (!googlePlacesHealthy) {
-      overallStatus = 'DEGRADED'; // Google Places issues are degraded but workable
+    } else if (!googlePlacesHealthy || !userDiscoveryHealthy) {
+      overallStatus = 'DEGRADED'; // Google Places or User Discovery issues are degraded but workable
     } else if (!redisHealthy) {
       overallStatus = 'DEGRADED'; // Redis issues are degraded but workable
     }
@@ -167,6 +195,12 @@ app.get('/health', async (req, res) => {
           type: 'Google Places API',
           initializedAt: serviceStatus.googlePlaces.initializedAt,
           error: serviceStatus.googlePlaces.error
+        },
+        userDiscovery: {
+          status: serviceStatus.userDiscovery.status,
+          type: 'User Discovery System',
+          enabledAt: serviceStatus.userDiscovery.enabledAt,
+          error: serviceStatus.userDiscovery.error
         }
       },
       ready: overallStatus === 'OK' || overallStatus === 'DEGRADED'
@@ -176,7 +210,8 @@ app.get('/health', async (req, res) => {
       status: overallStatus,
       database: serviceStatus.database.status,
       redis: serviceStatus.redis.status,
-      googlePlaces: serviceStatus.googlePlaces.status
+      googlePlaces: serviceStatus.googlePlaces.status,
+      userDiscovery: serviceStatus.userDiscovery.status
     });
 
     // Return appropriate status code
@@ -195,38 +230,53 @@ app.get('/health', async (req, res) => {
   }
 });
 
-// API routes (only places API)
+// API routes with proper rate limiting
 app.use('/api/v1/places', placesRoutes);
-// Search panel ROute
 app.use('/api/v1/search', searchRoutes);
-// Root endpoint with service status
+
+// User Discovery routes with authentication and rate limiting
+app.use('/api/v1/users/by-city', userDiscoveryLimiter);
+app.use('/api/v1/users/location', locationUpdateLimiter);
+app.use('/api/v1/users', authenticateToken, usersRoutes);
+app.use('/api/v1/invites', authenticateToken, invitesRoutes);
+
+// Root endpoint with enhanced service status
 app.get('/', (req, res) => {
   res.json({
-    message: 'Map Service API - Microservice for Coffee & Bar Locations',
+    message: 'Map Service API - Microservice for Coffee & Bar Locations + User Discovery',
     version: '1.0.0',
     status: serviceStatus.overall,
     services: {
       database: serviceStatus.database.status,
       redis: serviceStatus.redis.status,
-      googlePlaces: serviceStatus.googlePlaces.status
+      googlePlaces: serviceStatus.googlePlaces.status,
+      userDiscovery: serviceStatus.userDiscovery.status
     },
     endpoints: {
       health: '/health',
+      // Places API
       places: '/api/v1/places',
       nearbyPlaces: '/api/v1/places/nearby',
-      searchPlaces: '/api/v1/places/search'
+      searchPlaces: '/api/v1/places/search',
+      // User Discovery API
+      userDiscovery: '/api/v1/users/by-city',
+      citySearch: '/api/v1/users/cities',
+      locationUpdate: '/api/v1/users/location/update-with-city',
+      // Invitations API
+      sendInvite: '/api/v1/invites/send',
+      receivedInvites: '/api/v1/invites/received'
     },
-    note: 'Authentication handled by main application',
+    features: [
+      'place_discovery',
+      'user_discovery', 
+      'city_based_search',
+      'meetup_invitations',
+      'real_time_location'
+    ],
+    note: 'Authentication handled by main Caffis application via JWT',
     ready: serviceStatus.overall === 'OK' || serviceStatus.overall === 'DEGRADED'
   });
 });
-
-const usersRoutes = require('./routes/users');
-const invitesRoutes = require('./routes/invites');
-
-// Register new routes with authentication middleware
-app.use('/api/v1/users', authenticateToken, usersRoutes);
-app.use('/api/v1/invites', authenticateToken, invitesRoutes);
 
 // 404 handler
 app.use(notFound);
@@ -241,7 +291,9 @@ async function initializeServices() {
   const results = {
     database: false,
     redis: false,
-    googlePlaces: false
+    googlePlaces: false,
+    userDiscovery: false,
+    searchService: false
   };
 
   // 1. Initialize Database (CRITICAL)
@@ -266,7 +318,36 @@ async function initializeServices() {
     return results;
   }
 
-  // 2. Initialize Redis (NON-CRITICAL)
+  // 2. Initialize User Discovery System (CRITICAL for user features)
+  try {
+    console.log('👥 Initializing User Discovery System...');
+    
+    // Check if user discovery tables exist
+    await prisma.$queryRaw`SELECT 1 FROM user_live_locations LIMIT 1`;
+    await prisma.$queryRaw`SELECT 1 FROM meetup_invites LIMIT 1`;
+    await prisma.$queryRaw`SELECT 1 FROM user_profiles LIMIT 1`;
+    
+    console.log('✅ User Discovery System initialized successfully');
+    console.log('🔍 User Discovery features enabled:');
+    console.log('   - City-based user discovery');
+    console.log('   - Real-time location sharing');
+    console.log('   - Coffee meetup invitations');
+    console.log('   - Collaborative location selection');
+    
+    serviceStatus.userDiscovery.status = 'healthy';
+    serviceStatus.userDiscovery.enabledAt = new Date().toISOString();
+    serviceStatus.userDiscovery.error = null;
+    results.userDiscovery = true;
+    
+  } catch (userError) {
+    console.error('❌ User Discovery System initialization failed:', userError.message);
+    console.log('📱 User discovery features will be unavailable');
+    serviceStatus.userDiscovery.status = 'degraded';
+    serviceStatus.userDiscovery.error = userError.message;
+    // Continue without user discovery
+  }
+
+  // 3. Initialize Redis (NON-CRITICAL)
   try {
     console.log('🔴 Initializing Redis connection...');
     const redisConnected = await connectRedis();
@@ -288,8 +369,7 @@ async function initializeServices() {
     // Continue even if Redis fails
   }
 
-  // 3. Initialize Google Places Service (NON-CRITICAL but important)
-  // 3. Initialize Google Places Service with Comprehensive Search
+  // 4. Initialize Google Places Service (NON-CRITICAL but important)
   try {
     console.log('🗺️ Initializing Google Places Service with comprehensive search...');
     const googlePlacesService = require('./services/googlePlacesService');
@@ -325,7 +405,7 @@ async function initializeServices() {
     // Continue even if Google Places fails
   }
 
-  // 4. Initialize Search Service (for city/place search)
+  // 5. Initialize Search Service (for city/place search)
   try {
     console.log('🔍 Initializing Search Service...');
     const searchService = require('./services/searchService');
@@ -349,7 +429,7 @@ const HOST = process.env.HOST || '0.0.0.0';
 // ENHANCED: Start server with comprehensive initialization
 const server = app.listen(PORT, HOST, async () => {
   console.log('🚀='.repeat(50));
-  console.log(`🚀 Map Service Server Starting`);
+  console.log(`🚀 Caffis Map Service + User Discovery Server Starting`);
   console.log(`🚀 Port: ${PORT}`);
   console.log(`🚀 Host: ${HOST}`);
   console.log(`🚀 Environment: ${process.env.NODE_ENV || 'development'}`);
@@ -366,7 +446,7 @@ const server = app.listen(PORT, HOST, async () => {
 
   // Determine overall service status
   if (initResults.database) {
-    if (initResults.redis && initResults.googlePlaces) {
+    if (initResults.userDiscovery && initResults.redis && initResults.googlePlaces) {
       serviceStatus.overall = 'OK';
       console.log('✅ All services initialized successfully - Status: OK');
     } else {
@@ -380,29 +460,44 @@ const server = app.listen(PORT, HOST, async () => {
 
   console.log('\n📊 Service Status Summary:');
   console.log(`   Database: ${serviceStatus.database.status}`);
+  console.log(`   User Discovery: ${serviceStatus.userDiscovery.status}`);
   console.log(`   Redis: ${serviceStatus.redis.status}`);
   console.log(`   Google Places: ${serviceStatus.googlePlaces.status}`);
   console.log(`   Overall: ${serviceStatus.overall}`);
 
   console.log('\n🎯 Server is ready!');
   console.log(`📡 Health Check: http://localhost:${PORT}/health`);
-  console.log(`📡 API Test: http://localhost:${PORT}/api/v1/places/nearby?latitude=45.0703&longitude=7.6869&type=cafe&limit=3`);
+  console.log(`📡 Places API Test: http://localhost:${PORT}/api/v1/places/nearby?latitude=45.0703&longitude=7.6869&type=cafe&limit=3`);
+  console.log(`📡 User Discovery Test: http://localhost:${PORT}/api/v1/users/cities?q=milan&limit=5`);
 
   // Run self-test if services are healthy
   if (serviceStatus.overall === 'OK') {
     setTimeout(async () => {
       try {
         console.log('\n🧪 Running self-test...');
+        
+        // Test Google Places
         const googlePlacesService = require('./services/googlePlacesService');
         const testResult = await googlePlacesService.searchNearby(45.0703, 7.6869, {
           type: 'cafe',
           radius: 1000,
           limit: 1
         });
-        console.log('✅ Self-test passed:', { placesFound: testResult.count });
+        
+        // Test User Discovery (basic table check)
+        const userStats = await prisma.$queryRaw`
+          SELECT 
+            COUNT(*) as total_users,
+            COUNT(CASE WHEN "isLive" = true THEN 1 END) as active_users
+          FROM user_live_locations
+        `;
+        
+        console.log('✅ Self-test passed:', { 
+          placesFound: testResult.count,
+          userStats: userStats[0]
+        });
       } catch (testError) {
         console.error('❌ Self-test failed:', testError.message);
-        serviceStatus.googlePlaces.status = 'degraded';
         serviceStatus.overall = 'DEGRADED';
       }
     }, 3000);
