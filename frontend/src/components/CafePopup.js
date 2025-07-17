@@ -1,10 +1,18 @@
-// components/CafePopup.js - COMPLETE ENHANCED VERSION with Apple WWDC 2025 Design
+// components/CafePopup.js - MINIMAL UPDATE for Location Selection
 // Location: /map-service/frontend/src/components/CafePopup.js
+// ONLY ADD these props and the selection button - keep everything else unchanged
 
 import React, { useState, useEffect } from 'react';
 import { usePlaceDetails } from '../hooks/useCafes';
 
-const CafePopup = ({ cafe, onClose, userLocation }) => {
+const CafePopup = ({ 
+  cafe, 
+  onClose, 
+  userLocation,
+  // NEW PROPS - only add these
+  isLocationSelecting = false,  // Add this prop
+  onLocationSelect            // Add this prop
+}) => {
   const [isVisible, setIsVisible] = useState(false);
   const [animationPhase, setAnimationPhase] = useState('entering');
   const [activeTab, setActiveTab] = useState('info');
@@ -19,6 +27,15 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
   // Use detailed data if available, fallback to basic cafe data
   const placeData = detailedPlace || cafe;
 
+  // NEW FUNCTION - only add this
+  const handleSelectLocation = () => {
+    if (onLocationSelect) {
+      onLocationSelect(cafe);
+    }
+    handleClose();
+  };
+
+  // Keep all your existing code exactly the same...
   // Update current time every minute for dynamic status
   useEffect(() => {
     const timer = setInterval(() => {
@@ -391,6 +408,7 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
     }
   };
 
+  // Keep all your existing styling functions exactly the same...
   // 🎨 ENHANCED LIQUID GLASS POPUP STYLES
   const getPopupStyles = () => {
     const baseStyles = {
@@ -561,6 +579,7 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
         style={getPopupStyles()}
       >
         
+        {/* Keep all your existing header exactly the same... */}
         {/* 🎨 ENHANCED APPLE WWDC 2025 HEADER */}
         <div 
           style={{
@@ -774,6 +793,7 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
           </div>
         </div>
 
+        {/* Keep all your existing stats section exactly the same... */}
         {/* 🎨 ENHANCED QUICK STATS */}
         <div 
           style={{
@@ -882,6 +902,7 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
           </div>
         </div>
 
+        {/* Keep your existing tabs exactly the same... */}
         {/* 🎨 ENHANCED TABS */}
         <div 
           style={{
@@ -972,6 +993,7 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
           )}
         </div>
 
+        {/* Keep your existing content exactly the same... */}
         {/* Content */}
         <div 
           style={{
@@ -1130,6 +1152,7 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
             </div>
           )}
 
+          {/* Keep your existing hours and photos tabs exactly the same... */}
           {/* ENHANCED Hours Tab with Dynamic Status */}
           {activeTab === 'hours' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -1326,6 +1349,7 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
           )}
         </div>
 
+        {/* MODIFIED: Action buttons section - ADD the select button when in location selection mode */}
         {/* 🎨 ENHANCED ACTION BUTTONS */}
         <div 
           style={{
@@ -1344,99 +1368,168 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
             ...getElementAnimation(500, 'slideUp')
           }}
         >
-          <button 
-            onClick={handleDirections}
-            style={{
-              flex: 1,
-              padding: '16px 20px',
-              borderRadius: '16px',
-              border: 'none',
-              background: venueInfo.gradient,
-              color: 'white',
-              fontSize: '15px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              boxShadow: `0 8px 16px ${venueInfo.color}40`,
-              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-              ...getElementAnimation(550, 'scale')
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.transform = 'translateY(-2px) scale(1.02)';
-              e.target.style.boxShadow = `0 12px 24px ${venueInfo.color}50`;
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.transform = 'translateY(0) scale(1)';
-              e.target.style.boxShadow = `0 8px 16px ${venueInfo.color}40`;
-            }}
-          >
-            🧭 Indicazioni
-          </button>
-          
-          {placeData.phoneNumber && (
+          {/* NEW: Show special select button when in location selection mode */}
+          {isLocationSelecting ? (
             <button 
-              onClick={handleCall}
+              onClick={handleSelectLocation}
               style={{
+                flex: 1,
                 padding: '16px 20px',
                 borderRadius: '16px',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                background: 'rgba(255, 255, 255, 0.8)',
-                color: '#374151',
+                border: 'none',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                color: 'white',
                 fontSize: '15px',
                 fontWeight: '600',
                 cursor: 'pointer',
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)',
+                boxShadow: '0 8px 16px rgba(16, 185, 129, 0.4)',
                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                ...getElementAnimation(600, 'scale')
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                ...getElementAnimation(550, 'scale')
               }}
               onMouseEnter={(e) => {
-                e.target.style.transform = 'translateY(-2px)';
-                e.target.style.background = 'rgba(59, 130, 246, 0.1)';
-                e.target.style.color = '#3B82F6';
+                e.target.style.transform = 'translateY(-2px) scale(1.02)';
+                e.target.style.boxShadow = '0 12px 24px rgba(16, 185, 129, 0.5)';
               }}
               onMouseLeave={(e) => {
-                e.target.style.transform = 'translateY(0)';
-                e.target.style.background = 'rgba(255, 255, 255, 0.8)';
-                e.target.style.color = '#374151';
+                e.target.style.transform = 'translateY(0) scale(1)';
+                e.target.style.boxShadow = '0 8px 16px rgba(16, 185, 129, 0.4)';
               }}
             >
-              📞 Chiama
+              ✅ Seleziona questo luogo
             </button>
-          )}
-          
-          {placeData.website && (
-            <button 
-              onClick={handleWebsite}
-              style={{
-                padding: '16px 20px',
-                borderRadius: '16px',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                background: 'rgba(255, 255, 255, 0.8)',
-                color: '#374151',
-                fontSize: '15px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)',
-                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                ...getElementAnimation(650, 'scale')
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.transform = 'translateY(-2px)';
-                e.target.style.background = 'rgba(34, 197, 94, 0.1)';
-                e.target.style.color = '#22C55E';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.transform = 'translateY(0)';
-                e.target.style.background = 'rgba(255, 255, 255, 0.8)';
-                e.target.style.color = '#374151';
-              }}
-            >
-              🌐 Sito
-            </button>
+          ) : (
+            // Normal mode buttons (keep your existing buttons exactly the same)
+            <>
+              <button 
+                onClick={handleDirections}
+                style={{
+                  flex: 1,
+                  padding: '16px 20px',
+                  borderRadius: '16px',
+                  border: 'none',
+                  background: venueInfo.gradient,
+                  color: 'white',
+                  fontSize: '15px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  boxShadow: `0 8px 16px ${venueInfo.color}40`,
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  ...getElementAnimation(550, 'scale')
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.transform = 'translateY(-2px) scale(1.02)';
+                  e.target.style.boxShadow = `0 12px 24px ${venueInfo.color}50`;
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.transform = 'translateY(0) scale(1)';
+                  e.target.style.boxShadow = `0 8px 16px ${venueInfo.color}40`;
+                }}
+              >
+                🧭 Indicazioni
+              </button>
+              
+              {placeData.phoneNumber && (
+                <button 
+                  onClick={handleCall}
+                  style={{
+                    padding: '16px 20px',
+                    borderRadius: '16px',
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    background: 'rgba(255, 255, 255, 0.8)',
+                    color: '#374151',
+                    fontSize: '15px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    backdropFilter: 'blur(10px)',
+                    WebkitBackdropFilter: 'blur(10px)',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    ...getElementAnimation(600, 'scale')
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.transform = 'translateY(-2px)';
+                    e.target.style.background = 'rgba(59, 130, 246, 0.1)';
+                    e.target.style.color = '#3B82F6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.transform = 'translateY(0)';
+                    e.target.style.background = 'rgba(255, 255, 255, 0.8)';
+                    e.target.style.color = '#374151';
+                  }}
+                >
+                  📞 Chiama
+                </button>
+              )}
+              
+              {placeData.website && (
+                <button 
+                  onClick={handleWebsite}
+                  style={{
+                    padding: '16px 20px',
+                    borderRadius: '16px',
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    background: 'rgba(255, 255, 255, 0.8)',
+                    color: '#374151',
+                    fontSize: '15px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    backdropFilter: 'blur(10px)',
+                    WebkitBackdropFilter: 'blur(10px)',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    ...getElementAnimation(650, 'scale')
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.transform = 'translateY(-2px)';
+                    e.target.style.background = 'rgba(34, 197, 94, 0.1)';
+                    e.target.style.color = '#22C55E';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.transform = 'translateY(0)';
+                    e.target.style.background = 'rgba(255, 255, 255, 0.8)';
+                    e.target.style.color = '#374151';
+                  }}
+                >
+                  🌐 Sito
+                </button>
+              )}
+            </>
           )}
         </div>
 
+        {/* NEW: Location Selection Helper Text - only show when in location selection mode */}
+        {isLocationSelecting && (
+          <div 
+            style={{
+              margin: '0 24px 24px 24px',
+              padding: '16px',
+              background: 'rgba(16, 185, 129, 0.05)',
+              border: '1px solid rgba(16, 185, 129, 0.2)',
+              borderRadius: '16px',
+              textAlign: 'center',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
+              ...getElementAnimation(600, 'slideUp')
+            }}
+          >
+            <p style={{ 
+              margin: 0, 
+              fontSize: '13px', 
+              color: '#059669',
+              fontWeight: '600',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
+            }}>
+              📍 Perfetto per il tuo incontro! Clicca "Seleziona questo luogo" per continuare.
+            </p>
+          </div>
+        )}
+
+        {/* Keep your existing Italian venue tips exactly the same... */}
         {/* Italian venue tips */}
         <div 
           style={{
@@ -1473,6 +1566,7 @@ const CafePopup = ({ cafe, onClose, userLocation }) => {
         </div>
       </div>
 
+      {/* Keep all your existing CSS animations exactly the same... */}
       {/* Enhanced CSS Animations */}
       <style jsx>{`
         @keyframes headerParticles {

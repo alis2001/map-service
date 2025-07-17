@@ -1,4 +1,4 @@
-// App.js - ENHANCED USER DISCOVERY SYSTEM - PRODUCTION READY
+// App.js - ENHANCED USER DISCOVERY SYSTEM WITH LOCATION SELECTION - PRODUCTION READY
 // Location: /map-service/frontend/src/App.js
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -89,6 +89,10 @@ function MapApp() {
   const [inviteSelectedPlace, setInviteSelectedPlace] = useState(null);
   const [isSelectingPlace, setIsSelectingPlace] = useState(false);
   const [invitationLoading, setInvitationLoading] = useState(false);
+
+  // NEW: Enhanced modal states for location selection animation
+  const [isModalMinimized, setIsModalMinimized] = useState(false);
+  const [isLocationSelecting, setIsLocationSelecting] = useState(false);
 
   // NEW: Invitations in Corso states
   const [showInvitationsInCorso, setShowInvitationsInCorso] = useState(false);
@@ -508,27 +512,48 @@ function MapApp() {
     setShowInviteModal(true);
   }, []);
 
-  const handleSelectPlace = useCallback(() => {
-    console.log('📍 Place selection mode activated');
+  // NEW: Enhanced location selection handlers
+  const handleLocationSelectionStart = useCallback(() => {
+    console.log('📍 Location selection mode activated');
+    setIsLocationSelecting(true);
     setIsSelectingPlace(true);
-    setMapMode('places');
+    setIsModalMinimized(true);
+    setMapMode('places'); // Switch to places mode for location selection
+  }, []);
+
+  const handleLocationSelectionEnd = useCallback(() => {
+    console.log('✅ Location selection completed');
+    setIsLocationSelecting(false);
+    setIsSelectingPlace(false);
+    setIsModalMinimized(false);
+    setMapMode('people'); // Switch back to people mode
   }, []);
 
   const handlePlaceClick = useCallback((place) => {
     if (isSelectingPlace) {
       console.log('✅ Place selected for invitation:', place.name);
-      setInviteSelectedPlace({
+      
+      // Format the selected place
+      const formattedPlace = {
         id: place.place_id || place.googlePlaceId || place.id,
         name: place.name,
         address: place.address || place.vicinity || place.formatted_address,
         type: place.placeType || place.type || 'cafe'
-      });
-      setIsSelectingPlace(false);
-      setMapMode('people');
+      };
+      
+      setInviteSelectedPlace(formattedPlace);
+      
+      // Trigger location selection end through the modal
+      if (window.setInvitationLocation) {
+        window.setInvitationLocation(formattedPlace);
+      }
+      
+      // End location selection
+      handleLocationSelectionEnd();
     } else {
       setSelectedCafe(place);
     }
-  }, [isSelectingPlace]);
+  }, [isSelectingPlace, handleLocationSelectionEnd]);
 
   // ENHANCED: Send invitation with better error handling
   const handleSendInvite = useCallback(async (inviteData) => {
@@ -580,6 +605,9 @@ function MapApp() {
         setInviteSelectedUser(null);
         setInviteSelectedPlace(null);
         setShowInvitationsInCorso(false);
+        setIsLocationSelecting(false);
+        setIsSelectingPlace(false);
+        setIsModalMinimized(false);
       } else {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to send invitation');
@@ -1157,7 +1185,7 @@ function MapApp() {
         />
       )}
 
-      {/* ENHANCED: Invite modal with enhanced props */}
+      {/* ENHANCED: Invite modal with location selection animation */}
       {showInviteModal && (
         <InviteModal
           visible={showInviteModal}
@@ -1167,12 +1195,19 @@ function MapApp() {
             setInviteSelectedUser(null);
             setInviteSelectedPlace(null);
             setIsSelectingPlace(false);
+            setIsLocationSelecting(false);
+            setIsModalMinimized(false);
             setShowInvitationsInCorso(false); // Close invitations panel when modal closes
           }}
           onSendInvite={handleSendInvite}
           userLocation={userLocation}
           cafes={cafes} // Pass cafes data to modal
           onRefreshPlaces={refetchCafes} // Pass refresh function
+          // NEW: Location selection props
+          onLocationSelectionStart={handleLocationSelectionStart}
+          onLocationSelectionEnd={handleLocationSelectionEnd}
+          isLocationSelecting={isLocationSelecting}
+          isMinimized={isModalMinimized}
         />
       )}
 
@@ -1280,6 +1315,7 @@ function MapApp() {
           <div>Places: {cafes?.length || 0}</div>
           <div>City: {currentCity?.name || 'None'}</div>
           <div>Selecting: {isSelectingPlace ? 'Place' : 'Normal'}</div>
+          <div>Minimized: {isModalMinimized ? 'Yes' : 'No'}</div>
           <div>Auth: {authToken ? '✅' : '❌'}</div>
           <div>User: {authUser?.firstName || 'None'}</div>
           <div>Invitations: {activeInvitations.length}</div>

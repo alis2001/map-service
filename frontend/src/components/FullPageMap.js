@@ -255,12 +255,9 @@ const FullPageMap = ({
       optimized: false
     });
 
-    // Enhanced user marker events
     marker.addListener('click', () => {
-      console.log('👤 User clicked:', user.firstName);
-      if (onUserSelect) {
-        onUserSelect(user);
-      }
+      console.log('👤 User marker clicked:', user.firstName);
+      onUserSelect(user);
     });
 
     marker.addListener('mouseover', () => {
@@ -1386,16 +1383,10 @@ const FullPageMap = ({
           visible: true
         });
 
-        // Enhanced place marker events
+        // Enhanced place marker events - ALWAYS show popup first
         marker.addListener('click', () => {
-          if (isSelectingPlace) {
-            // In selection mode, treat as place selection for invitation
-            console.log('📍 Place selected for invitation:', cafe.name);
-            onCafeSelect(cafe);
-          } else {
-            // Normal mode, show place details
-            handleSmoothMarkerClick(cafe);
-          }
+          console.log('📍 Marker clicked, showing popup for:', cafe.name);
+          handleSmoothMarkerClick(cafe);
         });
 
         marker.addListener('mouseover', () => {
@@ -1708,7 +1699,8 @@ const FullPageMap = ({
           cafe={selectedCafe}
           onClose={handleSmoothPopupClose}
           userLocation={userLocation}
-          isLocationSelecting={isSelectingPlace} // Add this prop
+          isLocationSelecting={isSelectingPlace}
+          onLocationSelect={onCafeSelect}        // ADD THIS LINE
         />
       )}
 
