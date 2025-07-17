@@ -1703,11 +1703,12 @@ const FullPageMap = ({
       )}
 
       {/* Enhanced Popup for Places */}
-      {selectedCafe && mapLoaded && !isSelectingPlace && (
+      {selectedCafe && mapLoaded && (
         <CafePopup
           cafe={selectedCafe}
           onClose={handleSmoothPopupClose}
           userLocation={userLocation}
+          isLocationSelecting={isSelectingPlace} // Add this prop
         />
       )}
 

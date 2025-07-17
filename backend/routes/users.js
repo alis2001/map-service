@@ -130,13 +130,15 @@ router.post('/location/update', async (req, res) => {
   }
 });
 
-// Get user profile details for card display - FIXED TO USE user_profiles
+// Fixed user profile endpoint in backend/routes/users.js
+// Replace the existing GET /:userId/profile endpoint with this:
+
 router.get('/:userId/profile', async (req, res) => {
   try {
     const { userId } = req.params;
     const currentUserId = req.user.id;
 
-    // Get user profile - FIXED TO USE user_profiles table
+    // Get user profile - FIXED TO INCLUDE ALL PREFERENCE FIELDS
     const userProfile = await prisma.$queryRaw`
       SELECT 
         up.userId as id,
@@ -146,11 +148,18 @@ router.get('/:userId/profile', async (req, res) => {
         up.profilePic,
         up.bio,
         up.createdAt,
+        up.registeredAt,
         up.interests,
         up.ageRange,
         up.coffeePersonality,
         up.conversationTopics,
         up.socialGoals,
+        up.socialEnergy,
+        up.groupPreference,
+        up.locationPreference,
+        up.meetingFrequency,
+        up.timePreference,
+        up.onboardingCompleted,
         ull.lastSeen,
         ull.isLive,
         ull.city
@@ -182,12 +191,43 @@ router.get('/:userId/profile', async (req, res) => {
       );
     }
 
+    // Helper function to safely parse JSON strings
+    const safeJsonParse = (jsonString) => {
+      if (!jsonString) return null;
+      try {
+        return JSON.parse(jsonString);
+      } catch {
+        return jsonString;
+      }
+    };
+
     res.json({
       success: true,
       profile: {
-        ...profile,
-        interests: JSON.parse(profile.interests || '[]'),
-        conversationTopics: JSON.parse(profile.conversationTopics || '[]'),
+        userId: profile.id,
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        username: profile.username,
+        profilePic: profile.profilePic,
+        bio: profile.bio,
+        createdAt: profile.createdAt,
+        registeredAt: profile.registeredAt,
+        interests: safeJsonParse(profile.interests) || [],
+        ageRange: profile.ageRange,
+        coffeePersonality: profile.coffeePersonality,
+        conversationTopics: safeJsonParse(profile.conversationTopics) || '',
+        socialGoals: profile.socialGoals,
+        // NEW: Include all preference fields
+        socialEnergy: profile.socialEnergy,
+        groupPreference: profile.groupPreference,
+        locationPreference: profile.locationPreference,
+        meetingFrequency: profile.meetingFrequency,
+        timePreference: profile.timePreference,
+        onboardingCompleted: profile.onboardingCompleted,
+        // Status and location info
+        lastSeen: profile.lastSeen,
+        isLive: profile.isLive,
+        city: profile.city,
         commonInterests,
         status: getUserStatus(profile.lastSeen),
         isOnline: profile.isLive && getUserStatus(profile.lastSeen) !== 'offline'

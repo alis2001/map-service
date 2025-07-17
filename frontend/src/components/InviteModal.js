@@ -1,559 +1,731 @@
-// components/InviteModal.js - Modal per Inviti Caffè
-// Location: /frontend/src/components/InviteModal.js
-
-import React, { useState, useEffect } from 'react';
+// Enhanced Invitation Modal - Complete Italian System with Animation States
+import React, { useState, useEffect, useRef } from 'react';
+import { X, MapPin, Calendar, Clock, MessageSquare, Send, ArrowLeft, Search, Filter, Minimize2, Maximize2 } from 'lucide-react';
 
 const InviteModal = ({ 
   visible, 
   selectedUser, 
-  selectedPlace, 
   onClose, 
-  onSendInvite, 
-  onSelectPlace 
+  onSendInvite,
+  userLocation,
+  cafes,
+  onRefreshPlaces,
+  onLocationSelectionStart, // NEW: Callback when location selection starts
+  onLocationSelectionEnd,   // NEW: Callback when location selection ends
+  isLocationSelecting = false, // NEW: External state for location selection
+  isMinimized = false         // NEW: External state for minimized mode
 }) => {
-  const [message, setMessage] = useState('');
-  const [suggestedTime, setSuggestedTime] = useState('');
-  const [isSelectingPlace, setIsSelectingPlace] = useState(false);
-  const [isAnimating, setIsAnimating] = useState(false);
+  // Modal states
+  const [isVisible, setIsVisible] = useState(false);
+  const [invitationData, setInvitationData] = useState({
+    luogo: null,
+    data: '',
+    ora: '',
+    messaggio: ''
+  });
 
-  // Gestisci animazioni apertura/chiusura
+  // Internal animation states
+  const [isAnimatingToCorner, setIsAnimatingToCorner] = useState(false);
+  const [isAnimatingToCenter, setIsAnimatingToCenter] = useState(false);
+
+  // Validation
+  const [errors, setErrors] = useState({});
+
+  // Animation handling
   useEffect(() => {
     if (visible) {
-      setIsAnimating(true);
-    } else {
-      const timer = setTimeout(() => setIsAnimating(false), 300);
+      const timer = setTimeout(() => setIsVisible(true), 50);
       return () => clearTimeout(timer);
+    } else {
+      setIsVisible(false);
     }
   }, [visible]);
 
-  // Reset form quando il modal si chiude
+  // Handle backdrop click (only when not minimized)
+  const handleBackdropClick = (e) => {
+    if (e.target === e.currentTarget && !isMinimized && !isLocationSelecting) {
+      handleClose();
+    }
+  };
+
+  const handleClose = () => {
+    setIsVisible(false);
+    setTimeout(() => {
+      setInvitationData({ luogo: null, data: '', ora: '', messaggio: '' });
+      setErrors({});
+      onClose();
+    }, 300);
+  };
+
+  // Handle location selection start
+  const handleLocationSelectionStart = () => {
+    setIsAnimatingToCorner(true);
+    setTimeout(() => {
+      setIsAnimatingToCorner(false);
+      onLocationSelectionStart && onLocationSelectionStart();
+    }, 400);
+  };
+
+  // Handle location selection (called from parent when place is selected)
+  const handleLocationSelected = (place) => {
+    setInvitationData(prev => ({ ...prev, luogo: place }));
+    setIsAnimatingToCenter(true);
+    setTimeout(() => {
+      setIsAnimatingToCenter(false);
+      onLocationSelectionEnd && onLocationSelectionEnd();
+    }, 400);
+  };
+
+  // Expose method to parent for setting selected location
   useEffect(() => {
-    if (!visible) {
-      setMessage('');
-      setSuggestedTime('');
-      setIsSelectingPlace(false);
+    if (window.setInvitationLocation) {
+      window.setInvitationLocation = handleLocationSelected;
+    }
+  }, []);
+
+  // Validate form
+  const validateForm = () => {
+    const newErrors = {};
+    
+    if (!invitationData.luogo) {
+      newErrors.luogo = 'Seleziona un luogo per l\'incontro';
+    }
+    if (!invitationData.data) {
+      newErrors.data = 'Seleziona una data';
+    }
+    if (!invitationData.ora) {
+      newErrors.ora = 'Seleziona un orario';
+    }
+    if (!invitationData.messaggio.trim()) {
+      newErrors.messaggio = 'Scrivi un messaggio';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // Handle form submission
+  const handleSubmit = () => {
+    if (validateForm()) {
+      onSendInvite({
+        toUser: selectedUser,
+        place: invitationData.luogo,
+        date: invitationData.data,
+        time: invitationData.ora,
+        message: invitationData.messaggio
+      });
+      handleClose();
+    }
+  };
+
+  // Generate time options
+  const generateTimeOptions = () => {
+    const options = [];
+    for (let hour = 7; hour <= 22; hour++) {
+      for (let minute = 0; minute < 60; minute += 30) {
+        const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+        options.push(time);
+      }
+    }
+    return options;
+  };
+
+  if (!visible || !selectedUser) return null;
+
+  // Determine modal style based on state
+  const getModalStyle = () => {
+    if (isMinimized && !isAnimatingToCenter) {
+      // Minimized state - small card in corner
+      return {
+        position: 'fixed',
+        top: '20px',
+        right: '20px',
+        width: '300px',
+        maxWidth: '300px',
+        height: 'auto',
+        transform: isVisible ? 'scale(1)' : 'scale(0.8)',
+        zIndex: 2500
+      };
+    } else if (isAnimatingToCorner) {
+      // Animating to corner
+      return {
+        position: 'fixed',
+        top: '50%',
+        left: '50%',
+        width: '300px',
+        maxWidth: '300px',
+        height: 'auto',
+        transform: `translate(-50%, -50%) scale(0.8)`,
+        transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+        zIndex: 2500
+      };
+    } else if (isAnimatingToCenter) {
+      // Animating back to center
+      return {
+        position: 'fixed',
+        top: '50%',
+        left: '50%',
+        width: '600px',
+        maxWidth: '600px',
+        height: 'auto',
+        transform: `translate(-50%, -50%) scale(1)`,
+        transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+        zIndex: 3000
+      };
+    } else {
+      // Normal centered modal
+      return {
+        position: 'fixed',
+        top: '50%',
+        left: '50%',
+        width: '600px',
+        maxWidth: '600px',
+        height: 'auto',
+        transform: `translate(-50%, -50%) scale(${isVisible ? 1 : 0.95})`,
+        zIndex: 3000
+      };
+    }
+  };
+
+  return (
+    <>
+      {/* Backdrop - only show when not minimized */}
+      {(!isMinimized || isAnimatingToCenter) && (
+        <div 
+          className={`invitation-modal-backdrop ${isVisible ? 'visible' : ''}`}
+          onClick={handleBackdropClick}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.6)',
+            backdropFilter: 'blur(12px)',
+            zIndex: 2999,
+            opacity: isVisible ? 1 : 0,
+            transition: 'all 0.4s ease',
+            pointerEvents: isVisible ? 'auto' : 'none'
+          }}
+        />
+      )}
+
+      {/* Modal */}
+      <div 
+        className={`invitation-modal ${isVisible ? 'visible' : ''} ${isMinimized ? 'minimized' : ''}`}
+        style={getModalStyle()}
+      >
+        
+        {/* Header */}
+        <div className="invitation-modal-header">
+          {isMinimized && (
+            <button 
+              className="btn-expand"
+              onClick={() => onLocationSelectionEnd && onLocationSelectionEnd()}
+              title="Espandi invito"
+            >
+              <Maximize2 className="w-4 h-4" />
+            </button>
+          )}
+          <h3>
+            {isMinimized 
+              ? `Invito per ${selectedUser.firstName}` 
+              : `Invita ${selectedUser.firstName} per un caffè`
+            }
+          </h3>
+          <button 
+            className="btn-close-modal"
+            onClick={handleClose}
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Content - Hide most content when minimized */}
+        {!isMinimized && (
+          <div className="invitation-form">
+            
+            {/* User Info */}
+            <div className="invite-user-info">
+              <div className="invite-user-avatar">
+                {selectedUser.profilePic ? (
+                  <img src={selectedUser.profilePic} alt={selectedUser.firstName} />
+                ) : (
+                  <div className="avatar-placeholder">
+                    {selectedUser.firstName?.charAt(0)?.toUpperCase()}
+                  </div>
+                )}
+              </div>
+              <div className="invite-user-details">
+                <div className="invite-user-name">
+                  {selectedUser.firstName} {selectedUser.lastName}
+                </div>
+                <div className="invite-user-distance">
+                  📍 {selectedUser.distance 
+                    ? selectedUser.distance < 1000 
+                      ? `${Math.round(selectedUser.distance)}m di distanza`
+                      : `${(selectedUser.distance / 1000).toFixed(1)}km di distanza`
+                    : 'Nelle vicinanze'
+                  }
+                </div>
+              </div>
+            </div>
+
+            {/* Location Selection */}
+            <div className="form-section">
+              <label className="form-label">
+                <MapPin className="w-4 h-4" />
+                Luogo dell'incontro *
+              </label>
+              <button 
+                className={`location-select-btn ${errors.luogo ? 'error' : ''} ${invitationData.luogo ? 'selected' : ''}`}
+                onClick={handleLocationSelectionStart}
+              >
+                {invitationData.luogo ? (
+                  <div className="selected-location">
+                    <div className="location-name">{invitationData.luogo.name}</div>
+                    <div className="location-address">{invitationData.luogo.address}</div>
+                  </div>
+                ) : (
+                  <div className="placeholder">
+                    Tocca per selezionare un luogo
+                  </div>
+                )}
+                <MapPin className="w-5 h-5 location-icon" />
+              </button>
+              {errors.luogo && <div className="error-text">{errors.luogo}</div>}
+            </div>
+
+            {/* Date Selection */}
+            <div className="form-section">
+              <label className="form-label">
+                <Calendar className="w-4 h-4" />
+                Data dell'incontro *
+              </label>
+              <input
+                type="date"
+                className={`form-input ${errors.data ? 'error' : ''}`}
+                value={invitationData.data}
+                onChange={(e) => setInvitationData(prev => ({ ...prev, data: e.target.value }))}
+                min={new Date().toISOString().split('T')[0]}
+              />
+              {errors.data && <div className="error-text">{errors.data}</div>}
+            </div>
+
+            {/* Time Selection */}
+            <div className="form-section">
+              <label className="form-label">
+                <Clock className="w-4 h-4" />
+                Orario dell'incontro *
+              </label>
+              <select
+                className={`form-input ${errors.ora ? 'error' : ''}`}
+                value={invitationData.ora}
+                onChange={(e) => setInvitationData(prev => ({ ...prev, ora: e.target.value }))}
+              >
+                <option value="">Seleziona un orario</option>
+                {generateTimeOptions().map(time => (
+                  <option key={time} value={time}>{time}</option>
+                ))}
+              </select>
+              {errors.ora && <div className="error-text">{errors.ora}</div>}
+            </div>
+
+            {/* Message */}
+            <div className="form-section">
+              <label className="form-label">
+                <MessageSquare className="w-4 h-4" />
+                Messaggio personalizzato *
+              </label>
+              <textarea
+                className={`form-textarea ${errors.messaggio ? 'error' : ''}`}
+                placeholder="Scrivi un messaggio per l'invito..."
+                value={invitationData.messaggio}
+                onChange={(e) => setInvitationData(prev => ({ ...prev, messaggio: e.target.value }))}
+                rows={4}
+              />
+              {errors.messaggio && <div className="error-text">{errors.messaggio}</div>}
+            </div>
+
+            {/* Submit Button */}
+            <div className="form-actions">
+              <button 
+                className="btn-send-invite"
+                onClick={handleSubmit}
+              >
+                <Send className="w-4 h-4" />
+                Invia Invito
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Minimized content */}
+        {isMinimized && (
+          <div className="minimized-content">
+            <div className="minimized-info">
+              <div className="minimized-text">Seleziona luogo sulla mappa</div>
+              {invitationData.luogo && (
+                <div className="minimized-selected">
+                  ✅ {invitationData.luogo.name}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </>
+  );
+};
+
+export default InviteModal;
+  // Modal states
+  const [isVisible, setIsVisible] = useState(false);
+  const [currentStep, setCurrentStep] = useState('form'); // 'form' | 'location' 
+  const [invitationData, setInvitationData] = useState({
+    luogo: null,
+    data: '',
+    ora: '',
+    messaggio: ''
+  });
+
+  // Location selection states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedPlace, setSelectedPlace] = useState(null);
+  const [filteredPlaces, setFilteredPlaces] = useState([]);
+  const [cafeType, setCafeType] = useState('cafe');
+  const [showInvitationsInCorso, setShowInvitationsInCorso] = useState(false);
+
+  // Validation
+  const [errors, setErrors] = useState({});
+
+  // Animation handling
+  useEffect(() => {
+    if (visible) {
+      const timer = setTimeout(() => setIsVisible(true), 50);
+      return () => clearTimeout(timer);
+    } else {
+      setIsVisible(false);
     }
   }, [visible]);
 
-  const handleSendInvite = () => {
-    if (!selectedUser || !selectedPlace) return;
+  // Filter places based on search and type
+  useEffect(() => {
+    if (!cafes || cafes.length === 0) return;
     
-    onSendInvite({
-      user: selectedUser,
-      place: selectedPlace,
-      message: message.trim(),
-      suggestedTime: suggestedTime || null
+    let filtered = cafes.filter(place => {
+      const matchesType = place.type?.toLowerCase() === cafeType.toLowerCase() || 
+                         place.placeType?.toLowerCase() === cafeType.toLowerCase();
+      const matchesSearch = !searchQuery || 
+                           place.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           place.address?.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesType && matchesSearch;
     });
-  };
-
-  const handleSelectPlace = () => {
-    setIsSelectingPlace(true);
-    onSelectPlace();
-  };
-
-  const getDefaultTime = () => {
-    const now = new Date();
-    now.setMinutes(now.getMinutes() + 30); // 30 minuti da ora
-    return now.toISOString().slice(0, 16); // Format per datetime-local
-  };
-
-  const getUserStatusColor = () => {
-    if (!selectedUser?.isLive) return '#6b7280';
     
-    const timeDiff = new Date() - new Date(selectedUser.lastSeen);
-    const minutesAgo = Math.floor(timeDiff / (1000 * 60));
-    
-    if (minutesAgo < 5) return '#22c55e'; // Verde - online ora
-    if (minutesAgo < 15) return '#eab308'; // Giallo - online di recente
-    return '#6b7280'; // Grigio - offline
+    setFilteredPlaces(filtered);
+  }, [cafes, searchQuery, cafeType]);
+
+  // Handle backdrop click
+  const handleBackdropClick = (e) => {
+    if (e.target === e.currentTarget) {
+      handleClose();
+    }
   };
 
-  const getUserStatusText = () => {
-    if (!selectedUser?.isLive) return 'Offline';
-    
-    const timeDiff = new Date() - new Date(selectedUser.lastSeen);
-    const minutesAgo = Math.floor(timeDiff / (1000 * 60));
-    
-    if (minutesAgo < 5) return 'Online ora';
-    if (minutesAgo < 15) return `Attivo ${minutesAgo} min fa`;
-    return 'Offline';
+  const handleClose = () => {
+    setIsVisible(false);
+    setTimeout(() => {
+      setCurrentStep('form');
+      setInvitationData({ luogo: null, data: '', ora: '', messaggio: '' });
+      setSelectedPlace(null);
+      setErrors({});
+      onClose();
+    }, 300);
   };
 
-  if (!visible && !isAnimating) return null;
+  // Handle location selection
+  const handleLocationSelect = (place) => {
+    setSelectedPlace(place);
+    setInvitationData(prev => ({ ...prev, luogo: place }));
+    setCurrentStep('form');
+  };
+
+  // Validate form
+  const validateForm = () => {
+    const newErrors = {};
+    
+    if (!invitationData.luogo) {
+      newErrors.luogo = 'Seleziona un luogo per l\'incontro';
+    }
+    if (!invitationData.data) {
+      newErrors.data = 'Seleziona una data';
+    }
+    if (!invitationData.ora) {
+      newErrors.ora = 'Seleziona un orario';
+    }
+    if (!invitationData.messaggio.trim()) {
+      newErrors.messaggio = 'Scrivi un messaggio';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // Handle form submission
+  const handleSubmit = () => {
+    if (validateForm()) {
+      onSendInvite({
+        toUser: selectedUser,
+        place: invitationData.luogo,
+        date: invitationData.data,
+        time: invitationData.ora,
+        message: invitationData.messaggio
+      });
+      handleClose();
+    }
+  };
+
+  // Generate time options
+  const generateTimeOptions = () => {
+    const options = [];
+    for (let hour = 7; hour <= 22; hour++) {
+      for (let minute = 0; minute < 60; minute += 30) {
+        const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+        options.push(time);
+      }
+    }
+    return options;
+  };
+
+  if (!visible || !selectedUser) return null;
 
   return (
     <div 
-      className="invite-modal-overlay"
-      style={{
-        opacity: visible ? 1 : 0,
-        visibility: visible ? 'visible' : 'hidden',
-        transition: 'opacity 0.3s ease, visibility 0.3s ease'
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+      className={`invitation-modal-overlay ${isVisible ? 'visible' : ''}`}
+      onClick={handleBackdropClick}
     >
-      <div 
-        className="invite-modal"
-        style={{
-          transform: visible ? 'translateY(0) scale(1)' : 'translateY(50px) scale(0.95)',
-          opacity: visible ? 1 : 0,
-          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-        }}
-      >
+      <div className={`invitation-modal ${isVisible ? 'visible' : ''}`}>
+        
         {/* Header */}
-        <div className="invite-modal-header">
-          <h3>☕ Invita {selectedUser?.firstName} per un caffè</h3>
-          <button className="btn-close-modal" onClick={onClose}>
-            ✕
+        <div className="invitation-modal-header">
+          {currentStep === 'location' && (
+            <button 
+              className="btn-back"
+              onClick={() => setCurrentStep('form')}
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+          )}
+          <h3>
+            {currentStep === 'form' 
+              ? `Invita ${selectedUser.firstName} per un caffè` 
+              : 'Seleziona il luogo'
+            }
+          </h3>
+          <button 
+            className="btn-close-modal"
+            onClick={handleClose}
+          >
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="invite-modal-content">
-          {/* Informazioni utente */}
-          <div className="invite-user-info">
-            <div className="invite-user-avatar">
-              {selectedUser?.profilePic ? (
-                <img src={selectedUser.profilePic} alt={selectedUser.firstName} />
-              ) : (
-                <div className="avatar-placeholder">
-                  {selectedUser?.firstName?.charAt(0)}{selectedUser?.lastName?.charAt(0)}
+        {/* Form Step */}
+        {currentStep === 'form' && (
+          <div className="invitation-form">
+            
+            {/* User Info */}
+            <div className="invite-user-info">
+              <div className="invite-user-avatar">
+                {selectedUser.profilePic ? (
+                  <img src={selectedUser.profilePic} alt={selectedUser.firstName} />
+                ) : (
+                  <div className="avatar-placeholder">
+                    {selectedUser.firstName?.charAt(0)?.toUpperCase()}
+                  </div>
+                )}
+              </div>
+              <div className="invite-user-details">
+                <div className="invite-user-name">
+                  {selectedUser.firstName} {selectedUser.lastName}
                 </div>
-              )}
-              {/* Indicatore stato */}
-              <div 
-                className="status-indicator"
-                style={{ backgroundColor: getUserStatusColor() }}
-                title={getUserStatusText()}
-              />
+                <div className="invite-user-distance">
+                  📍 {selectedUser.distance 
+                    ? selectedUser.distance < 1000 
+                      ? `${Math.round(selectedUser.distance)}m di distanza`
+                      : `${(selectedUser.distance / 1000).toFixed(1)}km di distanza`
+                    : 'Nelle vicinanze'
+                  }
+                </div>
+              </div>
             </div>
-            <div>
-              <div className="invite-user-name">
-                {selectedUser?.firstName} {selectedUser?.lastName}
-              </div>
-              <div 
-                className="invite-user-status"
-                style={{ color: getUserStatusColor() }}
+
+            {/* Location Selection */}
+            <div className="form-section">
+              <label className="form-label">
+                <MapPin className="w-4 h-4" />
+                Luogo dell'incontro *
+              </label>
+              <button 
+                className={`location-select-btn ${errors.luogo ? 'error' : ''} ${invitationData.luogo ? 'selected' : ''}`}
+                onClick={() => setCurrentStep('location')}
               >
-                {getUserStatusText()}
-              </div>
-              <div className="invite-user-distance">
-                📍 {selectedUser?.distance ? Math.round(selectedUser.distance) : '---'}m di distanza
-              </div>
+                {invitationData.luogo ? (
+                  <div className="selected-location">
+                    <div className="location-name">{invitationData.luogo.name}</div>
+                    <div className="location-address">{invitationData.luogo.address}</div>
+                  </div>
+                ) : (
+                  <div className="placeholder">
+                    Tocca per selezionare un luogo
+                  </div>
+                )}
+                <MapPin className="w-5 h-5 location-icon" />
+              </button>
+              {errors.luogo && <div className="error-text">{errors.luogo}</div>}
+            </div>
+
+            {/* Date Selection */}
+            <div className="form-section">
+              <label className="form-label">
+                <Calendar className="w-4 h-4" />
+                Data dell'incontro *
+              </label>
+              <input
+                type="date"
+                className={`form-input ${errors.data ? 'error' : ''}`}
+                value={invitationData.data}
+                onChange={(e) => setInvitationData(prev => ({ ...prev, data: e.target.value }))}
+                min={new Date().toISOString().split('T')[0]}
+              />
+              {errors.data && <div className="error-text">{errors.data}</div>}
+            </div>
+
+            {/* Time Selection */}
+            <div className="form-section">
+              <label className="form-label">
+                <Clock className="w-4 h-4" />
+                Orario dell'incontro *
+              </label>
+              <select
+                className={`form-input ${errors.ora ? 'error' : ''}`}
+                value={invitationData.ora}
+                onChange={(e) => setInvitationData(prev => ({ ...prev, ora: e.target.value }))}
+              >
+                <option value="">Seleziona un orario</option>
+                {generateTimeOptions().map(time => (
+                  <option key={time} value={time}>{time}</option>
+                ))}
+              </select>
+              {errors.ora && <div className="error-text">{errors.ora}</div>}
+            </div>
+
+            {/* Message */}
+            <div className="form-section">
+              <label className="form-label">
+                <MessageSquare className="w-4 h-4" />
+                Messaggio personalizzato *
+              </label>
+              <textarea
+                className={`form-textarea ${errors.messaggio ? 'error' : ''}`}
+                placeholder="Scrivi un messaggio per l'invito..."
+                value={invitationData.messaggio}
+                onChange={(e) => setInvitationData(prev => ({ ...prev, messaggio: e.target.value }))}
+                rows={4}
+              />
+              {errors.messaggio && <div className="error-text">{errors.messaggio}</div>}
+            </div>
+
+            {/* Submit Button */}
+            <div className="form-actions">
+              <button 
+                className="btn-send-invite"
+                onClick={handleSubmit}
+              >
+                <Send className="w-4 h-4" />
+                Invia Invito
+              </button>
             </div>
           </div>
+        )}
 
-          {/* Selezione posto */}
-          <div className="invite-place-section">
-            <h4>📍 Luogo dell'incontro</h4>
-            {!selectedPlace ? (
-              <button 
-                className="btn-select-place" 
-                onClick={handleSelectPlace}
-                disabled={isSelectingPlace}
-              >
-                {isSelectingPlace ? '🗺️ Seleziona un posto sulla mappa...' : '📍 Scegli un posto'}
-              </button>
-            ) : (
-              <div className="selected-place-info">
-                <div className="place-header">
-                  <span className="place-emoji">
-                    {selectedPlace.type === 'restaurant' ? '🍽️' : '☕'}
-                  </span>
-                  <div>
-                    <div className="place-name">{selectedPlace.name}</div>
-                    <div className="place-address">{selectedPlace.address}</div>
-                  </div>
-                </div>
+        {/* Location Selection Step */}
+        {currentStep === 'location' && (
+          <div className="location-selection">
+            
+            {/* Search and Filter Header */}
+            <div className="search-header">
+              <div className="search-input-wrapper">
+                <Search className="w-4 h-4 search-icon" />
+                <input
+                  type="text"
+                  placeholder="Cerca caffè, bar, ristoranti..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="search-input-horizontal"
+                />
+              </div>
+              
+              <div className="filter-buttons">
                 <button 
-                  className="btn-change-place" 
-                  onClick={handleSelectPlace}
+                  className={`filter-btn ${cafeType === 'cafe' ? 'active' : ''}`}
+                  onClick={() => setCafeType('cafe')}
                 >
-                  Cambia posto
+                  ☕ Caffè
+                </button>
+                <button 
+                  className={`filter-btn ${cafeType === 'restaurant' ? 'active' : ''}`}
+                  onClick={() => setCafeType('restaurant')}
+                >
+                  🍽️ Ristoranti
                 </button>
               </div>
-            )}
+            </div>
+
+            {/* Places List */}
+            <div className="places-list">
+              {filteredPlaces.length > 0 ? (
+                filteredPlaces.map((place, index) => (
+                  <div key={place.id || index} className="place-card-selectable">
+                    <div className="place-info">
+                      <div className="place-name">{place.name}</div>
+                      <div className="place-address">{place.address}</div>
+                      <div className="place-meta">
+                        {place.rating && (
+                          <span className="rating">⭐ {place.rating}</span>
+                        )}
+                        {place.distance && (
+                          <span className="distance">
+                            📍 {place.distance < 1000 
+                              ? `${Math.round(place.distance)}m`
+                              : `${(place.distance / 1000).toFixed(1)}km`
+                            }
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <button 
+                      className="btn-select-place"
+                      onClick={() => handleLocationSelect(place)}
+                    >
+                      Seleziona
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <div className="no-places">
+                  <div className="no-places-icon">🔍</div>
+                  <div className="no-places-text">
+                    Nessun luogo trovato
+                  </div>
+                  <div className="no-places-subtext">
+                    Prova a cambiare i filtri di ricerca
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-
-          {/* Orario suggerito */}
-          <div className="invite-time-section">
-            <h4>🕒 Quando? (opzionale)</h4>
-            <input
-              type="datetime-local"
-              value={suggestedTime}
-              onChange={(e) => setSuggestedTime(e.target.value)}
-              min={new Date().toISOString().slice(0, 16)}
-              className="time-input"
-              placeholder="Scegli un orario"
-            />
-          </div>
-
-          {/* Messaggio personalizzato */}
-          <div className="invite-message-section">
-            <h4>💬 Messaggio (opzionale)</h4>
-            <textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder="Scrivi un messaggio per il tuo invito..."
-              className="message-textarea"
-              maxLength={200}
-              rows={3}
-            />
-            <div className="character-count">{message.length}/200</div>
-          </div>
-        </div>
-
-        {/* Azioni */}
-        <div className="invite-modal-actions">
-          <button className="btn-cancel" onClick={onClose}>
-            Annulla
-          </button>
-          <button 
-            className="btn-send-invite" 
-            onClick={handleSendInvite}
-            disabled={!selectedPlace || !selectedUser?.isLive}
-          >
-            {selectedUser?.isLive ? '🚀 Invia invito' : '⚫ Utente offline'}
-          </button>
-        </div>
-
-        {/* Stili CSS inline per semplicità */}
-        <style jsx>{`
-          .invite-modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(8px);
-            z-index: 2000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-          }
-
-          .invite-modal {
-            background: rgba(255, 255, 255, 0.98);
-            backdrop-filter: blur(20px);
-            border-radius: 24px;
-            overflow: hidden;
-            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            max-width: 480px;
-            width: 100%;
-            max-height: 90vh;
-          }
-
-          .invite-modal-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px 24px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-          }
-
-          .invite-modal-header h3 {
-            margin: 0;
-            font-size: 18px;
-            font-weight: 700;
-          }
-
-          .btn-close-modal {
-            background: rgba(255, 255, 255, 0.2);
-            border: none;
-            color: white;
-            width: 32px;
-            height: 32px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: all 0.3s ease;
-          }
-
-          .btn-close-modal:hover {
-            background: rgba(255, 255, 255, 0.3);
-          }
-
-          .invite-modal-content {
-            padding: 24px;
-            max-height: 60vh;
-            overflow-y: auto;
-          }
-
-          .invite-user-info {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            padding: 16px;
-            background: rgba(102, 126, 234, 0.05);
-            border-radius: 16px;
-            margin-bottom: 24px;
-          }
-
-          .invite-user-avatar {
-            position: relative;
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            overflow: hidden;
-            border: 3px solid rgba(102, 126, 234, 0.2);
-          }
-
-          .invite-user-avatar img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-          }
-
-          .avatar-placeholder {
-            width: 100%;
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            font-weight: 600;
-            font-size: 16px;
-          }
-
-          .status-indicator {
-            position: absolute;
-            bottom: 2px;
-            right: 2px;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            border: 2px solid white;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-          }
-
-          .invite-user-name {
-            font-weight: 700;
-            font-size: 16px;
-            color: #1f2937;
-            margin-bottom: 4px;
-          }
-
-          .invite-user-status {
-            font-size: 13px;
-            font-weight: 500;
-            margin-bottom: 2px;
-          }
-
-          .invite-user-distance {
-            font-size: 12px;
-            color: #6b7280;
-          }
-
-          .invite-place-section,
-          .invite-time-section,
-          .invite-message-section {
-            margin-bottom: 24px;
-          }
-
-          .invite-place-section h4,
-          .invite-time-section h4,
-          .invite-message-section h4 {
-            font-size: 14px;
-            font-weight: 600;
-            color: #374151;
-            margin-bottom: 12px;
-          }
-
-          .btn-select-place {
-            width: 100%;
-            padding: 16px;
-            border: 2px dashed #d1d5db;
-            border-radius: 12px;
-            background: rgba(249, 250, 251, 0.8);
-            color: #6b7280;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-size: 14px;
-          }
-
-          .btn-select-place:hover:not(:disabled) {
-            border-color: #667eea;
-            background: rgba(102, 126, 234, 0.05);
-            color: #667eea;
-          }
-
-          .btn-select-place:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-          }
-
-          .selected-place-info {
-            background: rgba(34, 197, 94, 0.05);
-            border: 1px solid rgba(34, 197, 94, 0.2);
-            border-radius: 12px;
-            padding: 16px;
-          }
-
-          .place-header {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 12px;
-          }
-
-          .place-emoji {
-            font-size: 24px;
-          }
-
-          .place-name {
-            font-weight: 600;
-            color: #1f2937;
-            margin-bottom: 4px;
-          }
-
-          .place-address {
-            font-size: 13px;
-            color: #6b7280;
-          }
-
-          .btn-change-place {
-            background: rgba(102, 126, 234, 0.1);
-            color: #667eea;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-size: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-          }
-
-          .btn-change-place:hover {
-            background: rgba(102, 126, 234, 0.2);
-          }
-
-          .time-input {
-            width: 100%;
-            padding: 12px 16px;
-            border: 1px solid #d1d5db;
-            border-radius: 12px;
-            font-size: 14px;
-            background: rgba(255, 255, 255, 0.8);
-            transition: all 0.3s ease;
-          }
-
-          .time-input:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-          }
-
-          .message-textarea {
-            width: 100%;
-            padding: 12px 16px;
-            border: 1px solid #d1d5db;
-            border-radius: 12px;
-            font-size: 14px;
-            font-family: inherit;
-            background: rgba(255, 255, 255, 0.8);
-            resize: vertical;
-            transition: all 0.3s ease;
-          }
-
-          .message-textarea:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-          }
-
-          .character-count {
-            text-align: right;
-            font-size: 12px;
-            color: #9ca3af;
-            margin-top: 4px;
-          }
-
-          .invite-modal-actions {
-            padding: 20px 24px;
-            background: rgba(249, 250, 251, 0.8);
-            border-top: 1px solid rgba(229, 231, 235, 0.5);
-            display: flex;
-            gap: 12px;
-            justify-content: flex-end;
-          }
-
-          .btn-cancel {
-            padding: 12px 24px;
-            border: 1px solid #d1d5db;
-            border-radius: 12px;
-            background: rgba(255, 255, 255, 0.8);
-            color: #6b7280;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-          }
-
-          .btn-cancel:hover {
-            background: rgba(243, 244, 246, 0.8);
-            border-color: #9ca3af;
-          }
-
-          .btn-send-invite {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 12px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-          }
-
-          .btn-send-invite:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
-          }
-
-          .btn-send-invite:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-            background: #9ca3af;
-          }
-
-          /* Responsive */
-          @media (max-width: 768px) {
-            .invite-modal {
-              margin: 10px;
-              max-width: none;
-              border-radius: 20px;
-            }
-            
-            .invite-modal-header {
-              padding: 16px 20px;
-            }
-            
-            .invite-modal-content {
-              padding: 20px;
-            }
-            
-            .invite-modal-actions {
-              padding: 16px 20px;
-              flex-direction: column;
-            }
-            
-            .btn-cancel,
-            .btn-send-invite {
-              width: 100%;
-              justify-content: center;
-            }
-          }
-        `}</style>
+        )}
       </div>
     </div>
   );

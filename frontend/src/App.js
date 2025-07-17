@@ -17,6 +17,7 @@ import PeopleDiscoveryPanel from './components/PeopleDiscoveryPanel';
 import UserMarker from './components/UserMarker';
 import UserInfoCard from './components/UserInfoCard';
 import InviteModal from './components/InviteModal';
+import InvitationsInCorsoButton from './components/InvitationsInCorsoButton';
 
 import './styles/App.css';
 
@@ -89,6 +90,10 @@ function MapApp() {
   const [isSelectingPlace, setIsSelectingPlace] = useState(false);
   const [invitationLoading, setInvitationLoading] = useState(false);
 
+  // NEW: Invitations in Corso states
+  const [showInvitationsInCorso, setShowInvitationsInCorso] = useState(false);
+  const [activeInvitations, setActiveInvitations] = useState([]);
+
   // ENHANCED AUTHENTICATION
   const [authToken, setAuthToken] = useState(null);
   const [authUser, setAuthUser] = useState(null);
@@ -125,6 +130,11 @@ function MapApp() {
     searchRadius, 
     cafeType
   );
+
+  // NEW: Handler for invitations toggle
+  const handleInvitationsToggle = () => {
+    setShowInvitationsInCorso(!showInvitationsInCorso);
+  };
 
   // ENHANCED: Authentication initialization with better token management
   useEffect(() => {
@@ -539,30 +549,44 @@ function MapApp() {
           'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({
-          toUserId: inviteData.user.userId || inviteData.user.id,
+          toUserId: inviteData.toUser.userId || inviteData.toUser.id,
           placeId: inviteData.place.id,
           placeName: inviteData.place.name,
           placeAddress: inviteData.place.address,
           message: inviteData.message,
-          meetupTime: inviteData.suggestedTime
+          meetupTime: `${inviteData.date} ${inviteData.time}:00`
         })
       });
       
       if (response.ok) {
         const data = await response.json();
-        alert(data.message || 'Invitation sent successfully! ☕');
+        alert(data.message || 'Invito inviato con successo! ☕');
+        
+        // Add to active invitations
+        const newInvitation = {
+          id: data.inviteId || Date.now(),
+          toUser: inviteData.toUser,
+          place: inviteData.place,
+          date: inviteData.date,
+          time: inviteData.time,
+          message: inviteData.message,
+          status: 'pending',
+          createdAt: new Date()
+        };
+        setActiveInvitations(prev => [...prev, newInvitation]);
         
         // Reset states
         setShowInviteModal(false);
         setInviteSelectedUser(null);
         setInviteSelectedPlace(null);
+        setShowInvitationsInCorso(false);
       } else {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to send invitation');
       }
     } catch (error) {
       console.error('❌ Error sending invitation:', error);
-      alert(`Error sending invitation: ${error.message}`);
+      alert(`Errore nell'invio dell'invito: ${error.message}`);
     } finally {
       setInvitationLoading(false);
     }
@@ -1133,21 +1157,32 @@ function MapApp() {
         />
       )}
 
-      {/* ENHANCED: Invite modal */}
+      {/* ENHANCED: Invite modal with enhanced props */}
       {showInviteModal && (
         <InviteModal
           visible={showInviteModal}
           selectedUser={inviteSelectedUser}
-          selectedPlace={inviteSelectedPlace}
           onClose={() => {
             setShowInviteModal(false);
             setInviteSelectedUser(null);
             setInviteSelectedPlace(null);
             setIsSelectingPlace(false);
+            setShowInvitationsInCorso(false); // Close invitations panel when modal closes
           }}
           onSendInvite={handleSendInvite}
-          onSelectPlace={handleSelectPlace}
-          isLoading={invitationLoading}
+          userLocation={userLocation}
+          cafes={cafes} // Pass cafes data to modal
+          onRefreshPlaces={refetchCafes} // Pass refresh function
+        />
+      )}
+
+      {/* ENHANCED: Invitations In Corso Button - Show when invite modal is open */}
+      {(showInviteModal && inviteSelectedUser) && (
+        <InvitationsInCorsoButton
+          visible={true}
+          onToggle={handleInvitationsToggle}
+          invitationsCount={activeInvitations.length}
+          isExpanded={showInvitationsInCorso}
         />
       )}
 
@@ -1247,6 +1282,7 @@ function MapApp() {
           <div>Selecting: {isSelectingPlace ? 'Place' : 'Normal'}</div>
           <div>Auth: {authToken ? '✅' : '❌'}</div>
           <div>User: {authUser?.firstName || 'None'}</div>
+          <div>Invitations: {activeInvitations.length}</div>
           {userDiscoveryStats && (
             <div>Stats: {userDiscoveryStats.platform?.online_now || 0} online</div>
           )}
