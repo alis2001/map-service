@@ -17,17 +17,19 @@ router.get('/nearby', async (req, res) => {
       return res.status(400).json({ error: 'Latitude and longitude required' });
     }
 
-    // Get users within radius using Haversine formula
+    // Get users within radius using Haversine formula - FIXED TO USE user_profiles
     const nearbyUsers = await prisma.$queryRaw`
       SELECT 
         ull.*,
-        cu.firstName,
-        cu.lastName,
-        cu.username,
-        cu.profilePic,
-        cu.bio,
-        cup.interests,
-        cup.ageRange,
+        up.firstName,
+        up.lastName,
+        up.username,
+        up.profilePic,
+        up.bio,
+        up.interests,
+        up.ageRange,
+        up.coffeePersonality,
+        up.conversationTopics,
         (
           6371000 * acos(
             cos(radians(${parseFloat(latitude)})) * 
@@ -38,8 +40,7 @@ router.get('/nearby', async (req, res) => {
           )
         ) AS distance
       FROM user_live_locations ull
-      JOIN caffis_users cu ON ull.userId = cu.id
-      LEFT JOIN caffis_user_preferences cup ON cu.id = cup.userId
+      JOIN user_profiles up ON ull.userId = up.userId
       WHERE ull.isLive = true 
         AND ull.userId != ${userId}
         AND ull.shareRadius >= (
@@ -60,6 +61,7 @@ router.get('/nearby', async (req, res) => {
     const formattedUsers = nearbyUsers.map(user => ({
       ...user,
       interests: user.interests ? JSON.parse(user.interests) : [],
+      conversationTopics: user.conversationTopics ? JSON.parse(user.conversationTopics) : [],
       distance: Math.round(user.distance),
       status: getUserStatus(user.lastSeen),
       isLive: user.isLive
@@ -128,44 +130,44 @@ router.post('/location/update', async (req, res) => {
   }
 });
 
-// Get user profile details for card display
+// Get user profile details for card display - FIXED TO USE user_profiles
 router.get('/:userId/profile', async (req, res) => {
   try {
     const { userId } = req.params;
     const currentUserId = req.user.id;
 
-    // Get user profile with preferences
+    // Get user profile - FIXED TO USE user_profiles table
     const userProfile = await prisma.$queryRaw`
       SELECT 
-        cu.id,
-        cu.firstName,
-        cu.lastName,
-        cu.username,
-        cu.profilePic,
-        cu.bio,
-        cu.createdAt,
-        cup.interests,
-        cup.ageRange,
-        cup.relationshipGoals,
-        cup.activities,
+        up.userId as id,
+        up.firstName,
+        up.lastName,
+        up.username,
+        up.profilePic,
+        up.bio,
+        up.createdAt,
+        up.interests,
+        up.ageRange,
+        up.coffeePersonality,
+        up.conversationTopics,
+        up.socialGoals,
         ull.lastSeen,
         ull.isLive,
         ull.city
-      FROM caffis_users cu
-      LEFT JOIN caffis_user_preferences cup ON cu.id = cup.userId
-      LEFT JOIN user_live_locations ull ON cu.id = ull.userId
-      WHERE cu.id = ${userId}
+      FROM user_profiles up
+      LEFT JOIN user_live_locations ull ON up.userId = ull.userId
+      WHERE up.userId = ${userId}
     `;
 
     if (!userProfile.length) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Check if users have common interests
+    // Check if users have common interests - FIXED TO USE user_profiles
     const currentUser = await prisma.$queryRaw`
-      SELECT cup.interests
-      FROM caffis_user_preferences cup
-      WHERE cup.userId = ${currentUserId}
+      SELECT up.interests
+      FROM user_profiles up
+      WHERE up.userId = ${currentUserId}
     `;
 
     const profile = userProfile[0];
@@ -185,7 +187,7 @@ router.get('/:userId/profile', async (req, res) => {
       profile: {
         ...profile,
         interests: JSON.parse(profile.interests || '[]'),
-        activities: JSON.parse(profile.activities || '[]'),
+        conversationTopics: JSON.parse(profile.conversationTopics || '[]'),
         commonInterests,
         status: getUserStatus(profile.lastSeen),
         isOnline: profile.isLive && getUserStatus(profile.lastSeen) !== 'offline'
@@ -265,7 +267,7 @@ router.get('/cities', async (req, res) => {
   }
 });
 
-// Dynamic city-based user discovery (enhanced version of /nearby)
+// Dynamic city-based user discovery - FIXED TO USE user_profiles
 router.get('/by-city', async (req, res) => {
   try {
     const { city, lat, lng, radius = 15000, limit = 50 } = req.query;
@@ -340,19 +342,19 @@ router.get('/by-city', async (req, res) => {
       console.warn('Cache read failed:', cacheError.message);
     }
     
-    // Dynamic user discovery with location-based queries (enhanced version of existing nearby logic)
+    // Dynamic user discovery - FIXED TO USE user_profiles table
     const nearbyUsers = await prisma.$queryRaw`
       SELECT 
         ull.*,
-        cu.firstName,
-        cu.lastName,
-        cu.username,
-        cu.profilePic,
-        cu.bio,
-        cup.interests,
-        cup.ageRange,
-        cup.coffeePersonality,
-        cup.conversationTopics,
+        up.firstName,
+        up.lastName,
+        up.username,
+        up.profilePic,
+        up.bio,
+        up.interests,
+        up.ageRange,
+        up.coffeePersonality,
+        up.conversationTopics,
         (
           6371000 * acos(
             cos(radians(${cityCoordinates.lat})) * 
@@ -363,8 +365,7 @@ router.get('/by-city', async (req, res) => {
           )
         ) AS distance
       FROM user_live_locations ull
-      JOIN caffis_users cu ON ull.userId = cu.id
-      LEFT JOIN caffis_user_preferences cup ON cu.id = cup.userId
+      JOIN user_profiles up ON ull.userId = up.userId
       WHERE ull.isLive = true 
         AND ull.userId != ${userId}
         AND ull.lastSeen > NOW() - INTERVAL '30 minutes'
@@ -526,7 +527,7 @@ router.post('/location/update-with-city', async (req, res) => {
   }
 });
 
-// Sync user profile from main app (enhanced with user_profiles table support)
+// ENHANCED: Sync user profile from main app - Include all preferences
 router.post('/sync-profile', async (req, res) => {
   try {
     const userId = req.user.id;
@@ -540,12 +541,20 @@ router.post('/sync-profile', async (req, res) => {
       ageRange,
       coffeePersonality,
       conversationTopics,
-      socialGoals 
+      socialGoals,
+      // NEW: Additional preferences
+      socialEnergy,
+      groupPreference,
+      locationPreference,
+      meetingFrequency,
+      timePreference,
+      createdAt,
+      onboardingCompleted
     } = req.body;
     
-    console.log(`👤 Syncing profile for user ${firstName} ${lastName}`);
+    console.log(`👤 Syncing enhanced profile for user ${firstName} ${lastName}`);
     
-    // Try to sync to user_profiles table if it exists
+    // Sync to user_profiles table with all preferences
     try {
       await prisma.userProfile.upsert({
         where: { userId },
@@ -560,6 +569,14 @@ router.post('/sync-profile', async (req, res) => {
           coffeePersonality,
           conversationTopics: conversationTopics ? JSON.stringify(conversationTopics) : null,
           socialGoals,
+          // NEW: Store additional preferences
+          socialEnergy,
+          groupPreference,
+          locationPreference,
+          meetingFrequency,
+          timePreference,
+          registeredAt: createdAt ? new Date(createdAt) : null,
+          onboardingCompleted: onboardingCompleted || false,
           lastUpdated: new Date()
         },
         create: {
@@ -573,15 +590,23 @@ router.post('/sync-profile', async (req, res) => {
           ageRange,
           coffeePersonality,
           conversationTopics: conversationTopics ? JSON.stringify(conversationTopics) : null,
-          socialGoals
+          socialGoals,
+          // NEW: Store additional preferences on create
+          socialEnergy,
+          groupPreference,
+          locationPreference,
+          meetingFrequency,
+          timePreference,
+          registeredAt: createdAt ? new Date(createdAt) : new Date(),
+          onboardingCompleted: onboardingCompleted || false
         }
       });
       
-      console.log(`✅ Profile synced successfully for ${firstName} ${lastName}`);
+      console.log(`✅ Enhanced profile synced successfully for ${firstName} ${lastName}`);
       
       res.json({ 
         success: true, 
-        message: 'Profile synced successfully',
+        message: 'Enhanced profile synced successfully',
         userId,
         profileData: {
           firstName,
@@ -593,35 +618,31 @@ router.post('/sync-profile', async (req, res) => {
           ageRange,
           coffeePersonality,
           conversationTopics,
-          socialGoals
+          socialGoals,
+          socialEnergy,
+          groupPreference,
+          locationPreference,
+          meetingFrequency,
+          timePreference,
+          registeredAt: createdAt,
+          onboardingCompleted
         }
       });
       
     } catch (tableError) {
-      console.warn('user_profiles table not available, acknowledging sync:', tableError.message);
+      console.warn('Enhanced sync failed:', tableError.message);
       
       res.json({ 
         success: true, 
-        message: 'Profile sync acknowledged (user_profiles table not yet implemented)',
+        message: 'Profile sync acknowledged (enhanced fields not yet implemented)',
         userId,
-        data: {
-          firstName,
-          lastName,
-          username,
-          bio,
-          profilePic,
-          interests,
-          ageRange,
-          coffeePersonality,
-          conversationTopics,
-          socialGoals
-        }
+        data: { firstName, lastName, username, bio }
       });
     }
     
   } catch (error) {
-    console.error('Error syncing user profile:', error);
-    res.status(500).json({ error: 'Failed to sync profile' });
+    console.error('Error syncing enhanced user profile:', error);
+    res.status(500).json({ error: 'Failed to sync enhanced profile' });
   }
 });
 
@@ -727,6 +748,25 @@ router.get('/cities/active', async (req, res) => {
   }
 });
 
+// Get current user profile (REQUIRED by frontend)
+router.get('/profile', async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    res.json({
+      success: true,
+      user: {
+        id: userId,
+        firstName: req.user.firstName || '',
+        lastName: req.user.lastName || ''
+      }
+    });
+  } catch (error) {
+    console.error('Error getting profile:', error);
+    res.status(500).json({ error: 'Failed to get profile' });
+  }
+});
+
 // =============== HELPER FUNCTIONS ===============
 
 // Helper function to determine user status based on last seen time
@@ -770,78 +810,3 @@ async function getCityUserCount(lat, lng, radius = 15000) {
 }
 
 module.exports = router;
-// Get current user profile (REQUIRED by frontend)
-router.get('/profile', async (req, res) => {
-  try {
-    const userId = req.user.id;
-    
-    res.json({
-      success: true,
-      user: {
-        id: userId,
-        firstName: req.user.firstName || '',
-        lastName: req.user.lastName || ''
-      }
-    });
-  } catch (error) {
-    console.error('Error getting profile:', error);
-    res.status(500).json({ error: 'Failed to get profile' });
-  }
-});
-
-// Get dynamic cities with active users (USES EXISTING searchService)
-router.get('/cities', async (req, res) => {
-  try {
-    const { q: query, limit = 10 } = req.query;
-    
-    if (query) {
-      // Use existing searchService for dynamic city search
-      const searchService = require('../services/searchService');
-      const cities = await searchService.searchCities(query, parseInt(limit));
-      
-      // Add real user counts for each city
-      const citiesWithUsers = await Promise.all(cities.map(async (city) => {
-        const userCount = await getCityUserCount(city.coordinates.lat, city.coordinates.lng);
-        return {
-          ...city,
-          userCount,
-          onlineNow: Math.floor(userCount * 0.3) // Estimate 30% online
-        };
-      }));
-      
-      res.json({
-        success: true,
-        cities: citiesWithUsers,
-        count: citiesWithUsers.length
-      });
-    } else {
-      // Return cities with most active users
-      const activeCities = await prisma.$queryRaw`
-        SELECT 
-          city,
-          COUNT(*) as user_count,
-          COUNT(CASE WHEN "lastSeen" > NOW() - INTERVAL '30 minutes' THEN 1 END) as online_now
-        FROM user_live_locations 
-        WHERE "isLive" = true AND city != 'unknown'
-        GROUP BY city 
-        ORDER BY user_count DESC 
-        LIMIT ${parseInt(limit)}
-      `;
-      
-      res.json({
-        success: true,
-        cities: activeCities.map(city => ({
-          name: city.city,
-          displayName: city.city.charAt(0).toUpperCase() + city.city.slice(1),
-          userCount: parseInt(city.user_count),
-          onlineNow: parseInt(city.online_now)
-        })),
-        count: activeCities.length
-      });
-    }
-  } catch (error) {
-    console.error('Error getting cities:', error);
-    res.status(500).json({ error: 'Failed to get cities' });
-  }
-});
-

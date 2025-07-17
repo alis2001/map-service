@@ -25,12 +25,12 @@ router.post('/send', async (req, res) => {
       });
     }
 
-    // Controlla se l'utente di destinazione esiste ed è online
+    // Controlla se l'utente di destinazione esiste ed è online - FIXED TO USE user_profiles
     const targetUser = await prisma.$queryRaw`
-      SELECT cu.id, cu.firstName, ull.isLive
-      FROM caffis_users cu
-      LEFT JOIN user_live_locations ull ON cu.id = ull.userId
-      WHERE cu.id = ${toUserId}
+      SELECT up.userId as id, up.firstName, ull.isLive
+      FROM user_profiles up
+      LEFT JOIN user_live_locations ull ON up.userId = ull.userId
+      WHERE up.userId = ${toUserId}
     `;
 
     if (!targetUser.length) {
@@ -52,14 +52,18 @@ router.post('/send', async (req, res) => {
     });
 
     // Cache dell'invito per notifiche in tempo reale
-    await redis.setex(
-      `invite:${invite.id}`, 
-      86400, // 24 ore
-      JSON.stringify(invite)
-    );
+    try {
+      await redis.setex(
+        `invite:${invite.id}`, 
+        86400, // 24 ore
+        JSON.stringify(invite)
+      );
 
-    // Aggiungi alla lista degli inviti in sospeso dell'utente
-    await redis.sadd(`user_invites:${toUserId}`, invite.id);
+      // Aggiungi alla lista degli inviti in sospeso dell'utente
+      await redis.sadd(`user_invites:${toUserId}`, invite.id);
+    } catch (cacheError) {
+      console.warn('Cache write failed:', cacheError.message);
+    }
 
     res.json({ 
       success: true, 
@@ -73,7 +77,7 @@ router.post('/send', async (req, res) => {
   }
 });
 
-// Ottieni inviti ricevuti per un utente
+// Ottieni inviti ricevuti per un utente - FIXED TO USE user_profiles
 router.get('/received', async (req, res) => {
   try {
     const userId = req.user.id;
@@ -82,12 +86,12 @@ router.get('/received', async (req, res) => {
     const invites = await prisma.$queryRaw`
       SELECT 
         mi.*,
-        cu.firstName as fromFirstName,
-        cu.lastName as fromLastName,
-        cu.username as fromUsername,
-        cu.profilePic as fromProfilePic
+        up.firstName as fromFirstName,
+        up.lastName as fromLastName,
+        up.username as fromUsername,
+        up.profilePic as fromProfilePic
       FROM meetup_invites mi
-      JOIN caffis_users cu ON mi.fromUserId = cu.id
+      JOIN user_profiles up ON mi.fromUserId = up.userId
       WHERE mi.toUserId = ${userId}
         AND mi.status = ${status}
       ORDER BY mi.createdAt DESC
@@ -107,7 +111,7 @@ router.get('/received', async (req, res) => {
   }
 });
 
-// Ottieni inviti inviati per un utente
+// Ottieni inviti inviati per un utente - FIXED TO USE user_profiles
 router.get('/sent', async (req, res) => {
   try {
     const userId = req.user.id;
@@ -116,12 +120,12 @@ router.get('/sent', async (req, res) => {
     const invites = await prisma.$queryRaw`
       SELECT 
         mi.*,
-        cu.firstName as toFirstName,
-        cu.lastName as toLastName,
-        cu.username as toUsername,
-        cu.profilePic as toProfilePic
+        up.firstName as toFirstName,
+        up.lastName as toLastName,
+        up.username as toUsername,
+        up.profilePic as toProfilePic
       FROM meetup_invites mi
-      JOIN caffis_users cu ON mi.toUserId = cu.id
+      JOIN user_profiles up ON mi.toUserId = up.userId
       WHERE mi.fromUserId = ${userId}
         AND mi.status = ${status}
       ORDER BY mi.createdAt DESC
@@ -180,20 +184,24 @@ router.patch('/:inviteId/respond', async (req, res) => {
     });
 
     // Aggiorna la cache
-    await redis.setex(
-      `invite:${inviteId}`, 
-      86400,
-      JSON.stringify(updatedInvite)
-    );
+    try {
+      await redis.setex(
+        `invite:${inviteId}`, 
+        86400,
+        JSON.stringify(updatedInvite)
+      );
 
-    // Rimuovi dagli inviti in sospeso se rifiutato
-    if (status === 'DECLINED') {
-      await redis.srem(`user_invites:${userId}`, inviteId);
+      // Rimuovi dagli inviti in sospeso se rifiutato
+      if (status === 'DECLINED') {
+        await redis.srem(`user_invites:${userId}`, inviteId);
+      }
+    } catch (cacheError) {
+      console.warn('Cache update failed:', cacheError.message);
     }
 
     const responseMessage = status === 'ACCEPTED' ? 
-      'Invito accettato! Incontro confermato. 🎉' : 
-      'Invito rifiutato. 😔';
+      'Invito accettato! Buon caffè! ☕' : 
+      'Invito rifiutato';
 
     res.json({ 
       success: true, 
@@ -207,64 +215,72 @@ router.patch('/:inviteId/respond', async (req, res) => {
   }
 });
 
-// Annulla un invito inviato
-router.delete('/:inviteId/cancel', async (req, res) => {
+// Cancella un invito (solo da chi l'ha creato)
+router.delete('/:inviteId', async (req, res) => {
   try {
     const { inviteId } = req.params;
     const userId = req.user.id;
 
-    const invite = await prisma.meetupInvite.updateMany({
+    // Cancella solo se l'utente è il creatore
+    const deletedInvite = await prisma.meetupInvite.deleteMany({
       where: {
         id: inviteId,
         fromUserId: userId,
         status: 'PENDING'
-      },
-      data: {
-        status: 'CANCELLED',
-        updatedAt: new Date()
       }
     });
 
-    if (invite.count === 0) {
+    if (deletedInvite.count === 0) {
       return res.status(404).json({ 
-        error: 'Invito non trovato o non può essere annullato' 
+        error: 'Invito non trovato o non puoi cancellarlo' 
       });
     }
 
-    // Pulisci la cache
-    await redis.del(`invite:${inviteId}`);
+    // Rimuovi dalla cache
+    try {
+      await redis.del(`invite:${inviteId}`);
+    } catch (cacheError) {
+      console.warn('Cache deletion failed:', cacheError.message);
+    }
 
     res.json({ 
       success: true, 
-      message: 'Invito annullato con successo ❌' 
+      message: 'Invito cancellato con successo' 
     });
 
   } catch (error) {
-    console.error('Errore nell\'annullamento dell\'invito:', error);
-    res.status(500).json({ error: 'Impossibile annullare l\'invito' });
+    console.error('Errore nella cancellazione dell\'invito:', error);
+    res.status(500).json({ error: 'Impossibile cancellare l\'invito' });
   }
 });
 
-// Ottieni statistiche degli inviti per la dashboard
+// Ottieni statistiche degli inviti per un utente
 router.get('/stats', async (req, res) => {
   try {
     const userId = req.user.id;
 
     const stats = await prisma.$queryRaw`
       SELECT 
-        COUNT(CASE WHEN fromUserId = ${userId} AND status = 'PENDING' THEN 1 END) as inviiInSospeso,
-        COUNT(CASE WHEN toUserId = ${userId} AND status = 'PENDING' THEN 1 END) as ricevutiInSospeso,
-        COUNT(CASE WHEN (fromUserId = ${userId} OR toUserId = ${userId}) AND status = 'ACCEPTED' THEN 1 END) as accettati,
-        COUNT(CASE WHEN fromUserId = ${userId} AND status = 'DECLINED' THEN 1 END) as rifiutati
+        COUNT(CASE WHEN fromUserId = ${userId} THEN 1 END) as sent_total,
+        COUNT(CASE WHEN toUserId = ${userId} THEN 1 END) as received_total,
+        COUNT(CASE WHEN fromUserId = ${userId} AND status = 'PENDING' THEN 1 END) as sent_pending,
+        COUNT(CASE WHEN toUserId = ${userId} AND status = 'PENDING' THEN 1 END) as received_pending,
+        COUNT(CASE WHEN fromUserId = ${userId} AND status = 'ACCEPTED' THEN 1 END) as sent_accepted,
+        COUNT(CASE WHEN toUserId = ${userId} AND status = 'ACCEPTED' THEN 1 END) as received_accepted
       FROM meetup_invites
-      WHERE (fromUserId = ${userId} OR toUserId = ${userId})
-        AND createdAt >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+      WHERE fromUserId = ${userId} OR toUserId = ${userId}
     `;
 
-    res.json({ 
-      success: true, 
-      stats: stats[0],
-      message: 'Statistiche inviti ultimi 30 giorni'
+    res.json({
+      success: true,
+      stats: stats[0] || {
+        sent_total: 0,
+        received_total: 0,
+        sent_pending: 0,
+        received_pending: 0,
+        sent_accepted: 0,
+        received_accepted: 0
+      }
     });
 
   } catch (error) {

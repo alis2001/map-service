@@ -41,7 +41,7 @@ model Place {
   @@map("places")
 }
 
-// Cache user profiles from main app for performance
+// Enhanced UserProfile model with all preferences
 model UserProfile {
   id          String   @id @default(cuid())
   userId      String   @unique
@@ -55,6 +55,16 @@ model UserProfile {
   coffeePersonality String?
   conversationTopics String?
   socialGoals String?
+  
+  // NEW: Additional preference fields
+  socialEnergy        String?
+  groupPreference     String?
+  locationPreference  String?
+  meetingFrequency    String?
+  timePreference      String?
+  registeredAt        DateTime?  // When user registered in main app
+  onboardingCompleted Boolean   @default(false)
+  
   city        String?  // User's primary city
   isActive    Boolean  @default(true)
   lastUpdated DateTime @default(now())
@@ -63,6 +73,7 @@ model UserProfile {
   @@index([city])
   @@index([isActive])
   @@index([lastUpdated])
+  @@index([registeredAt])
   @@map("user_profiles")
 }
 

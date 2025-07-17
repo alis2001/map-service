@@ -158,9 +158,11 @@ function MapApp() {
     initializeAuth();
   }, []);
 
-  // ENHANCED: Sync user profile to map service
-  const syncProfileToMapService = useCallback(async (userProfile, syncReason = 'update') => {
-    if (!authToken || !userProfile) {
+  // ENHANCED: Sync user profile to map service - Include preferences and registration date
+  const syncProfileToMapService = useCallback(async (userProfile, syncReason = 'update', tokenOverride = null) => {
+    const tokenToUse = tokenOverride || authToken;
+    
+    if (!tokenToUse || !userProfile) {
       console.warn('⚠️ Cannot sync profile - missing token or profile data');
       return false;
     }
@@ -178,15 +180,23 @@ function MapApp() {
         ageRange: userProfile.ageRange || '',
         coffeePersonality: userProfile.coffeePersonality || '',
         conversationTopics: userProfile.conversationTopics || '',
-        socialGoals: userProfile.socialGoals || ''
+        socialGoals: userProfile.socialGoals || '',
+        // NEW: Include additional profile data
+        socialEnergy: userProfile.socialEnergy || '',
+        groupPreference: userProfile.groupPreference || '',
+        locationPreference: userProfile.locationPreference || '',
+        meetingFrequency: userProfile.meetingFrequency || '',
+        timePreference: userProfile.timePreference || '',
+        createdAt: userProfile.createdAt || new Date().toISOString(), // Registration date
+        onboardingCompleted: userProfile.onboardingCompleted || false
       };
       
-      console.log('📤 Sync data:', syncData);
+      console.log('📤 Enhanced sync data:', syncData);
       
       const response = await fetch(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001'}/api/v1/users/sync-profile`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${authToken}`,
+          'Authorization': `Bearer ${tokenToUse}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(syncData)
@@ -210,7 +220,7 @@ function MapApp() {
   // ENHANCED: User profile fetching
   const fetchUserProfile = useCallback(async (token) => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001'}/api/v1/users/profile`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/user/profile`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -222,8 +232,8 @@ function MapApp() {
         setAuthUser(data.user);
         console.log('👤 User profile loaded:', data.user.firstName);
         
-        // Automatically sync profile to map service on login
-        await syncProfileToMapService(data.user, 'login');
+        // Automatically sync profile to map service on login - Pass token directly
+        await syncProfileToMapService(data.user, 'login', token);
       } else {
         console.warn('⚠️ Failed to fetch user profile');
       }
