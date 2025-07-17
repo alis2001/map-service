@@ -471,27 +471,27 @@ const InviteModal = ({
                         // Determine display type and emoji
                         let displayType = 'Bar';
                         let emoji = '☕';
-                        let typeColor = '#F97316';
-                        
+                        let typeColor = '#F97316'; // Orange for cafes
+
                         if (placeType === 'restaurant' || 
                             placeName.includes('pizzeria') || placeName.includes('pizza') || 
                             placeName.includes('ristorante') || placeName.includes('osteria') ||
                             placeName.includes('trattoria')) {
                             displayType = 'Ristorante';
                             emoji = '🍽️';
-                            typeColor = '#EF4444';
+                            typeColor = '#EF4444';  // RED for all restaurants
                         } else if (placeName.includes('gelateria') || placeName.includes('gelato')) {
                             displayType = 'Gelateria';
                             emoji = '🍦';
-                            typeColor = '#FF6B9D';
+                            typeColor = '#EF4444';  // CHANGED: RED instead of pink
                         } else if (placeName.includes('pizzeria') || placeName.includes('pizza')) {
                             displayType = 'Pizzeria';
                             emoji = '🍕';
-                            typeColor = '#FF8C42';
+                            typeColor = '#EF4444';  // CHANGED: RED instead of orange
                         } else if (placeName.includes('pasticceria') || placeName.includes('dolc')) {
                             displayType = 'Pasticceria';
                             emoji = '🧁';
-                            typeColor = '#FF69B4';
+                            typeColor = '#EF4444';  // CHANGED: RED instead of pink
                         }
 
                         return (
@@ -556,16 +556,9 @@ const InviteModal = ({
                                 className="btn-select-place-enhanced"
                                 onClick={() => handleSelectPlaceFromList(cafe)}
                                 style={{
-                                background: `linear-gradient(135deg, ${typeColor}, ${typeColor}dd)`,
-                                boxShadow: `0 4px 12px ${typeColor}30`
-                                }}
-                                onMouseEnter={(e) => {
-                                e.target.style.transform = 'translateY(-1px)';
-                                e.target.style.boxShadow = `0 6px 20px ${typeColor}40`;
-                                }}
-                                onMouseLeave={(e) => {
-                                e.target.style.transform = 'translateY(0)';
-                                e.target.style.boxShadow = `0 4px 12px ${typeColor}30`;
+                                    background: `linear-gradient(135deg, ${typeColor}, ${typeColor}dd)`,
+                                    boxShadow: `0 4px 12px ${typeColor}30`,
+                                    cursor: 'default'
                                 }}
                             >
                                 <span>Seleziona</span>

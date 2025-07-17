@@ -5639,686 +5639,6 @@ html, body, #root {
     width: 100%;
   }
 }
-
-/* Enhanced CSS Styles for Location Selection Animation */
-/* Add these styles to your existing App.css */
-
-/* ============================================
-   INVITATION MODAL ENHANCED ANIMATIONS
-   ============================================ */
-
-.invitation-modal-backdrop {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  z-index: 2999;
-  pointer-events: none;
-}
-
-.invitation-modal-backdrop.visible {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.invitation-modal {
-  background: rgba(255, 255, 255, 0.98);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-radius: 24px;
-  padding: 0;
-  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  overflow: hidden;
-  opacity: 0;
-  transform: scale(0.95);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.invitation-modal.visible {
-  opacity: 1;
-  transform: scale(1);
-}
-
-/* Enhanced Modal Header */
-.invitation-modal-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 20px 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  position: relative;
-  overflow: hidden;
-}
-
-.invitation-modal-header::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
-  transition: left 0.6s ease;
-}
-
-.invitation-modal-header:hover::before {
-  left: 100%;
-}
-
-.invitation-modal-header h3 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 700;
-  z-index: 2;
-  position: relative;
-}
-
-.invitation-modal.minimized .invitation-modal-header h3 {
-  font-size: 14px;
-}
-
-.btn-expand {
-  background: rgba(255, 255, 255, 0.2);
-  border: none;
-  color: white;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s ease;
-  z-index: 2;
-  position: relative;
-}
-
-.btn-expand:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: scale(1.05);
-}
-
-.btn-close-modal {
-  background: rgba(255, 255, 255, 0.2);
-  border: none;
-  color: white;
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s ease;
-  z-index: 2;
-  position: relative;
-}
-
-.invitation-modal.minimized .btn-close-modal {
-  width: 28px;
-  height: 28px;
-}
-
-.btn-close-modal:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: scale(1.05);
-}
-
-/* Minimized Content */
-.minimized-content {
-  padding: 12px 16px;
-}
-
-.minimized-info {
-  text-align: center;
-}
-
-.minimized-text {
-  font-size: 12px;
-  color: #6b7280;
-  margin-bottom: 4px;
-}
-
-.minimized-selected {
-  font-size: 11px;
-  color: #10b981;
-  font-weight: 600;
-  padding: 2px 8px;
-  background: rgba(16, 185, 129, 0.1);
-  border-radius: 8px;
-  display: inline-block;
-}
-
-/* Form Content */
-.invitation-form {
-  padding: 24px;
-  max-height: 70vh;
-  overflow-y: auto;
-}
-
-/* User Info Section */
-.invite-user-info {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(255, 255, 255, 0.8) 100%);
-  border-radius: 16px;
-  margin-bottom: 24px;
-  border: 1px solid rgba(102, 126, 234, 0.1);
-}
-
-.invite-user-avatar {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  overflow: hidden;
-  border: 3px solid rgba(102, 126, 234, 0.2);
-  flex-shrink: 0;
-}
-
-.invite-user-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.avatar-placeholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  font-weight: 700;
-  font-size: 16px;
-}
-
-.invite-user-details {
-  flex: 1;
-}
-
-.invite-user-name {
-  font-weight: 700;
-  font-size: 16px;
-  color: #1f2937;
-  margin-bottom: 4px;
-}
-
-.invite-user-distance {
-  font-size: 13px;
-  color: #6b7280;
-  font-weight: 500;
-}
-
-/* Form Sections */
-.form-section {
-  margin-bottom: 20px;
-}
-
-.form-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #374151;
-  margin-bottom: 8px;
-}
-
-.form-label svg {
-  color: #667eea;
-}
-
-/* Location Select Button - Enhanced for animation feedback */
-.location-select-btn {
-  width: 100%;
-  padding: 16px;
-  border: 2px dashed #d1d5db;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.8);
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  text-align: left;
-  position: relative;
-  overflow: hidden;
-}
-
-.location-select-btn::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.1), transparent);
-  transition: left 0.5s ease;
-}
-
-.location-select-btn:hover::before {
-  left: 100%;
-}
-
-.location-select-btn:hover {
-  border-color: #667eea;
-  background: rgba(102, 126, 234, 0.05);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
-}
-
-.location-select-btn.selected {
-  border: 2px solid #667eea;
-  background: rgba(102, 126, 234, 0.05);
-}
-
-.location-select-btn.error {
-  border-color: #ef4444;
-  background: rgba(239, 68, 68, 0.05);
-}
-
-.selected-location {
-  flex: 1;
-  z-index: 2;
-  position: relative;
-}
-
-.location-name {
-  font-weight: 600;
-  color: #1f2937;
-  margin-bottom: 2px;
-}
-
-.location-address {
-  font-size: 13px;
-  color: #6b7280;
-}
-
-.placeholder {
-  color: #9ca3af;
-  font-weight: 500;
-  z-index: 2;
-  position: relative;
-}
-
-.location-icon {
-  color: #667eea;
-  flex-shrink: 0;
-  z-index: 2;
-  position: relative;
-}
-
-/* Form Inputs */
-.form-input, .form-textarea {
-  width: 100%;
-  padding: 12px 16px;
-  border: 2px solid #e5e7eb;
-  border-radius: 12px;
-  font-size: 14px;
-  transition: all 0.3s ease;
-  background: rgba(255, 255, 255, 0.8);
-  color: #1f2937;
-}
-
-.form-input:focus, .form-textarea:focus {
-  outline: none;
-  border-color: #667eea;
-  background: rgba(102, 126, 234, 0.05);
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-.form-input.error, .form-textarea.error {
-  border-color: #ef4444;
-  background: rgba(239, 68, 68, 0.05);
-}
-
-.form-textarea {
-  resize: vertical;
-  min-height: 100px;
-  font-family: inherit;
-}
-
-/* Dynamic text coloring as user types */
-.form-textarea:not(:placeholder-shown) {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(255, 255, 255, 0.9) 100%);
-  color: #667eea;
-  font-weight: 500;
-}
-
-/* Error Text */
-.error-text {
-  color: #ef4444;
-  font-size: 12px;
-  margin-top: 4px;
-  font-weight: 500;
-}
-
-/* Form Actions */
-.form-actions {
-  margin-top: 32px;
-  padding-top: 20px;
-  border-top: 1px solid rgba(0, 0, 0, 0.05);
-}
-
-.btn-send-invite {
-  width: 100%;
-  padding: 16px 24px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border: none;
-  border-radius: 16px;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  position: relative;
-  overflow: hidden;
-}
-
-.btn-send-invite::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-  transition: left 0.5s ease;
-}
-
-.btn-send-invite:hover::before {
-  left: 100%;
-}
-
-.btn-send-invite:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
-}
-
-.btn-send-invite:active {
-  transform: translateY(0);
-}
-
-/* ============================================
-   LOCATION SELECTION PANEL
-   ============================================ */
-
-.location-selection {
-  height: 70vh;
-  display: flex;
-  flex-direction: column;
-}
-
-/* Search Header - Horizontal Layout */
-.search-header {
-  padding: 16px 24px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-  background: rgba(255, 255, 255, 0.8);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.search-input-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.search-icon {
-  position: absolute;
-  left: 12px;
-  color: #6b7280;
-  z-index: 2;
-}
-
-.search-input-horizontal {
-  width: 100%;
-  padding: 12px 12px 12px 40px;
-  border: 2px solid #e5e7eb;
-  border-radius: 12px;
-  font-size: 14px;
-  transition: all 0.3s ease;
-  background: rgba(255, 255, 255, 0.9);
-}
-
-.search-input-horizontal:focus {
-  outline: none;
-  border-color: #667eea;
-  background: rgba(102, 126, 234, 0.05);
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-.filter-buttons {
-  display: flex;
-  gap: 8px;
-}
-
-.filter-btn {
-  padding: 8px 16px;
-  border: 2px solid #e5e7eb;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.8);
-  color: #6b7280;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.filter-btn.active {
-  border-color: #667eea;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-}
-
-.filter-btn:hover:not(.active) {
-  border-color: #667eea;
-  color: #667eea;
-}
-
-/* Places List */
-.places-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px 24px;
-}
-
-.place-card-selectable {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px;
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  border-radius: 16px;
-  margin-bottom: 12px;
-  background: rgba(255, 255, 255, 0.8);
-  transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
-}
-
-.place-card-selectable::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.05), transparent);
-  transition: left 0.5s ease;
-}
-
-.place-card-selectable:hover::before {
-  left: 100%;
-}
-
-.place-card-selectable:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-  border-color: rgba(102, 126, 234, 0.2);
-}
-
-.place-info {
-  flex: 1;
-  z-index: 2;
-  position: relative;
-}
-
-.place-name {
-  font-weight: 600;
-  color: #1f2937;
-  margin-bottom: 4px;
-  font-size: 15px;
-}
-
-.place-address {
-  color: #6b7280;
-  font-size: 13px;
-  margin-bottom: 6px;
-}
-
-.place-meta {
-  display: flex;
-  gap: 12px;
-  font-size: 12px;
-}
-
-.rating {
-  color: #f59e0b;
-  font-weight: 500;
-}
-
-.distance {
-  color: #6b7280;
-  font-weight: 500;
-}
-
-.btn-select-place {
-  padding: 8px 16px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  flex-shrink: 0;
-  z-index: 2;
-  position: relative;
-}
-
-.btn-select-place:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-}
-
-/* No Places State */
-.no-places {
-  text-align: center;
-  padding: 40px 20px;
-}
-
-.no-places-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
-}
-
-.no-places-text {
-  font-size: 16px;
-  font-weight: 600;
-  color: #374151;
-  margin-bottom: 8px;
-}
-
-.no-places-subtext {
-  font-size: 14px;
-  color: #6b7280;
-}
-
-/* Select from Map Button */
-.btn-select-from-map {
-  position: relative;
-  overflow: hidden;
-}
-
-.btn-select-from-map::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-  transition: left 0.5s ease;
-}
-
-.btn-select-from-map:hover::before {
-  left: 100%;
-}
-
-.btn-select-from-map:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
-}
-
-/* ============================================
-   ENHANCED PLACE SELECTION INDICATOR
-   ============================================ */
-
-.selecting-place-indicator {
-  position: absolute;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: linear-gradient(135deg, #10B981, #059669);
-  color: white;
-  padding: 18px 28px;
-  border-radius: 18px;
-  box-shadow: 0 10px 40px rgba(16, 185, 129, 0.4);
-  z-index: 1000;
-  animation: pulseIndicator 2s infinite;
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.selecting-place-content {
-  text-align: center;
-}
-
-.selecting-place-content span {
-  display: block;
-  font-weight: 600;
-  font-size: 16px;
-  margin-bottom: 4px;
-}
-
-.selecting-place-content small {
-  font-size: 13px;
-  opacity: 0.9;
-}
-
-@keyframes pulseIndicator {
-  0%, 100% { transform: translateX(-50%) scale(1); }
-  50% { transform: translateX(-50%) scale(1.05); }
-}
-
 /* ============================================
    MOBILE RESPONSIVE ENHANCEMENTS
    ============================================ */
@@ -6746,31 +6066,7 @@ html, body, #root {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     cursor: pointer;
     position: relative;
-    overflow: hidden;
-  }
-
-  .place-card-enhanced::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
-    transition: left 0.6s ease;
-  }
-
-  .place-card-enhanced:hover::before {
-    left: 100%;
-  }
-
-  .place-card-enhanced:hover {
-    transform: translateY(-2px);
-    box-shadow: 
-      0 12px 32px rgba(0, 0, 0, 0.12),
-      0 8px 16px rgba(0, 0, 0, 0.08),
-      inset 0 1px 0 rgba(255, 255, 255, 0.9);
-    border-color: rgba(255, 255, 255, 0.7);
+    overflow: visible;
   }
 
   .place-header {
@@ -6784,6 +6080,7 @@ html, body, #root {
     flex-shrink: 0;
     position: relative;
     z-index: 1;
+    margin: 4px;
   }
 
   .place-emoji {
@@ -6803,6 +6100,9 @@ html, body, #root {
     /* Fix emoji overflow */
     overflow: visible;
     line-height: 1;
+    flex-shrink: 0;
+    min-width: 52px;
+    min-height: 52px;
   }
 
   .place-info-main {
@@ -6879,6 +6179,29 @@ html, body, #root {
     line-height: 1;
   }
 
+  /* WWDC Restaurant Colors - Add these specific overrides */
+  .place-card-enhanced[data-restaurant="true"] .place-emoji {
+    background: linear-gradient(135deg, #EF4444, #DC2626) !important;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4) !important;
+  }
+
+  .place-card-enhanced[data-restaurant="true"] .place-type-badge {
+    background: rgba(239, 68, 68, 0.15) !important;
+    color: #EF4444 !important;
+    border: 1px solid rgba(239, 68, 68, 0.3) !important;
+  }
+
+  .place-card-enhanced[data-restaurant="true"] .btn-select-place-enhanced {
+    background: linear-gradient(135deg, #EF4444, #DC2626) !important;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3) !important;
+  }
+
+  .place-card-enhanced[data-restaurant="true"] .btn-select-place-enhanced:hover {
+    background: linear-gradient(135deg, #DC2626, #B91C1C) !important;
+    box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4) !important;
+    transform: translateY(-1px) !important;
+  }
+
   .place-distance {
     font-size: 11px;
     color: #3B82F6;
@@ -6902,21 +6225,27 @@ html, body, #root {
   }
 
   .btn-select-place-enhanced {
-    width: 100%;
-    padding: 12px 16px;
+    /* CHANGE: Make button smaller and centered */
+    width: auto; /* Changed from: width: 100%; */
+    min-width: 120px; /* Add minimum width */
+    max-width: 150px; /* Add maximum width */
+    padding: 10px 20px; /* Changed from: padding: 12px 16px; */
+    margin: 0 auto; /* Center the button */
     border: none;
     border-radius: 12px;
     color: white;
     font-weight: 600;
-    font-size: 14px;
-    cursor: pointer;
+    font-size: 13px; /* Slightly smaller text */
+    cursor: default;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center; /* Center content */
+    gap: 6px; /* Smaller gap */
     position: relative;
     overflow: hidden;
     z-index: 1;
+    flex-shrink: 0; /* Prevent shrinking */
   }
 
   .select-arrow {
@@ -7068,3 +6397,172 @@ html, body, #root {
     -moz-user-select: none;
     -ms-user-select: none;
   }
+
+
+  /* =============================================================================
+   FINAL OVERRIDES - Place at the very end of CSS file
+   ============================================================================= */
+
+/* Remove all sliding line animations */
+.place-card-enhanced::before,
+.place-card-selectable::before,
+.btn-select-from-map::before,
+.btn-send-invite::before,
+.location-select-btn::before {
+  display: none !important;
+}
+
+/* Fix place card hover effects - subtle only */
+.place-card-enhanced {
+  overflow: visible !important;
+  cursor: default !important;
+  background: linear-gradient(135deg,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(248, 250, 252, 0.98) 100%
+  ) !important;
+  backdrop-filter: blur(20px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(150%) !important;
+  border-radius: 16px !important;
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  box-shadow: 
+    0 8px 24px rgba(0, 0, 0, 0.08),
+    0 4px 12px rgba(0, 0, 0, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+  padding: 20px !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  position: relative !important;
+}
+
+.place-card-enhanced:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 
+    0 10px 28px rgba(0, 0, 0, 0.10) !important,
+    0 6px 16px rgba(0, 0, 0, 0.07) !important,
+    inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+  border-color: rgba(255, 255, 255, 0.7) !important;
+}
+
+/* Fix button styles - remove cursor pointer */
+.btn-select-place-enhanced {
+  width: auto !important;
+  min-width: 120px !important;
+  max-width: 150px !important;
+  padding: 10px 20px !important;
+  margin: 0 auto !important;
+  border: none !important;
+  border-radius: 12px !important;
+  color: white !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  cursor: default !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  position: relative !important;
+  overflow: hidden !important;
+  z-index: 1 !important;
+  flex-shrink: 0 !important;
+}
+
+.btn-select-place-enhanced:hover {
+  transform: none !important;
+  cursor: default !important;
+}
+
+/* Remove hover effects from arrows */
+.select-arrow {
+  transition: none !important;
+  opacity: 0.8 !important;
+  line-height: 1 !important;
+}
+
+.btn-select-place-enhanced:hover .select-arrow {
+  transform: none !important;
+  opacity: 0.8 !important;
+}
+
+/* Ensure place emoji container has proper spacing */
+.place-emoji-container {
+  flex-shrink: 0 !important;
+  position: relative !important;
+  z-index: 1 !important;
+  margin: 4px !important;
+}
+
+.place-emoji {
+  width: 52px !important;
+  height: 52px !important;
+  border-radius: 16px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 22px !important;
+  color: white !important;
+  font-weight: bold !important;
+  border: 2px solid rgba(255, 255, 255, 0.3) !important;
+  transition: all 0.3s ease !important;
+  position: relative !important;
+  z-index: 2 !important;
+  overflow: visible !important;
+  line-height: 1 !important;
+  flex-shrink: 0 !important;
+  min-width: 52px !important;
+  min-height: 52px !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+}
+
+.place-emoji * {
+  pointer-events: none !important;
+}
+
+/* Remove other problematic hover effects */
+.place-card-selectable:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1) !important;
+  border-color: rgba(102, 126, 234, 0.2) !important;
+}
+
+.btn-select-from-map:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.3) !important;
+}
+
+.btn-send-invite:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.3) !important;
+}
+
+.location-select-btn:hover {
+  border-color: #667eea !important;
+  background: rgba(102, 126, 234, 0.05) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1) !important;
+}
+
+/* Mobile responsive for overrides */
+@media (max-width: 480px) {
+  .place-card-enhanced {
+    padding: 16px !important;
+  }
+
+  .place-emoji {
+    width: 44px !important;
+    height: 44px !important;
+    font-size: 18px !important;
+    border-radius: 12px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+
+  .btn-select-place-enhanced {
+    min-width: 100px !important;
+    max-width: 130px !important;
+    padding: 8px 16px !important;
+    font-size: 12px !important;
+  }
+}
