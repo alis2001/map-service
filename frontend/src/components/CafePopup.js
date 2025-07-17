@@ -27,12 +27,24 @@ const CafePopup = ({
   // Use detailed data if available, fallback to basic cafe data
   const placeData = detailedPlace || cafe;
 
-  // NEW FUNCTION - only add this
+  // ENHANCED FUNCTION - better error handling
   const handleSelectLocation = () => {
-    if (onLocationSelect) {
-      onLocationSelect(cafe);
+    console.log('🎯 Location selection triggered for:', cafe?.name);
+    console.log('🔍 onLocationSelect function:', typeof onLocationSelect);
+    console.log('📍 Cafe data:', cafe);
+    
+    try {
+      if (onLocationSelect && typeof onLocationSelect === 'function') {
+        console.log('✅ Calling onLocationSelect with cafe');
+        onLocationSelect(cafe);
+        handleClose();
+      } else {
+        console.error('❌ onLocationSelect not provided or not a function');
+        console.error('❌ onLocationSelect type:', typeof onLocationSelect);
+      }
+    } catch (error) {
+      console.error('❌ Error in handleSelectLocation:', error);
     }
-    handleClose();
   };
 
   // Keep all your existing code exactly the same...
@@ -576,7 +588,11 @@ const CafePopup = ({
     >
       <div 
         className={`cafe-popup ${isVisible ? 'visible' : ''}`}
-        style={getPopupStyles()}
+        style={{
+          ...getPopupStyles(),
+          display: 'flex',
+          flexDirection: 'column'
+        }}
       >
         
         {/* Keep all your existing header exactly the same... */}
@@ -745,7 +761,7 @@ const CafePopup = ({
               </div>
             </div>
 
-            {/* Enhanced Close Button */}
+            {/* Enhanced Close Button - MOVED HERE */}
             <button 
               onClick={handleClose}
               style={{
@@ -993,13 +1009,13 @@ const CafePopup = ({
           )}
         </div>
 
-        {/* Keep your existing content exactly the same... */}
         {/* Content */}
         <div 
           style={{
             maxHeight: '400px',
             overflowY: 'auto',
             padding: '24px',
+            flex: 1,
             ...getElementAnimation(400, 'slideUp')
           }}
         >
@@ -1350,7 +1366,8 @@ const CafePopup = ({
         </div>
 
         {/* MODIFIED: Action buttons section - ADD the select button when in location selection mode */}
-        {/* 🎨 ENHANCED ACTION BUTTONS */}
+        {/* MODIFIED: Action buttons section - STICKY AT BOTTOM */}
+        {/* 🎨 ENHANCED ACTION BUTTONS - ALWAYS VISIBLE */}
         <div 
           style={{
             display: 'flex',
@@ -1358,13 +1375,15 @@ const CafePopup = ({
             padding: '24px',
             background: `
               linear-gradient(135deg,
-                rgba(255, 255, 255, 0.8) 0%,
-                rgba(248, 250, 252, 0.9) 100%
+                rgba(255, 255, 255, 0.95) 0%,
+                rgba(248, 250, 252, 0.98) 100%
               )
             `,
-            backdropFilter: 'blur(10px)',
-            WebkitBackdropFilter: 'blur(10px)',
-            borderTop: '1px solid rgba(255, 255, 255, 0.3)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            borderTop: '2px solid rgba(255, 255, 255, 0.4)',
+            boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.1)',
+            flexShrink: 0,
             ...getElementAnimation(500, 'slideUp')
           }}
         >

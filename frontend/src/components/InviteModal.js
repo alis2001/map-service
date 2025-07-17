@@ -7,6 +7,7 @@ import { X, MapPin, Calendar, Clock, MessageSquare, Send, ArrowLeft, Search, Fil
 const InviteModal = ({ 
   visible, 
   selectedUser, 
+  selectedPlace,  // ADD THIS LINE
   onClose, 
   onSendInvite,
   userLocation,
@@ -103,17 +104,32 @@ const InviteModal = ({
 
   // Handle location selection (called from parent when place is selected)
   const handleLocationSelected = (place) => {
-    console.log('✅ Location selected:', place.name);
-    setInvitationData(prev => ({ ...prev, luogo: place }));
-    setIsAnimatingToCenter(true);
+    console.log('✅ InviteModal: Location selected:', place?.name);
+    console.log('📍 Place data received:', place);
     
-    // Animate back to center
-    setTimeout(() => {
-      setIsAnimatingToCenter(false);
-      if (onLocationSelectionEnd) {
-        onLocationSelectionEnd();
-      }
-    }, 400);
+    try {
+        // Update the invitation data with the selected place
+        setInvitationData(prev => ({ 
+        ...prev, 
+        luogo: place 
+        }));
+        
+        // Hide the location panel and show the main form
+        setShowLocationPanel(false);
+        setIsAnimatingToCenter(true);
+        
+        // Animate back to center
+        setTimeout(() => {
+        setIsAnimatingToCenter(false);
+        if (onLocationSelectionEnd) {
+            onLocationSelectionEnd();
+        }
+        }, 400);
+        
+        console.log('✅ Location successfully set in invitation data');
+    } catch (error) {
+        console.error('❌ Error in handleLocationSelected:', error);
+    }
   };
 
   // Handle selecting place from list
@@ -131,6 +147,14 @@ const InviteModal = ({
       delete window.setInvitationLocation;
     };
   }, []);
+
+  // NEW: Handle when a place is selected from the map
+  useEffect(() => {
+    if (selectedPlace && !invitationData.luogo) {
+        console.log('🎯 InviteModal: Received selected place from parent:', selectedPlace.name);
+        handleLocationSelected(selectedPlace);
+    }
+  }, [selectedPlace, invitationData.luogo]);
 
   // Validate form
   const validateForm = () => {

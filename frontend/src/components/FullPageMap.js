@@ -1700,7 +1700,18 @@ const FullPageMap = ({
           onClose={handleSmoothPopupClose}
           userLocation={userLocation}
           isLocationSelecting={isSelectingPlace}
-          onLocationSelect={onCafeSelect}        // ADD THIS LINE
+          onLocationSelect={(cafe) => {
+            console.log('🎯 FullPageMap: Location selected from popup:', cafe?.name);
+            console.log('🔍 isSelectingPlace:', isSelectingPlace);
+            
+            if (isSelectingPlace) {
+              console.log('✅ Calling handlePlaceClick from popup');
+              // This will call the actual selection logic
+              if (window.handlePlaceClickFromPopup) {
+                window.handlePlaceClickFromPopup(cafe);
+              }
+            }
+          }}
         />
       )}
 

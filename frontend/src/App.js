@@ -512,48 +512,86 @@ function MapApp() {
     setShowInviteModal(true);
   }, []);
 
-  // NEW: Enhanced location selection handlers
   const handleLocationSelectionStart = useCallback(() => {
-    console.log('📍 Location selection mode activated');
+    console.log('📍 App.js: Location selection mode activated');
+    console.log('🔍 Current state before activation:', {
+      isLocationSelecting,
+      isSelectingPlace,
+      mapMode,
+      isModalMinimized
+    });
+    
     setIsLocationSelecting(true);
     setIsSelectingPlace(true);
     setIsModalMinimized(true);
     setMapMode('places'); // Switch to places mode for location selection
-  }, []);
+    
+    console.log('✅ Location selection state updated');
+  }, [isLocationSelecting, isSelectingPlace, mapMode, isModalMinimized]);
 
   const handleLocationSelectionEnd = useCallback(() => {
-    console.log('✅ Location selection completed');
+    console.log('✅ App.js: Location selection completed');
+    console.log('🔍 Current state before cleanup:', {
+      isLocationSelecting,
+      isSelectingPlace,
+      mapMode,
+      isModalMinimized,
+      inviteSelectedPlace
+    });
+    
     setIsLocationSelecting(false);
     setIsSelectingPlace(false);
     setIsModalMinimized(false);
     setMapMode('people'); // Switch back to people mode
-  }, []);
+    
+    console.log('✅ Location selection cleanup completed');
+  }, [isLocationSelecting, isSelectingPlace, mapMode, isModalMinimized, inviteSelectedPlace]);
 
   const handlePlaceClick = useCallback((place) => {
+    console.log('🎯 App.js: handlePlaceClick called with:', place?.name);
+    console.log('🔍 isSelectingPlace:', isSelectingPlace);
+    
     if (isSelectingPlace) {
       console.log('✅ Place selected for invitation:', place.name);
       
-      // Format the selected place
-      const formattedPlace = {
-        id: place.place_id || place.googlePlaceId || place.id,
-        name: place.name,
-        address: place.address || place.vicinity || place.formatted_address,
-        type: place.placeType || place.type || 'cafe'
-      };
-      
-      setInviteSelectedPlace(formattedPlace);
-      
-      // Trigger location selection end through the modal
-      if (window.setInvitationLocation) {
-        window.setInvitationLocation(formattedPlace);
+      try {
+        // Format the selected place
+        const formattedPlace = {
+          id: place.id || place.googlePlaceId,
+          name: place.name,
+          address: place.address || place.vicinity,
+          location: place.location,
+          type: place.type || place.placeType || 'cafe',
+          rating: place.rating,
+          distance: place.distance,
+          formattedDistance: place.formattedDistance
+        };
+
+        console.log('📍 Formatted place:', formattedPlace);
+        
+        // Set the selected place for invitation
+        setInviteSelectedPlace(formattedPlace);
+        
+        // Close the map popup
+        setSelectedCafe(null);
+        
+        // End location selection mode
+        setIsLocationSelecting(false);
+        setIsSelectingPlace(false);
+        setIsModalMinimized(false);
+        
+        // Switch back to people mode
+        setMapMode('people');
+        
+        console.log('✅ Place selection completed successfully');
+      } catch (error) {
+        console.error('❌ Error in handlePlaceClick:', error);
       }
-      
-      // End location selection
-      handleLocationSelectionEnd();
     } else {
+      console.log('ℹ️ Not in selection mode - setting selected cafe normally');
       setSelectedCafe(place);
     }
-  }, [isSelectingPlace, handleLocationSelectionEnd]);
+  }, [isSelectingPlace]);
 
   // ENHANCED: Send invitation with better error handling
   const handleSendInvite = useCallback(async (inviteData) => {
@@ -793,6 +831,14 @@ function MapApp() {
       return () => clearTimeout(timer);
     }
   }, [appReady, mapCenter, isRateLimitRecovery]);
+
+  // Expose handlePlaceClick to be called from popup
+  useEffect(() => {
+    window.handlePlaceClickFromPopup = handlePlaceClick;
+    return () => {
+      delete window.handlePlaceClickFromPopup;
+    };
+  }, [handlePlaceClick]);
 
   // ENHANCED: Search change handler
   const handleSearchChange = useCallback((changes) => {
@@ -1134,9 +1180,16 @@ function MapApp() {
         selectedUser={selectedUser}
         userLocation={userLocation}
         onCafeSelect={(cafe) => {
+          console.log('🎯 App.js: onCafeSelect called with:', cafe?.name);
+          console.log('🔍 isSelectingPlace:', isSelectingPlace);
+          
           if (isSelectingPlace) {
-            handlePlaceClick(cafe);
+            // In location selection mode, ALWAYS show the popup first
+            console.log('📍 Location selection mode - showing popup for place info');
+            setSelectedCafe(cafe);
           } else {
+            // Normal mode - just set selected cafe
+            console.log('ℹ️ Normal mode - setting selected cafe');
             setSelectedCafe(cafe);
           }
         }}
@@ -1190,6 +1243,7 @@ function MapApp() {
         <InviteModal
           visible={showInviteModal}
           selectedUser={inviteSelectedUser}
+          selectedPlace={inviteSelectedPlace}  // ADD THIS LINE
           onClose={() => {
             setShowInviteModal(false);
             setInviteSelectedUser(null);
