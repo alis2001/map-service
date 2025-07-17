@@ -1,7 +1,3 @@
-// components/CafePopup.js - MINIMAL UPDATE for Location Selection
-// Location: /map-service/frontend/src/components/CafePopup.js
-// ONLY ADD these props and the selection button - keep everything else unchanged
-
 import React, { useState, useEffect } from 'react';
 import { usePlaceDetails } from '../hooks/useCafes';
 
@@ -591,12 +587,12 @@ const CafePopup = ({
         style={{
           ...getPopupStyles(),
           display: 'flex',
-          flexDirection: 'column'
+          flexDirection: 'column',
+          height: '85vh'
         }}
       >
         
-        {/* Keep all your existing header exactly the same... */}
-        {/* 🎨 ENHANCED APPLE WWDC 2025 HEADER */}
+        {/* FIXED HEADER - No longer scrolls */}
         <div 
           style={{
             position: 'relative',
@@ -612,6 +608,7 @@ const CafePopup = ({
             borderBottom: '1px solid rgba(255, 255, 255, 0.4)',
             padding: '28px 24px',
             overflow: 'hidden',
+            flexShrink: 0,
             ...getElementAnimation(100, 'slideUp')
           }}
         >
@@ -701,18 +698,18 @@ const CafePopup = ({
                   {placeData.name}
                 </h2>
 
-                {/* Venue Meta */}
+                {/* Venue Meta with Creative Consiglio Integration */}
                 <div 
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '12px',
+                    gap: '8px',
                     flexWrap: 'wrap',
                     ...getElementAnimation(400, 'slideLeft')
                   }}
                 >
                   
-                  {/* Venue Type Badge */}
+                  {/* Venue Type Badge with Smart Tip */}
                   <div style={{
                     padding: '6px 12px',
                     borderRadius: '12px',
@@ -727,9 +724,16 @@ const CafePopup = ({
                     fontWeight: '600',
                     color: venueInfo.color,
                     backdropFilter: 'blur(10px)',
-                    WebkitBackdropFilter: 'blur(10px)'
+                    WebkitBackdropFilter: 'blur(10px)',
+                    cursor: 'help',
+                    position: 'relative',
+                    title: venueInfo.type === 'cafe' ? 'I bar italiani servono caffè eccellente!' : 
+                           venueInfo.type === 'restaurant' ? 'I ristoranti spesso aprono alle 19:30' :
+                           venueInfo.type === 'gelateria' ? 'Gelato artigianale fresco ogni giorno' :
+                           venueInfo.type === 'pizzeria' ? 'Pizza autentica con ingredienti freschi' :
+                           venueInfo.type === 'pasticceria' ? 'Dolci freschi ogni mattina' : ''
                   }}>
-                    {venueInfo.label}
+                    💡 {venueInfo.label}
                   </div>
 
                   {/* Distance Badge */}
@@ -761,7 +765,7 @@ const CafePopup = ({
               </div>
             </div>
 
-            {/* Enhanced Close Button - MOVED HERE */}
+            {/* Enhanced Close Button */}
             <button 
               onClick={handleClose}
               style={{
@@ -791,6 +795,7 @@ const CafePopup = ({
                 `,
                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 transform: 'translateZ(0)',
+                flexShrink: 0,
                 ...getElementAnimation(500, 'scale')
               }}
               onMouseEnter={(e) => {
@@ -809,8 +814,7 @@ const CafePopup = ({
           </div>
         </div>
 
-        {/* Keep all your existing stats section exactly the same... */}
-        {/* 🎨 ENHANCED QUICK STATS */}
+        {/* FIXED STATS SECTION */}
         <div 
           style={{
             display: 'flex',
@@ -825,6 +829,7 @@ const CafePopup = ({
             backdropFilter: 'blur(10px)',
             WebkitBackdropFilter: 'blur(10px)',
             borderBottom: '1px solid rgba(255, 255, 255, 0.3)',
+            flexShrink: 0,
             ...getElementAnimation(200, 'slideUp')
           }}
         >
@@ -918,8 +923,7 @@ const CafePopup = ({
           </div>
         </div>
 
-        {/* Keep your existing tabs exactly the same... */}
-        {/* 🎨 ENHANCED TABS */}
+        {/* FIXED TABS NAVIGATION */}
         <div 
           style={{
             display: 'flex',
@@ -927,6 +931,7 @@ const CafePopup = ({
             backdropFilter: 'blur(10px)',
             WebkitBackdropFilter: 'blur(10px)',
             borderBottom: '1px solid rgba(255, 255, 255, 0.3)',
+            flexShrink: 0,
             ...getElementAnimation(300, 'slideUp')
           }}
         >
@@ -1009,13 +1014,14 @@ const CafePopup = ({
           )}
         </div>
 
-        {/* Content */}
+        {/* SCROLLABLE CONTENT AREA */}
         <div 
           style={{
-            maxHeight: '400px',
-            overflowY: 'auto',
-            padding: '24px',
             flex: 1,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            padding: '24px',
+            minHeight: 0,
             ...getElementAnimation(400, 'slideUp')
           }}
         >
@@ -1168,8 +1174,7 @@ const CafePopup = ({
             </div>
           )}
 
-          {/* Keep your existing hours and photos tabs exactly the same... */}
-          {/* ENHANCED Hours Tab with Dynamic Status */}
+          {/* Hours Tab */}
           {activeTab === 'hours' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               
@@ -1365,9 +1370,7 @@ const CafePopup = ({
           )}
         </div>
 
-        {/* MODIFIED: Action buttons section - ADD the select button when in location selection mode */}
-        {/* MODIFIED: Action buttons section - STICKY AT BOTTOM */}
-        {/* 🎨 ENHANCED ACTION BUTTONS - ALWAYS VISIBLE */}
+        {/* FIXED FOOTER - Action Buttons */}
         <div 
           style={{
             display: 'flex',
@@ -1421,7 +1424,7 @@ const CafePopup = ({
               ✅ Seleziona questo luogo
             </button>
           ) : (
-            // Normal mode buttons (keep your existing buttons exactly the same)
+            // Normal mode buttons
             <>
               <button 
                 onClick={handleDirections}
@@ -1518,74 +1521,8 @@ const CafePopup = ({
           )}
         </div>
 
-        {/* NEW: Location Selection Helper Text - only show when in location selection mode */}
-        {isLocationSelecting && (
-          <div 
-            style={{
-              margin: '0 24px 24px 24px',
-              padding: '16px',
-              background: 'rgba(16, 185, 129, 0.05)',
-              border: '1px solid rgba(16, 185, 129, 0.2)',
-              borderRadius: '16px',
-              textAlign: 'center',
-              backdropFilter: 'blur(10px)',
-              WebkitBackdropFilter: 'blur(10px)',
-              ...getElementAnimation(600, 'slideUp')
-            }}
-          >
-            <p style={{ 
-              margin: 0, 
-              fontSize: '13px', 
-              color: '#059669',
-              fontWeight: '600',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px'
-            }}>
-              📍 Perfetto per il tuo incontro! Clicca "Seleziona questo luogo" per continuare.
-            </p>
-          </div>
-        )}
-
-        {/* Keep your existing Italian venue tips exactly the same... */}
-        {/* Italian venue tips */}
-        <div 
-          style={{
-            background: `rgba(${venueInfo.color.slice(1).match(/.{2}/g).map(hex => parseInt(hex, 16)).join(', ')}, 0.05)`,
-            margin: '0 24px 24px 24px',
-            padding: '16px',
-            borderRadius: '16px',
-            fontSize: '13px',
-            color: '#6B7280',
-            backdropFilter: 'blur(10px)',
-            WebkitBackdropFilter: 'blur(10px)',
-            border: `1px solid ${venueInfo.color}20`,
-            ...getElementAnimation(600, 'slideUp')
-          }}
-        >
-          <div style={{ fontWeight: '700', marginBottom: '8px', color: venueInfo.color, display: 'flex', alignItems: 'center', gap: '8px' }}>
-            💡 Consiglio locale
-          </div>
-          {(placeData.type || placeData.placeType) === 'cafe' && 
-            'I bar italiani servono caffè eccellente e aperitivi dalle 18:00.'
-          }
-          {(placeData.type || placeData.placeType) === 'restaurant' && 
-            'I ristoranti italiani spesso aprono alle 19:30 per cena.'
-          }
-          {venueInfo.type === 'gelateria' && 
-            'Le gelaterie italiane offrono gelato artigianale fresco ogni giorno.'
-          }
-          {venueInfo.type === 'pizzeria' && 
-            'Le pizzerie napoletane servono pizza autentica con ingredienti freschi.'
-          }
-          {venueInfo.type === 'pasticceria' && 
-            'Le pasticcerie italiane preparano dolci freschi ogni mattina.'
-          }
         </div>
-      </div>
 
-      {/* Keep all your existing CSS animations exactly the same... */}
       {/* Enhanced CSS Animations */}
       <style jsx>{`
         @keyframes headerParticles {

@@ -1734,16 +1734,6 @@ const FullPageMap = ({
           <button onClick={handleSmoothSearch}>Retry</button>
         </div>
       )}
-
-      {/* Enhanced Place Selection Indicator */}
-      {isSelectingPlace && (
-        <div className="selecting-place-indicator">
-          <div className="selecting-place-content">
-            <span>📍 Select a place on the map</span>
-            <small>Click on a marker to choose the meeting location</small>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
