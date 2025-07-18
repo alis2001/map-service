@@ -17,7 +17,6 @@ import PeopleDiscoveryPanel from './components/PeopleDiscoveryPanel';
 import UserMarker from './components/UserMarker';
 import UserInfoCard from './components/UserInfoCard';
 import InviteModal from './components/InviteModal';
-import InvitationsInCorsoButton from './components/InvitationsInCorsoButton';
 
 import './styles/App.css';
 
@@ -49,7 +48,7 @@ function MapApp() {
   const [appReady, setAppReady] = useState(false);
 
   // Map mode state (enhanced with city discovery)
-  const [mapMode, setMapMode] = useState('places'); // 'people' | 'places'
+  const [mapMode, setMapMode] = useState('people'); // 'people' | 'places'
   const [currentCity, setCurrentCity] = useState(null);
 
   // Search panel state
@@ -94,10 +93,6 @@ function MapApp() {
   const [isModalMinimized, setIsModalMinimized] = useState(false);
   const [isLocationSelecting, setIsLocationSelecting] = useState(false);
 
-  // NEW: Invitations in Corso states
-  const [showInvitationsInCorso, setShowInvitationsInCorso] = useState(false);
-  const [activeInvitations, setActiveInvitations] = useState([]);
-
   // ENHANCED AUTHENTICATION
   const [authToken, setAuthToken] = useState(null);
   const [authUser, setAuthUser] = useState(null);
@@ -124,6 +119,7 @@ function MapApp() {
   // Enhanced cafes hook with better error handling
   const {
     cafes,
+    allPlaces,
     loading: cafesLoading,
     error: cafesError,
     refetch: refetchCafes,
@@ -134,11 +130,6 @@ function MapApp() {
     searchRadius, 
     cafeType
   );
-
-  // NEW: Handler for invitations toggle
-  const handleInvitationsToggle = () => {
-    setShowInvitationsInCorso(!showInvitationsInCorso);
-  };
 
   // ENHANCED: Authentication initialization with better token management
   useEffect(() => {
@@ -230,6 +221,45 @@ function MapApp() {
       return false;
     }
   }, [authToken]);
+
+  const handleInviteHere = useCallback((place) => {
+    console.log('🎉 App.js: Invite someone here triggered for:', place?.name);
+    
+    try {
+      // Format the selected place
+      const formattedPlace = {
+        id: place.id || place.googlePlaceId,
+        name: place.name,
+        address: place.address || place.vicinity,
+        location: place.location,
+        type: place.type || place.placeType || 'cafe',
+        rating: place.rating,
+        distance: place.distance,
+        formattedDistance: place.formattedDistance
+      };
+      
+      console.log('📍 Formatted place for invitation:', formattedPlace);
+      
+      // Set the selected place for invitation
+      setInviteSelectedPlace(formattedPlace);
+      
+      // Clear any selected user (since we're starting from place)
+      setInviteSelectedUser(null);
+      
+      // Close the current popup
+      setSelectedCafe(null);
+      
+      // Switch to people mode for user selection
+      setMapMode('people');
+      
+      // Open the invitation modal in "place → people" mode
+      setShowInviteModal(true);
+      
+      console.log('✅ Place → People invitation flow started');
+    } catch (error) {
+      console.error('❌ Error in handleInviteHere:', error);
+    }
+  }, []);
 
   // ENHANCED: User profile fetching
   const fetchUserProfile = useCallback(async (token) => {
@@ -636,13 +666,11 @@ function MapApp() {
           status: 'pending',
           createdAt: new Date()
         };
-        setActiveInvitations(prev => [...prev, newInvitation]);
         
         // Reset states
         setShowInviteModal(false);
         setInviteSelectedUser(null);
         setInviteSelectedPlace(null);
-        setShowInvitationsInCorso(false);
         setIsLocationSelecting(false);
         setIsSelectingPlace(false);
         setIsModalMinimized(false);
@@ -676,6 +704,13 @@ function MapApp() {
       loadUsersByCity(city.displayName, city.coordinates);
     }
   }, [mapMode, loadUsersByCity]);
+
+  useEffect(() => {
+    window.handleInviteHereFromPopup = handleInviteHere;
+    return () => {
+      delete window.handleInviteHereFromPopup;
+    };
+  }, [handleInviteHere]);
 
   // Rate limit detection - enhanced
   useEffect(() => {
@@ -1238,12 +1273,24 @@ function MapApp() {
         />
       )}
 
+
       {/* ENHANCED: Invite modal with location selection animation */}
       {showInviteModal && (
         <InviteModal
           visible={showInviteModal}
           selectedUser={inviteSelectedUser}
-          selectedPlace={inviteSelectedPlace}  // ADD THIS LINE
+          selectedPlace={inviteSelectedPlace}
+          cafeType={cafeType}
+          onCafeTypeChange={(newType) => {
+            console.log('🔄 App: InviteModal changed cafeType to:', newType);
+            setCafeType(newType);
+            setTimeout(() => {
+              if (refetchCafes && mapCenter && mapMode === 'places') {
+                console.log('🔄 Auto-refetching with new type from InviteModal');
+                refetchCafes();
+              }
+            }, 300);
+          }}
           onClose={() => {
             setShowInviteModal(false);
             setInviteSelectedUser(null);
@@ -1251,27 +1298,42 @@ function MapApp() {
             setIsSelectingPlace(false);
             setIsLocationSelecting(false);
             setIsModalMinimized(false);
-            setShowInvitationsInCorso(false); // Close invitations panel when modal closes
           }}
           onSendInvite={handleSendInvite}
           userLocation={userLocation}
-          cafes={cafes} // Pass cafes data to modal
-          onRefreshPlaces={refetchCafes} // Pass refresh function
-          // NEW: Location selection props
-          onLocationSelectionStart={handleLocationSelectionStart}
-          onLocationSelectionEnd={handleLocationSelectionEnd}
+          cafes={(() => {
+            if (allPlaces && allPlaces.length > 0) {
+              console.log('📍 InviteModal: Using allPlaces data:', allPlaces.length, 'places');
+              return allPlaces;
+            } else if (cafes && cafes.length > 0) {
+              console.log('📍 InviteModal: Using filtered cafes data:', cafes.length, 'places');
+              return cafes;
+            } else {
+              console.log('📍 InviteModal: No places data available');
+              return [];
+            }
+          })()}
+          onRefreshPlaces={refetchCafes}
+          onLocationSelectionStart={() => {
+            console.log('🎯 App: Location selection started from InviteModal');
+            setIsModalMinimized(true);
+            setIsLocationSelecting(true);
+            setIsSelectingPlace(true);
+            setMapMode('places');
+          }}
+          onLocationSelectionEnd={() => {
+            console.log('🎯 App: Location selection ended from InviteModal');
+            setIsModalMinimized(false);
+            setIsLocationSelecting(false);
+            setIsSelectingPlace(false);
+            setMapMode('people');
+          }}
+          onClearPlace={() => {
+            console.log('🗑️ App: Clearing selected place');
+            setInviteSelectedPlace(null);
+          }}
           isLocationSelecting={isLocationSelecting}
           isMinimized={isModalMinimized}
-        />
-      )}
-
-      {/* ENHANCED: Invitations In Corso Button - Show when invite modal is open */}
-      {(showInviteModal && inviteSelectedUser) && (
-        <InvitationsInCorsoButton
-          visible={true}
-          onToggle={handleInvitationsToggle}
-          invitationsCount={activeInvitations.length}
-          isExpanded={showInvitationsInCorso}
         />
       )}
 
@@ -1372,7 +1434,6 @@ function MapApp() {
           <div>Minimized: {isModalMinimized ? 'Yes' : 'No'}</div>
           <div>Auth: {authToken ? '✅' : '❌'}</div>
           <div>User: {authUser?.firstName || 'None'}</div>
-          <div>Invitations: {activeInvitations.length}</div>
           {userDiscoveryStats && (
             <div>Stats: {userDiscoveryStats.platform?.online_now || 0} online</div>
           )}

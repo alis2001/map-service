@@ -1368,7 +1368,7 @@ const FullPageMap = ({
         const popularityScore = calculatePopularityScore(cafe);
         const markerSize = getMarkerSizeFromPopularity(popularityScore, zoomLevel);
         const totalSize = markerSize + (isHovered ? 80 : 24);
-
+        
         const marker = new window.google.maps.Marker({
           position: position,
           map: googleMapRef.current,
@@ -1383,9 +1383,12 @@ const FullPageMap = ({
           visible: true
         });
 
-        // Enhanced place marker events - ALWAYS show popup first
         marker.addListener('click', () => {
-          console.log('📍 Marker clicked, showing popup for:', cafe.name);
+          console.log('📍 Marker clicked:', cafe.name, 'isSelectingPlace:', isSelectingPlace);
+          
+          // ALWAYS SHOW POPUP FIRST - even in selection mode
+          // The CafePopup will show a "Select this place" button when isLocationSelecting = true
+          console.log('📍 Showing popup for place info (selection mode aware)');
           handleSmoothMarkerClick(cafe);
         });
 
@@ -1706,10 +1709,16 @@ const FullPageMap = ({
             
             if (isSelectingPlace) {
               console.log('✅ Calling handlePlaceClick from popup');
-              // This will call the actual selection logic
               if (window.handlePlaceClickFromPopup) {
                 window.handlePlaceClickFromPopup(cafe);
               }
+            }
+          }}
+          onInviteHere={(cafe) => {
+            console.log('🎉 FullPageMap: Invite someone here for:', cafe?.name);
+            // Call the parent component's handler
+            if (window.handleInviteHereFromPopup) {
+              window.handleInviteHereFromPopup(cafe);
             }
           }}
         />

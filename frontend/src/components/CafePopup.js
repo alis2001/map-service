@@ -7,7 +7,8 @@ const CafePopup = ({
   userLocation,
   // NEW PROPS - only add these
   isLocationSelecting = false,  // Add this prop
-  onLocationSelect            // Add this prop
+  onLocationSelect,            // Add this prop
+  onInviteHere // ADD THIS NEW PROP
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [animationPhase, setAnimationPhase] = useState('entering');
@@ -81,6 +82,22 @@ const CafePopup = ({
   const handleBackdropClick = (e) => {
     if (e.target === e.currentTarget) {
       handleClose();
+    }
+  };
+
+  const handleInviteHere = () => {
+    console.log('🎉 Invite someone here triggered for:', cafe?.name);
+    
+    try {
+      if (onInviteHere && typeof onInviteHere === 'function') {
+        console.log('✅ Calling onInviteHere with cafe');
+        onInviteHere(cafe);
+        handleClose();
+      } else {
+        console.error('❌ onInviteHere not provided or not a function');
+      }
+    } catch (error) {
+      console.error('❌ Error in handleInviteHere:', error);
     }
   };
 
@@ -1390,7 +1407,7 @@ const CafePopup = ({
             ...getElementAnimation(500, 'slideUp')
           }}
         >
-          {/* NEW: Show special select button when in location selection mode */}
+          {/* Show special select button when in location selection mode */}
           {isLocationSelecting ? (
             <button 
               onClick={handleSelectLocation}
@@ -1424,8 +1441,40 @@ const CafePopup = ({
               ✅ Seleziona questo luogo
             </button>
           ) : (
-            // Normal mode buttons
+            // Normal mode buttons - NOW WITH INVITE BUTTON
             <>
+              <button 
+                onClick={handleInviteHere}
+                style={{
+                  flex: 1,
+                  padding: '16px 20px',
+                  borderRadius: '16px',
+                  border: 'none',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: 'white',
+                  fontSize: '15px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  boxShadow: '0 8px 16px rgba(102, 126, 234, 0.4)',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  ...getElementAnimation(550, 'scale')
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.transform = 'translateY(-2px) scale(1.02)';
+                  e.target.style.boxShadow = '0 12px 24px rgba(102, 126, 234, 0.5)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.transform = 'translateY(0) scale(1)';
+                  e.target.style.boxShadow = '0 8px 16px rgba(102, 126, 234, 0.4)';
+                }}
+              >
+                🎉 Invita qualcuno qui
+              </button>
+              
               <button 
                 onClick={handleDirections}
                 style={{
@@ -1440,7 +1489,7 @@ const CafePopup = ({
                   cursor: 'pointer',
                   boxShadow: `0 8px 16px ${venueInfo.color}40`,
                   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  ...getElementAnimation(550, 'scale')
+                  ...getElementAnimation(600, 'scale')
                 }}
                 onMouseEnter={(e) => {
                   e.target.style.transform = 'translateY(-2px) scale(1.02)';
@@ -1469,7 +1518,7 @@ const CafePopup = ({
                     backdropFilter: 'blur(10px)',
                     WebkitBackdropFilter: 'blur(10px)',
                     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                    ...getElementAnimation(600, 'scale')
+                    ...getElementAnimation(650, 'scale')
                   }}
                   onMouseEnter={(e) => {
                     e.target.style.transform = 'translateY(-2px)';
@@ -1501,7 +1550,7 @@ const CafePopup = ({
                     backdropFilter: 'blur(10px)',
                     WebkitBackdropFilter: 'blur(10px)',
                     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                    ...getElementAnimation(650, 'scale')
+                    ...getElementAnimation(700, 'scale')
                   }}
                   onMouseEnter={(e) => {
                     e.target.style.transform = 'translateY(-2px)';

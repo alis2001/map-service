@@ -4677,6 +4677,133 @@ html, body, #root {
   border-color: rgba(102, 126, 234, 0.3) !important;
 }
 
+/* Add these CSS classes to App.css for the new bidirectional flow components */
+
+/* People Selection Panel */
+.people-selection {
+  height: 70vh;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 24px;
+}
+
+.selected-place-header {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.place-info-summary h3 {
+  color: #10B981;
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.place-info-summary p {
+  color: #6B7280;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.change-place-btn {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #10B981;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.change-place-btn:hover {
+  background: rgba(16, 185, 129, 0.2);
+}
+
+.people-selection-content h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1F2937;
+  margin-bottom: 12px;
+}
+
+.people-instruction {
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 12px;
+  padding: 16px;
+  color: #3B82F6;
+  font-size: 14px;
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* Selected Location Display */
+.selected-location-display {
+  background: rgba(16, 185, 129, 0.05);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 12px;
+  padding: 16px;
+  position: relative;
+}
+
+.selected-location-display .location-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #10B981;
+  margin-bottom: 4px;
+}
+
+.selected-location-display .location-address {
+  font-size: 14px;
+  color: #6B7280;
+  margin-bottom: 12px;
+}
+
+.change-location-btn {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #10B981;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: absolute;
+  top: 16px;
+  right: 16px;
+}
+
+.change-location-btn:hover {
+  background: rgba(16, 185, 129, 0.2);
+}
+
+/* Mobile responsiveness for new components */
+@media (max-width: 480px) {
+  .people-selection {
+    padding: 12px 16px;
+  }
+  
+  .selected-place-header {
+    padding: 16px;
+  }
+  
+  .place-info-summary h3 {
+    font-size: 16px;
+  }
+  
+  .change-location-btn {
+    position: static;
+    margin-top: 8px;
+    width: 100%;
+  }
+}
+
 
 /* ============================================
    END OF FILE
