@@ -222,13 +222,19 @@ const InviteModal = ({
     }
   };
 
-  // Handle selecting place from list
   const handleSelectPlaceFromList = (place) => {
     console.log('📍 Place selected from list:', place.name);
-    setInvitationData(prev => ({ ...prev, luogo: place }));
+    
+    // Format the place with proper address fallback
+    const formattedPlace = {
+        ...place,
+        address: place.address || place.vicinity || place.formatted_address || 'Indirizzo non disponibile'
+    };
+    
+    setInvitationData(prev => ({ ...prev, luogo: formattedPlace }));
     setShowLocationPanel(false);
     setLocationSearch('');
-  };
+    };
 
   // Expose method to parent for setting selected location
   useEffect(() => {
@@ -683,16 +689,23 @@ const InviteModal = ({
                     <div className="selected-place-header">
                       <div className="place-info-summary">
                         <h3>📍 {(selectedPlace || invitationData.luogo)?.name || 'Luogo selezionato'}</h3>
-                        <p>{(selectedPlace || invitationData.luogo)?.address || 'Indirizzo non disponibile'}</p>
+                        <p>{(selectedPlace || invitationData.luogo)?.address || 
+                            (selectedPlace || invitationData.luogo)?.vicinity || 
+                            (selectedPlace || invitationData.luogo)?.formatted_address || 
+                            'Indirizzo non disponibile'}</p>
                         <button 
-                          className="change-place-btn"
-                          onClick={() => {
-                            if (onClearPlace) onClearPlace();
-                            setInvitationData(prev => ({ ...prev, luogo: null }));
-                            setShowLocationPanel(true);
-                          }}
-                        >
-                          Cambia luogo
+                            className="change-place-btn"
+                            onClick={() => {
+                                console.log('🔄 Change place button clicked - activating map selection');
+                                if (onClearPlace) onClearPlace();
+                                setInvitationData(prev => ({ ...prev, luogo: null }));
+                                
+                                // Activate map selection instead of location panel
+                                setShowLocationPanel(false);
+                                handleLocationSelectionStart(); // This will minimize modal and show map
+                            }}
+                            >
+                            Cambia luogo
                         </button>
                       </div>
                     </div>
@@ -748,17 +761,28 @@ const InviteModal = ({
                           {(selectedPlace || invitationData.luogo)?.name || 'Luogo selezionato'}
                         </div>
                         <div className="location-address">
-                          {(selectedPlace || invitationData.luogo)?.address || 'Indirizzo non disponibile'}
+                            {(selectedPlace || invitationData.luogo)?.address || 
+                            (selectedPlace || invitationData.luogo)?.vicinity || 
+                            (selectedPlace || invitationData.luogo)?.formatted_address || 
+                            'Indirizzo non disponibile'}
                         </div>
                         <button 
-                          className="change-location-btn"
-                          onClick={() => {
-                            if (onClearPlace) onClearPlace();
-                            setInvitationData(prev => ({ ...prev, luogo: null }));
-                            setShowLocationPanel(true);
-                          }}
-                        >
-                          Cambia
+                            className="change-location-btn"
+                            onClick={() => {
+                                console.log('🔄 Change location button clicked - activating map selection');
+                                if (onClearPlace) onClearPlace();
+                                setInvitationData(prev => ({ ...prev, luogo: null }));
+                                
+                                // Instead of showing location panel, activate map selection
+                                setShowLocationPanel(false);
+                                handleLocationSelectionStart(); // This will minimize modal and show map
+                                
+                                // Reset any search state
+                                setLocationSearch('');
+                                setSelectedFilter('all');
+                            }}
+                            >
+                            Cambia
                         </button>
                       </div>
                     </div>

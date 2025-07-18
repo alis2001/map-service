@@ -521,7 +521,7 @@ export const apiUtils = {
       id: place.id,
       googlePlaceId: place.googlePlaceId,
       name: place.name,
-      address: place.address,
+      address: place.address || place.vicinity || place.formatted_address || 'Indirizzo non disponibile',
       location: {
         latitude: place.location?.latitude || place.latitude,
         longitude: place.location?.longitude || place.longitude

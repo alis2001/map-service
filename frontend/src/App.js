@@ -131,9 +131,9 @@ function MapApp() {
     cafeType
   );
 
-  // ENHANCED: Authentication initialization with better token management
+  // SEQUENTIAL AUTHENTICATION - INLINE VERSION (no dependencies)
   useEffect(() => {
-    const initializeAuth = () => {
+    const initializeAuth = async () => {
       // Check multiple sources for auth token
       const urlParams = new URLSearchParams(window.location.search);
       const tokenFromUrl = urlParams.get('token');
@@ -152,8 +152,75 @@ function MapApp() {
           localStorage.setItem('caffis_auth_token', token);
         }
         
-        // Fetch user profile
-        fetchUserProfile(token);
+        // SEQUENTIAL: Fetch user profile first, then sync (INLINE)
+        try {
+          console.log('👤 Step 1: Fetching user profile...');
+          
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/user/profile`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            setAuthUser(data.user);
+            console.log('👤 User profile loaded:', data.user.firstName);
+            
+            // Wait 1 second before syncing to map service
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            console.log('🔄 Step 2: Syncing profile to map service...');
+            
+            // Inline profile sync to avoid dependency issues
+            try {
+              const syncData = {
+                firstName: data.user.firstName || '',
+                lastName: data.user.lastName || '',
+                username: data.user.username || '',
+                bio: data.user.bio || '',
+                profilePic: data.user.profilePic || null,
+                interests: data.user.interests || [],
+                ageRange: data.user.ageRange || '',
+                coffeePersonality: data.user.coffeePersonality || '',
+                conversationTopics: data.user.conversationTopics || '',
+                socialGoals: data.user.socialGoals || '',
+                socialEnergy: data.user.socialEnergy || '',
+                groupPreference: data.user.groupPreference || '',
+                locationPreference: data.user.locationPreference || '',
+                meetingFrequency: data.user.meetingFrequency || '',
+                timePreference: data.user.timePreference || '',
+                createdAt: data.user.createdAt || new Date().toISOString(),
+                onboardingCompleted: data.user.onboardingCompleted || false
+              };
+              
+              const syncResponse = await fetch(`${process.env.REACT_APP_API_BASE_URL || 'http://localhost:5001'}/api/v1/users/sync-profile`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(syncData)
+              });
+              
+              if (syncResponse.ok) {
+                const syncResult = await syncResponse.json();
+                console.log('✅ Profile synced to map service (login):', syncResult.message);
+              } else {
+                console.warn('⚠️ Failed to sync profile to map service');
+              }
+            } catch (syncError) {
+              console.error('❌ Error syncing profile to map service:', syncError);
+            }
+            
+          } else {
+            console.warn('⚠️ Failed to fetch user profile');
+          }
+          
+        } catch (error) {
+          console.error('❌ Sequential auth initialization failed:', error);
+        }
       } else {
         console.warn('⚠️ No authentication token found');
         setAuthUser(null);
@@ -161,7 +228,7 @@ function MapApp() {
     };
 
     initializeAuth();
-  }, []);
+  }, []); // Empty dependency array - no more circular dependencies!
 
   // ENHANCED: Sync user profile to map service - Include preferences and registration date
   const syncProfileToMapService = useCallback(async (userProfile, syncReason = 'update', tokenOverride = null) => {
@@ -222,6 +289,30 @@ function MapApp() {
     }
   }, [authToken]);
 
+  const fetchUserProfile = useCallback(async (token) => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/user/profile`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setAuthUser(data.user);
+        console.log('👤 User profile loaded:', data.user.firstName);
+        
+        // Automatically sync profile to map service on login - Pass token directly
+        await syncProfileToMapService(data.user, 'login', token);
+      } else {
+        console.warn('⚠️ Failed to fetch user profile');
+      }
+    } catch (error) {
+      console.error('❌ Error fetching user profile:', error);
+    }
+  }, [syncProfileToMapService]);
+
   const handleInviteHere = useCallback((place) => {
     console.log('🎉 App.js: Invite someone here triggered for:', place?.name);
     
@@ -230,7 +321,7 @@ function MapApp() {
       const formattedPlace = {
         id: place.id || place.googlePlaceId,
         name: place.name,
-        address: place.address || place.vicinity,
+        address: place.address || place.vicinity || place.formatted_address || place.formatted_address,
         location: place.location,
         type: place.type || place.placeType || 'cafe',
         rating: place.rating,
@@ -260,31 +351,6 @@ function MapApp() {
       console.error('❌ Error in handleInviteHere:', error);
     }
   }, []);
-
-  // ENHANCED: User profile fetching
-  const fetchUserProfile = useCallback(async (token) => {
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/user/profile`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setAuthUser(data.user);
-        console.log('👤 User profile loaded:', data.user.firstName);
-        
-        // Automatically sync profile to map service on login - Pass token directly
-        await syncProfileToMapService(data.user, 'login', token);
-      } else {
-        console.warn('⚠️ Failed to fetch user profile');
-      }
-    } catch (error) {
-      console.error('❌ Error fetching user profile:', error);
-    }
-  }, [syncProfileToMapService]);
 
   const loadUsersByCity = useCallback(async (cityName, coordinates) => {
     setUsersLoading(true);
@@ -455,7 +521,8 @@ function MapApp() {
   }, [authToken]);
 
   // ENHANCED: Mode change handler with proper search control
-  const handleModeChange = useCallback((newMode) => {
+  // SEQUENTIAL MODE CHANGE - Replace the existing handleModeChange function
+  const handleModeChange = useCallback(async (newMode) => {
     console.log(`🔄 Switching map mode from ${mapMode} to ${newMode}`);
     
     // Prevent unnecessary changes
@@ -467,43 +534,50 @@ function MapApp() {
     setShowUserCard(false);
     setSelectedSearchPlace(null);
     setIsSelectingPlace(false);
-    
     setUsersError(null);
     
-    // Stop any ongoing API calls by setting loading states
-    if (newMode === 'places') {
-      // Stop user searches and prepare for place searches
-      console.log('🏪 Switching to places mode - stopping user API calls');
-      setUsersLoading(false);
-      setUsersError(null);
-      setNearbyUsers([]); // Clear users to stop any rendering
-      
-      // Update mode
-      setMapMode(newMode);
-      
-      // Load places data if location is available
-      if (mapCenter && refetchCafes) {
-        console.log('📍 Loading cafes for places mode');
-        setTimeout(() => refetchCafes(), 300); // Small delay to ensure mode is set
-      }
-    } else if (newMode === 'people') {
-      // Stop place searches and prepare for user searches
-      console.log('👥 Switching to people mode - stopping places API calls');
-      
-      // Update mode first
-      setMapMode(newMode);
-      
-      // Load users data if location is available
-      if (mapCenter) {
-        console.log('📍 Loading users for people mode');
-        if (currentCity && currentCity.name !== 'Current Location') {
-          setTimeout(() => loadUsersByCity(currentCity.name, currentCity.coordinates), 300);
-        } else {
-          setTimeout(() => loadNearbyUsers(mapCenter.lat, mapCenter.lng), 300);
+    // Update mode first
+    setMapMode(newMode);
+    
+    // SEQUENTIAL data loading with delays
+    try {
+      if (newMode === 'places') {
+        console.log('🏪 Switching to places mode - stopping user API calls');
+        setUsersLoading(false);
+        setUsersError(null);
+        setNearbyUsers([]); // Clear users to stop any rendering
+        
+        // Wait a moment before loading places data
+        if (mapCenter && refetchCafes) {
+          console.log('📍 Loading cafes for places mode...');
+          await new Promise(resolve => setTimeout(resolve, 800)); // 800ms delay
+          refetchCafes();
         }
-        // Load discovery stats
-        setTimeout(() => loadDiscoveryStats(), 500);
+        
+      } else if (newMode === 'people') {
+        console.log('👥 Switching to people mode - stopping places API calls');
+        
+        // Wait before loading user data
+        if (mapCenter) {
+          await new Promise(resolve => setTimeout(resolve, 800)); // 800ms delay
+          
+          console.log('📍 Loading users for people mode...');
+          if (currentCity && currentCity.name !== 'Current Location') {
+            await loadUsersByCity(currentCity.name, currentCity.coordinates);
+          } else {
+            await loadNearbyUsers(mapCenter.lat, mapCenter.lng);
+          }
+          
+          // Load discovery stats after another delay
+          await new Promise(resolve => setTimeout(resolve, 500));
+          loadDiscoveryStats();
+        }
       }
+      
+      console.log(`✅ Sequential mode change to ${newMode} completed`);
+      
+    } catch (error) {
+      console.error(`❌ Error during sequential mode change to ${newMode}:`, error);
     }
   }, [mapMode, mapCenter, currentCity, refetchCafes, loadUsersByCity, loadNearbyUsers, loadDiscoveryStats]);
 
@@ -559,6 +633,18 @@ function MapApp() {
     console.log('✅ Location selection state updated');
   }, [isLocationSelecting, isSelectingPlace, mapMode, isModalMinimized]);
 
+  const handleClearPlace = useCallback(() => {
+    console.log('🧹 App.js: Clearing selected place');
+    setInviteSelectedPlace(null);
+    setSelectedCafe(null);
+    setSelectedSearchPlace(null);
+    
+    // If we're in location selection mode, keep it active
+    if (isSelectingPlace) {
+      console.log('📍 Keeping location selection mode active for new selection');
+    }
+  }, [isSelectingPlace]);
+
   const handleLocationSelectionEnd = useCallback(() => {
     console.log('✅ App.js: Location selection completed');
     console.log('🔍 Current state before cleanup:', {
@@ -589,7 +675,7 @@ function MapApp() {
         const formattedPlace = {
           id: place.id || place.googlePlaceId,
           name: place.name,
-          address: place.address || place.vicinity,
+          address: place.address || place.vicinity || place.formatted_address,
           location: place.location,
           type: place.type || place.placeType || 'cafe',
           rating: place.rating,
@@ -761,35 +847,51 @@ function MapApp() {
     }
   }, []);
 
+  // SEQUENTIAL APP INITIALIZATION - Replace the existing initialization
   useEffect(() => {
     // Prevent multiple initializations
     if (appReady) return;
     
-    console.log('🚀 Starting app initialization...');
+    console.log('🚀 Starting sequential app initialization...');
     setLoadingStage('initializing');
     setLoadingProgress(0);
     
     const initializeApp = async () => {
-      // Stage 1: Backend Health Check
-      setLoadingProgress(20);
-      const backendOk = await checkBackendHealth();
-      
-      if (backendOk) {
-        console.log('✅ Backend ready');
-        setLoadingProgress(40);
-        setAppReady(true);
+      try {
+        // Stage 1: Backend Health Check
+        setLoadingProgress(20);
+        console.log('🏥 Step 1: Checking backend health...');
+        const backendOk = await checkBackendHealth();
         
-        // Load initial cities
-        setTimeout(() => loadAvailableCities(), 1000); // Delay to prevent rate limit
-      } else {
-        console.log('⚡ App ready with degraded backend');
-        setLoadingProgress(30);
+        if (backendOk) {
+          console.log('✅ Backend ready');
+          setLoadingProgress(40);
+          setAppReady(true);
+          
+          // Wait 2 seconds before loading cities to prevent rate limiting
+          console.log('⏳ Waiting 2 seconds before loading cities...');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          console.log('🏙️ Step 2: Loading initial cities...');
+          await loadAvailableCities();
+          
+        } else {
+          console.log('⚡ App ready with degraded backend');
+          setLoadingProgress(30);
+          setAppReady(true);
+        }
+        
+        // Stage 2: Location Detection
+        setLoadingStage('location');
+        setLoadingProgress(50);
+        
+        console.log('✅ Sequential app initialization completed');
+        
+      } catch (error) {
+        console.error('❌ Sequential app initialization failed:', error);
+        // Still mark as ready to allow app to function
         setAppReady(true);
       }
-      
-      // Stage 2: Location Detection
-      setLoadingStage('location');
-      setLoadingProgress(50);
     };
 
     initializeApp();
@@ -819,6 +921,7 @@ function MapApp() {
     }
   }, [locationLoading, userLocation, hasLocation]);
 
+  // SEQUENTIAL INITIALIZATION - Replace the existing location effect
   useEffect(() => {
     if (userLocation && hasLocation && !locationLoading) {
       console.log('📍 Setting map center to user location:', {
@@ -831,27 +934,49 @@ function MapApp() {
         lng: userLocation.longitude
       });
       
-      // Debounce location updates to prevent rate limiting
-      const updateTimer = setTimeout(() => {
-        updateUserLocation(userLocation.latitude, userLocation.longitude);
-      }, 2000);
-      
-      // Load appropriate data based on mode with delay
-      if (mapMode === 'people') {
-        setTimeout(() => {
-          loadUsersByCity('Current Location', {
-            lat: userLocation.latitude,
-            lng: userLocation.longitude
-          });
-        }, 3000);
-      }
+      // SEQUENTIAL API CALLS - Execute one after another with delays
+      const executeSequentialInitialization = async () => {
+        try {
+          console.log('🔄 Starting sequential initialization...');
+          
+          // Step 1: Update user location (highest priority)
+          console.log('📍 Step 1: Updating user location...');
+          await updateUserLocation(userLocation.latitude, userLocation.longitude);
+          
+          // Wait 1 second before next API call
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // Step 2: Load available cities (medium priority)
+          console.log('🏙️ Step 2: Loading available cities...');
+          await loadAvailableCities();
+          
+          // Wait 1.5 seconds before next API call
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          
+          // Step 3: Load mode-specific data (lower priority)
+          if (mapMode === 'people') {
+            console.log('👥 Step 3: Loading users for people mode...');
+            await loadUsersByCity('Current Location', {
+              lat: userLocation.latitude,
+              lng: userLocation.longitude
+            });
+          }
+          // Note: Places data will be loaded by the useCafes hook when needed
+          
+          console.log('✅ Sequential initialization completed successfully');
+          
+        } catch (error) {
+          console.error('❌ Sequential initialization failed:', error);
+          // Don't throw - let the app continue with partial data
+        }
+      };
+
+      executeSequentialInitialization();
       
       setLoadingStage('map');
       setLoadingProgress(90);
-      
-      return () => clearTimeout(updateTimer);
     }
-  }, [userLocation?.latitude, userLocation?.longitude, hasLocation, locationLoading, mapMode]);
+  }, [userLocation?.latitude, userLocation?.longitude, hasLocation, locationLoading, mapMode, updateUserLocation, loadAvailableCities, loadUsersByCity]);
 
   // Final readiness check
   useEffect(() => {
@@ -875,8 +1000,8 @@ function MapApp() {
     };
   }, [handlePlaceClick]);
 
-  // ENHANCED: Search change handler
-  const handleSearchChange = useCallback((changes) => {
+  // SEQUENTIAL SEARCH CHANGES - Replace the existing handleSearchChange
+  const handleSearchChange = useCallback(async (changes) => {
     console.log('🔍 Search parameters changed:', changes);
     
     if (changes.type !== undefined) {
@@ -887,19 +1012,32 @@ function MapApp() {
       setSearchRadius(parseInt(changes.radius));
     }
     
-    // Auto-refetch with new parameters
-    setTimeout(() => {
-      if (refetchCafes && mapCenter && mapMode === 'places') {
-        console.log('🔄 Auto-refetching with new search params');
-        refetchCafes();
-      } else if (mapCenter && mapMode === 'people') {
-        if (currentCity && currentCity.name !== 'Current Location') {
-          loadUsersByCity(currentCity.name, currentCity.coordinates);
-        } else {
-          loadNearbyUsers(mapCenter.lat, mapCenter.lng);
+    // SEQUENTIAL auto-refetch with delay to prevent rate limiting
+    const executeSequentialRefresh = async () => {
+      try {
+        // Wait 800ms before making API calls
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        if (refetchCafes && mapCenter && mapMode === 'places') {
+          console.log('🔄 Sequential refetch for places with new search params');
+          await refetchCafes();
+        } else if (mapCenter && mapMode === 'people') {
+          console.log('🔄 Sequential refetch for people with new search params');
+          if (currentCity && currentCity.name !== 'Current Location') {
+            await loadUsersByCity(currentCity.name, currentCity.coordinates);
+          } else {
+            await loadNearbyUsers(mapCenter.lat, mapCenter.lng);
+          }
         }
+        
+        console.log('✅ Sequential search refresh completed');
+        
+      } catch (error) {
+        console.error('❌ Sequential search refresh failed:', error);
       }
-    }, 300);
+    };
+    
+    executeSequentialRefresh();
     
   }, [refetchCafes, mapCenter, mapMode, currentCity, loadUsersByCity, loadNearbyUsers]);
 
