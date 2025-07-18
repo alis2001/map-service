@@ -3131,7 +3131,7 @@ html, body, #root {
 }
 
 .place-card-selectable:hover {
-  transform: translateY(-2px);
+  transform: translateY(-1px); /* CHANGED: from translateY(-2px) to smaller movement */
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
   border-color: rgba(102, 126, 234, 0.2);
 }
@@ -3177,14 +3177,41 @@ html, body, #root {
   border-radius: 8px;
   font-size: 13px;
   font-weight: 600;
-  cursor: pointer;
+  cursor: default; /* CHANGED: from 'pointer' to 'default' */
   transition: all 0.3s ease;
   flex-shrink: 0;
 }
 
 .btn-select-place:hover {
-  transform: translateY(-1px);
+  transform: translateY(-0.5px); /* CHANGED: from translateY(-1px) to smaller movement */
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+/* ============================================
+   MAP SELECTION BUTTON OVERRIDE
+   ============================================ */
+
+/* Specific styling for the "Oppure seleziona dalla mappa" button */
+.location-action-btn.precise-btn {
+  padding: 16px 20px; /* INCREASED: from 10px 14px to 16px 20px for more height */
+  width: 100%; /* ADDED: full width */
+  justify-content: center; /* ADDED: center the content */
+  text-align: center; /* ADDED: center the text */
+  font-size: 15px; /* INCREASED: from 13px to 15px for better visibility */
+  margin: 0 auto; /* ADDED: center the button itself */
+  border-radius: 16px; /* INCREASED: from var(--border-radius-small) to 16px for modern look */
+}
+
+/* Ensure the button text is centered */
+.location-action-btn.precise-btn .btn-text {
+  text-align: center;
+  flex: none; /* CHANGED: from flex: 1 to flex: none to prevent stretching */
+}
+
+/* Ensure the icon doesn't take extra space */
+.location-action-btn.precise-btn .btn-icon {
+  flex-shrink: 0;
+  margin-right: 4px; /* ADDED: small margin for spacing */
 }
 
 /* No Places State */
@@ -3650,12 +3677,22 @@ html, body, #root {
    ============================================ */
 
 .places-list-enhanced {
-  max-height: 400px;
-  overflow-y: auto;
+  flex: 1; /* Take remaining space */
+  overflow-y: auto; /* Make it scrollable */
   padding: 16px 24px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  max-height: none; /* Remove max-height constraint */
+}
+
+.location-selection-bottom {
+  padding: 16px 24px;
+  border-top: 1px solid rgba(0,0,0,0.05);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  margin-top: auto; /* Push to bottom */
+  flex-shrink: 0; /* Prevent shrinking */
 }
 
 .place-card-enhanced {
@@ -3831,18 +3868,19 @@ html, body, #root {
   line-height: 1;
 }
 
+/* Fix button structure and height */
 .btn-select-place-enhanced {
   width: auto;
   min-width: 120px;
   max-width: 150px;
-  padding: 10px 20px;
+  padding: 14px 24px !important; /* INCREASED: from 10px 20px to 14px 24px for more height */
   margin: 0 auto;
   border: none;
   border-radius: 12px;
   color: white;
   font-weight: 600;
-  font-size: 13px;
-  cursor: default;
+  font-size: 14px !important; /* INCREASED: from 13px to 14px */
+  cursor: default !important; /* FORCE: remove pointer cursor */
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   align-items: center;
@@ -4563,6 +4601,82 @@ html, body, #root {
   -moz-user-select: none;
   -ms-user-select: none;
 }
+
+
+/* ============================================
+   FIX FOR ENHANCED PLACE CARDS AND BUTTONS - FINAL
+   ============================================ */
+
+/* Fix hover effect for enhanced place cards - MISSING RULE */
+.place-card-enhanced:hover {
+  transform: translateY(-1px) !important; /* FIXED: from -2px to -1px with !important to override */
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1) !important;
+  border-color: rgba(102, 126, 234, 0.2) !important;
+}
+
+/* Strengthen button fixes with !important */
+.btn-select-place-enhanced:hover {
+  transform: translateY(-0.5px) !important; /* REDUCED: from translateY(-1px) to smaller movement */
+  cursor: default !important; /* FORCE: keep default cursor even on hover */
+}
+
+/* Fix button text cursor - STRENGTHEN */
+.btn-select-place-enhanced span {
+  cursor: default !important; /* FORCE: remove pointer cursor from text */
+  pointer-events: none !important; /* PREVENT: any pointer events on text */
+}
+
+/* Fix select arrow - STRENGTHEN */
+.select-arrow {
+  cursor: default !important; /* FORCE: remove pointer cursor */
+  pointer-events: none !important; /* PREVENT: any pointer events */
+}
+
+.btn-select-place-enhanced:hover .select-arrow {
+  cursor: default !important; /* FORCE: keep default cursor */
+}
+
+/* Override any existing place-card-selectable styles as well - STRENGTHEN */
+.place-card-selectable:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1) !important;
+  border-color: rgba(102, 126, 234, 0.2) !important;
+}
+
+/* Fix main button list styles - STRENGTHEN */
+.btn-select-place:hover {
+  transform: translateY(-0.5px) !important; /* REDUCED: smaller movement */
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3) !important;
+  cursor: default !important; /* FORCE: keep default cursor */
+}
+
+
+/* ============================================
+   ULTIMATE CURSOR FIX - OVERRIDE ALL
+   ============================================ */
+
+/* Force default cursor on all button elements */
+.btn-select-place-enhanced,
+.btn-select-place-enhanced *,
+.btn-select-place,
+.btn-select-place * {
+  cursor: default !important;
+}
+
+/* Remove pointer events from spans inside buttons */
+.btn-select-place-enhanced span,
+.btn-select-place span {
+  pointer-events: none !important;
+  cursor: default !important;
+}
+
+/* Make hover effect more visible */
+.place-card-enhanced:hover {
+  transform: translateY(-2px) !important; /* Make it more visible */
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15) !important;
+  border-color: rgba(102, 126, 234, 0.3) !important;
+}
+
 
 /* ============================================
    END OF FILE

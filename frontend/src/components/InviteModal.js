@@ -59,38 +59,11 @@ const InviteModal = ({
         cafe.name.toLowerCase().includes(locationSearch.toLowerCase()) ||
         (cafe.address && cafe.address.toLowerCase().includes(locationSearch.toLowerCase()));
         
-        // Enhanced type detection - check multiple sources
-        const placeType = (cafe.type || cafe.placeType || '').toLowerCase();
-        const placeName = (cafe.name || '').toLowerCase();
-        const googleTypes = cafe.types || []; // Google API types array
+        // SIMPLIFIED: Only apply search filter, not type filter
+        // The API already handles type filtering, so we should show ALL results from API
+        // The user can filter visually with the buttons but see all venues
         
-        // Check if it's a restaurant based on multiple criteria
-        const isRestaurant = 
-        placeType === 'restaurant' ||
-        googleTypes.includes('restaurant') ||
-        googleTypes.includes('meal_takeaway') ||
-        googleTypes.includes('meal_delivery') ||
-        placeName.includes('pizzeria') || placeName.includes('pizza') ||
-        placeName.includes('ristorante') || placeName.includes('osteria') ||
-        placeName.includes('trattoria') || placeName.includes('gelateria') ||
-        placeName.includes('gelato') || placeName.includes('pasticceria') ||
-        placeName.includes('dolc');
-        
-        // Check if it's a cafe/bar
-        const isCafe = 
-        placeType === 'cafe' ||
-        googleTypes.includes('cafe') ||
-        googleTypes.includes('bar') ||
-        placeName.includes('bar') || placeName.includes('caffè') ||
-        placeName.includes('caffe') || !isRestaurant; // default to cafe if not restaurant
-        
-        // Determine actual type
-        let actualType = isRestaurant ? 'restaurant' : 'cafe';
-        
-        // Filter matching
-        const matchesFilter = selectedFilter === 'all' || actualType === selectedFilter;
-        
-        return matchesSearch && matchesFilter;
+        return matchesSearch;
     });
 
     // Sort by distance if available, then by rating
@@ -441,22 +414,32 @@ const InviteModal = ({
                   
                   <div className="filter-buttons">
                     <button 
-                      className={`filter-btn ${selectedFilter === 'all' ? 'active' : ''}`}
-                      onClick={() => setSelectedFilter('all')}
-                    >
-                      Tutti
-                    </button>
-                    <button 
-                      className={`filter-btn ${selectedFilter === 'cafe' ? 'active' : ''}`}
-                      onClick={() => setSelectedFilter('cafe')}
-                    >
-                      ☕ Bar
-                    </button>
-                    <button 
-                      className={`filter-btn ${selectedFilter === 'restaurant' ? 'active' : ''}`}
-                      onClick={() => setSelectedFilter('restaurant')}
-                    >
-                      🍽️ Ristoranti
+                        className={`filter-btn ${selectedFilter === 'all' ? 'active' : ''}`}
+                        onClick={() => setSelectedFilter('all')}
+                        >
+                        Tutti ({filteredCafes.length})
+                        </button>
+                        <button 
+                        className={`filter-btn ${selectedFilter === 'cafe' ? 'active' : ''}`}
+                        onClick={() => setSelectedFilter('cafe')}
+                        >
+                        ☕ Bar ({filteredCafes.filter(c => {
+                            const placeType = (c.type || c.placeType || '').toLowerCase();
+                            const placeName = (c.name || '').toLowerCase();
+                            return placeType === 'cafe' || placeName.includes('bar') || placeName.includes('caffè') || 
+                                (!placeType.includes('restaurant') && !placeName.includes('ristorante'));
+                        }).length})
+                        </button>
+                        <button 
+                        className={`filter-btn ${selectedFilter === 'restaurant' ? 'active' : ''}`}
+                        onClick={() => setSelectedFilter('restaurant')}
+                        >
+                        🍽️ Ristoranti ({filteredCafes.filter(c => {
+                            const placeType = (c.type || c.placeType || '').toLowerCase();
+                            const placeName = (c.name || '').toLowerCase();
+                            return placeType === 'restaurant' || placeName.includes('ristorante') || 
+                                placeName.includes('pizzeria') || placeName.includes('trattoria');
+                        }).length})
                     </button>
                   </div>
                 </div>
@@ -558,11 +541,12 @@ const InviteModal = ({
                                 style={{
                                     background: `linear-gradient(135deg, ${typeColor}, ${typeColor}dd)`,
                                     boxShadow: `0 4px 12px ${typeColor}30`,
-                                    cursor: 'default'
+                                    cursor: 'default !important',
+                                    pointerEvents: 'auto'
                                 }}
                             >
-                                <span>Seleziona</span>
-                                <span className="select-arrow">→</span>
+                                <span style={{ cursor: 'default !important', pointerEvents: 'none' }}>Seleziona</span>
+                                <span className="select-arrow" style={{ cursor: 'default !important', pointerEvents: 'none' }}>→</span>
                             </button>
                             </div>
                         );
@@ -587,28 +571,11 @@ const InviteModal = ({
                     )}
                     </div>
 
-                <div style={{ padding: '16px 24px', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
-                  <button 
-                    className="btn-select-from-map"
-                    onClick={handleLocationSelectionStart}
-                    style={{
-                      width: '100%',
-                      padding: '12px 16px',
-                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '12px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px'
-                    }}
-                  >
-                    <MapPin className="w-4 h-4" />
-                    Oppure seleziona dalla mappa
-                  </button>
+                <div className="location-selection-bottom">
+                    <button className="location-action-btn precise-btn" onClick={handleLocationSelectionStart}>
+                        <span className="btn-icon">📍</span>
+                        <span className="btn-text">Oppure seleziona dalla mappa</span>
+                    </button>
                 </div>
               </div>
             ) : (
