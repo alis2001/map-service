@@ -158,8 +158,8 @@ const FullPageMap = ({
     };
 
     const statusColor = getStatusColor();
-    const markerSize = 52; // Slightly larger for better visibility
-    const totalSize = markerSize + 20;
+    const markerSize = 28; // Slightly larger for better visibility
+    const totalSize = markerSize + 12;
 
     // Enhanced user status text
     const getStatusText = () => {
@@ -175,70 +175,62 @@ const FullPageMap = ({
       return 'Away';
     };
 
-    // Enhanced SVG for user marker with better status indicators
+    // Enhanced SVG for user marker - Purple Lightning Theme (Smaller & Cuter)
     const userMarkerSVG = `
       <svg width="${totalSize}" height="${totalSize}" viewBox="0 0 ${totalSize} ${totalSize}" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <clipPath id="circleClip${user.userId || user.id}">
-            <circle cx="${totalSize / 2}" cy="${totalSize / 2}" r="${markerSize / 2 - 4}"/>
+            <circle cx="${totalSize / 2}" cy="${totalSize / 2}" r="${markerSize / 2 - 3}"/>
           </clipPath>
-          <filter id="glow${user.userId || user.id}">
-            <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+          <filter id="purpleGlow${user.userId || user.id}">
+            <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
             <feMerge>
               <feMergeNode in="coloredBlur"/>
               <feMergeNode in="SourceGraphic"/>
             </feMerge>
           </filter>
-          <radialGradient id="profileGrad${user.userId || user.id}" cx="30%" cy="30%" r="70%">
-            <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.6" />
-            <stop offset="50%" style="stop-color:${statusColor};stop-opacity:0.3" />
-            <stop offset="100%" style="stop-color:${statusColor};stop-opacity:0.8" />
+          <radialGradient id="purpleGrad${user.userId || user.id}" cx="30%" cy="30%" r="70%">
+            <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.8" />
+            <stop offset="30%" style="stop-color:#a855f7;stop-opacity:0.9" />
+            <stop offset="100%" style="stop-color:#7c3aed;stop-opacity:1" />
           </radialGradient>
+          <linearGradient id="lightningGrad${user.userId || user.id}" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#fbbf24;stop-opacity:1" />
+            <stop offset="50%" style="stop-color:#f59e0b;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#d97706;stop-opacity:1" />
+          </linearGradient>
         </defs>
         
-        <!-- Outer status ring -->
+        <!-- Outer purple glow ring -->
         <circle cx="${totalSize / 2}" cy="${totalSize / 2}" r="${markerSize / 2 + 2}" 
-                fill="none" stroke="${statusColor}" stroke-width="4" opacity="0.8"
-                filter="url(#glow${user.userId || user.id})"/>
+                fill="none" stroke="#a855f7" stroke-width="2" opacity="0.6"
+                filter="url(#purpleGlow${user.userId || user.id})"/>
         
-        <!-- White background -->
+        <!-- Main purple background -->
         <circle cx="${totalSize / 2}" cy="${totalSize / 2}" r="${markerSize / 2}" 
-                fill="white" stroke="${statusColor}" stroke-width="3"/>
+                fill="url(#purpleGrad${user.userId || user.id})" stroke="#7c3aed" stroke-width="2"/>
         
-        <!-- Profile photo or initials -->
-        ${user.profilePic ? `
-          <image x="${(totalSize - markerSize + 8) / 2}" y="${(totalSize - markerSize + 8) / 2}" 
-                 width="${markerSize - 8}" height="${markerSize - 8}" 
-                 href="${user.profilePic}" clip-path="url(#circleClip${user.userId || user.id})"/>
-        ` : `
-          <circle cx="${totalSize / 2}" cy="${totalSize / 2}" r="${markerSize / 2 - 4}" 
-                  fill="url(#profileGrad${user.userId || user.id})"/>
-          <text x="${totalSize / 2}" y="${totalSize / 2 + 6}" 
-                text-anchor="middle" font-size="20" font-weight="bold" fill="white">
-            ${user.firstName?.charAt(0) || ''}${user.lastName?.charAt(0) || ''}
-          </text>
-        `}
+        <!-- Lightning bolt icon -->
+        <path d="M${totalSize / 2 - 4} ${totalSize / 2 - 6} L${totalSize / 2 + 1} ${totalSize / 2 - 1} L${totalSize / 2 - 2} ${totalSize / 2 - 1} L${totalSize / 2 + 4} ${totalSize / 2 + 6} L${totalSize / 2 - 1} ${totalSize / 2 + 1} L${totalSize / 2 + 2} ${totalSize / 2 + 1} Z" 
+              fill="url(#lightningGrad${user.userId || user.id})" stroke="#ffffff" stroke-width="0.5"/>
         
-        <!-- Enhanced status indicator -->
-        <circle cx="${totalSize - 8}" cy="12" r="8" fill="${statusColor}" stroke="white" stroke-width="3"/>
-        
-        <!-- Distance badge if available -->
-        ${user.distance && user.distance < 1000 ? `
-          <rect x="2" y="${totalSize - 18}" width="24" height="16" rx="8" 
-                fill="rgba(0,0,0,0.8)" stroke="white" stroke-width="1"/>
-          <text x="14" y="${totalSize - 8}" text-anchor="middle" 
-                font-size="9" font-weight="bold" fill="white">
+        ${user.distance ? `
+          <!-- Distance label -->
+          <rect x="2" y="${totalSize - 16}" width="20" height="12" rx="6" 
+                fill="rgba(139, 69, 19, 0.9)" stroke="white" stroke-width="1"/>
+          <text x="12" y="${totalSize - 8}" text-anchor="middle" 
+                font-size="7" font-weight="bold" fill="white">
             ${Math.round(user.distance)}m
           </text>
         ` : ''}
         
         ${user.isLive && statusColor === '#10b981' ? `
           <!-- Active pulse animation -->
-          <circle cx="${totalSize / 2}" cy="${totalSize / 2}" r="${markerSize / 2 + 8}" 
-                  fill="none" stroke="${statusColor}" stroke-width="2" opacity="0.6">
-            <animate attributeName="r" values="${markerSize / 2 + 8};${markerSize / 2 + 16};${markerSize / 2 + 8}" 
-                     dur="2s" repeatCount="indefinite"/>
-            <animate attributeName="opacity" values="0.6;0.1;0.6" dur="2s" repeatCount="indefinite"/>
+          <circle cx="${totalSize / 2}" cy="${totalSize / 2}" r="${markerSize / 2 + 6}" 
+                  fill="none" stroke="#a855f7" stroke-width="2" opacity="0.4">
+            <animate attributeName="r" values="${markerSize / 2 + 6};${markerSize / 2 + 12};${markerSize / 2 + 6}" 
+                    dur="2s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0.4;0.1;0.4" dur="2s" repeatCount="indefinite"/>
           </circle>
         ` : ''}
       </svg>
@@ -1409,6 +1401,7 @@ const FullPageMap = ({
       });
 
       console.log(`✅ Created ${validCafes.length} enhanced place markers`);
+      console.log('🔍 MARKER DEBUG - mapMode:', mapMode, 'users:', users?.length, 'mapLoaded:', mapLoaded);
 
     } else if (mapMode === 'people' && users && users.length > 0) {
       // PEOPLE MODE: Create user markers
@@ -1433,7 +1426,7 @@ const FullPageMap = ({
 
     console.log(`🎉 ENHANCED DUAL MARKER UPDATE completed - Mode: ${mapMode}`);
 
-  }, [cafes, users, mapMode, cafeType, mapLoaded, isDragging, isMapInteracting, isZoomingIn, isZoomingOut, handleSmoothMarkerClick, handleMarkerHover, zoomLevel, createUserMarker, isSelectingPlace, onCafeSelect]);
+  }, [cafes, users, mapMode, cafeType, mapLoaded, handleSmoothMarkerClick, handleMarkerHover, createUserMarker, isSelectingPlace, onCafeSelect]);
 
   // ENHANCED: Smooth loading animations
   const SmoothLoader = ({ isVisible, message = "Loading..." }) => (
