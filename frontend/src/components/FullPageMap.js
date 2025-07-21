@@ -1,23 +1,580 @@
-// components/FullPageMap.js - PRODUCTION READY DUAL MODE MAP - FIXED VERSION
+// components/FullPageMap.js - COMPLETE AIRBNB MARKER RENDERING SYSTEM
 // Location: /frontend/src/components/FullPageMap.js
 
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import LoadingScreen from './LoadingScreen';
 import MapUpdateLoader from './MapUpdateLoader';
 import CafePopup from './CafePopup';
 import MapControls from './MapControls';
 import MarkerHoverTooltip from './MarkerHoverTooltip';
 
+// AIRBNB'S MARKER POOL SYSTEM - Eliminates marker flickering
+class AirbnbMarkerPool {
+  constructor(mapInstance) {
+    this.map = mapInstance;
+    this.pool = [];
+    this.activeMarkers = new Map();
+    this.maxPoolSize = 100;
+    this.animationFrameId = null;
+    
+    console.log('🏊‍♂️ Airbnb Marker Pool initialized');
+  }
+
+  getMarker(id, type = 'place') {
+    let marker;
+    
+    if (this.pool.length > 0) {
+      marker = this.pool.pop();
+      console.log(`♻️ Reusing pooled marker for ${id}`);
+    } else {
+      marker = new window.google.maps.Marker({
+        map: this.map,
+        optimized: false // Required for smooth animations
+      });
+      console.log(`🆕 Created new marker for ${id}`);
+    }
+
+    // Add custom properties for tracking
+    marker._poolId = id;
+    marker._poolType = type;
+    marker._isActive = true;
+    marker._fadeElement = null;
+    
+    this.activeMarkers.set(id, marker);
+    return marker;
+  }
+
+  releaseMarker(id) {
+    const marker = this.activeMarkers.get(id);
+    if (!marker) return;
+
+    // Smooth fade out using CSS transforms
+    this.fadeOutMarker(marker, () => {
+      marker.setVisible(false);
+      marker._isActive = false;
+      
+      // Return to pool if under limit
+      if (this.pool.length < this.maxPoolSize) {
+        this.pool.push(marker);
+        console.log(`🔄 Released marker ${id} to pool`);
+      } else {
+        marker.setMap(null);
+        console.log(`🗑️ Discarded excess marker ${id}`);
+      }
+    });
+
+    this.activeMarkers.delete(id);
+  }
+
+  fadeOutMarker(marker, callback) {
+    // Use requestAnimationFrame for smooth 60fps animation
+    let opacity = 1;
+    const fadeStep = () => {
+      opacity -= 0.1;
+      
+      if (opacity <= 0) {
+        callback();
+        return;
+      }
+      
+      // Apply hardware-accelerated opacity change
+      if (marker.getIcon && marker.getIcon()) {
+        const icon = marker.getIcon();
+        const newIcon = {
+          ...icon,
+          url: icon.url + `&opacity=${opacity}`
+        };
+        marker.setIcon(newIcon);
+      }
+      
+      this.animationFrameId = requestAnimationFrame(fadeStep);
+    };
+    
+    this.animationFrameId = requestAnimationFrame(fadeStep);
+  }
+
+  clearPool() {
+    // Cancel any ongoing animations
+    if (this.animationFrameId) {
+      cancelAnimationFrame(this.animationFrameId);
+    }
+    
+    // Release all active markers
+    this.activeMarkers.forEach((marker, id) => {
+      this.releaseMarker(id);
+    });
+    
+    // Clear the pool
+    this.pool.forEach(marker => {
+      if (marker.setMap) marker.setMap(null);
+    });
+    this.pool = [];
+    
+    console.log('🧹 Marker pool cleared');
+  }
+
+  getStats() {
+    return {
+      active: this.activeMarkers.size,
+      pooled: this.pool.length,
+      total: this.activeMarkers.size + this.pool.length
+    };
+  }
+}
+
+// AIRBNB'S VIEWPORT CULLING SYSTEM
+class AirbnbViewportCuller {
+  constructor() {
+    this.currentViewport = null;
+    this.observer = null;
+    this.intersectionCallbacks = new Map();
+    this.culledMarkers = new Set();
+    
+    console.log('👁️ Airbnb Viewport Culler initialized');
+  }
+
+  setViewport(bounds) {
+    this.currentViewport = {
+      north: bounds.getNorthEast().lat(),
+      south: bounds.getSouthWest().lat(),
+      east: bounds.getNorthEast().lng(),
+      west: bounds.getSouthWest().lng()
+    };
+  }
+
+  isInViewport(lat, lng, buffer = 0.01) {
+    if (!this.currentViewport) return true;
+    
+    return lat >= this.currentViewport.south - buffer &&
+           lat <= this.currentViewport.north + buffer &&
+           lng >= this.currentViewport.west - buffer &&
+           lng <= this.currentViewport.east + buffer;
+  }
+
+  cullMarkers(markers) {
+    if (!this.currentViewport) return markers;
+    
+    return markers.filter(marker => {
+      const lat = marker.location?.latitude || marker.latitude;
+      const lng = marker.location?.longitude || marker.longitude;
+      
+      const isVisible = this.isInViewport(lat, lng, 0.005); // Smaller buffer for precise culling
+      
+      if (!isVisible) {
+        this.culledMarkers.add(marker.id || marker.googlePlaceId || marker.userId);
+      } else {
+        this.culledMarkers.delete(marker.id || marker.googlePlaceId || marker.userId);
+      }
+      
+      return isVisible;
+    });
+  }
+
+  initIntersectionObserver(container) {
+    if (this.observer) this.observer.disconnect();
+
+    this.observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        const markerId = entry.target.dataset.markerId;
+        const callback = this.intersectionCallbacks.get(markerId);
+        
+        if (callback) {
+          callback(entry.isIntersecting, entry.intersectionRatio);
+        }
+      });
+    }, {
+      root: container,
+      rootMargin: '100px', // Load markers slightly outside viewport
+      threshold: [0, 0.25, 0.5, 0.75, 1.0] // Multiple thresholds for smooth transitions
+    });
+
+    console.log('👁️ Intersection Observer initialized');
+  }
+
+  observeMarker(markerId, element, callback) {
+    if (!this.observer || !element) return;
+    
+    element.dataset.markerId = markerId;
+    this.intersectionCallbacks.set(markerId, callback);
+    this.observer.observe(element);
+  }
+
+  unobserveMarker(markerId) {
+    this.intersectionCallbacks.delete(markerId);
+  }
+
+  destroy() {
+    if (this.observer) {
+      this.observer.disconnect();
+    }
+    this.intersectionCallbacks.clear();
+    this.culledMarkers.clear();
+  }
+}
+
+// AIRBNB'S FRAME-BASED RENDERER
+class AirbnbFrameRenderer {
+  constructor() {
+    this.pendingUpdates = [];
+    this.isRendering = false;
+    this.frameId = null;
+    this.lastFrameTime = 0;
+    this.targetFPS = 60;
+    this.frameInterval = 1000 / this.targetFPS;
+    
+    console.log('🎬 Airbnb Frame Renderer initialized');
+  }
+
+  scheduleUpdate(updateFn, priority = 'normal') {
+    this.pendingUpdates.push({
+      fn: updateFn,
+      priority: priority === 'high' ? 1 : 0,
+      timestamp: performance.now()
+    });
+
+    // Sort by priority
+    this.pendingUpdates.sort((a, b) => b.priority - a.priority);
+
+    if (!this.isRendering) {
+      this.startRenderLoop();
+    }
+  }
+
+  startRenderLoop() {
+    this.isRendering = true;
+    this.renderFrame();
+  }
+
+  renderFrame = (currentTime) => {
+    if (currentTime - this.lastFrameTime >= this.frameInterval) {
+      const startTime = performance.now();
+      const frameBudget = 12; // Leave 4ms for other operations in 16ms frame
+      
+      while (this.pendingUpdates.length > 0 && 
+             (performance.now() - startTime) < frameBudget) {
+        const update = this.pendingUpdates.shift();
+        try {
+          update.fn();
+        } catch (error) {
+          console.error('Frame render error:', error);
+        }
+      }
+      
+      this.lastFrameTime = currentTime;
+    }
+
+    if (this.pendingUpdates.length > 0) {
+      this.frameId = requestAnimationFrame(this.renderFrame);
+    } else {
+      this.isRendering = false;
+    }
+  }
+
+  clearPendingUpdates() {
+    this.pendingUpdates = [];
+    if (this.frameId) {
+      cancelAnimationFrame(this.frameId);
+      this.frameId = null;
+    }
+    this.isRendering = false;
+  }
+}
+
+// AIRBNB'S SMOOTH MARKER MANAGER
+class AirbnbSmoothMarkerManager {
+  constructor(map) {
+    this.map = map;
+    this.markerPool = new AirbnbMarkerPool(map);
+    this.viewportCuller = new AirbnbViewportCuller();
+    this.frameRenderer = new AirbnbFrameRenderer();
+    this.activeMarkers = new Map();
+    this.markerElements = new Map();
+    this.transitioningMarkers = new Set();
+    
+    console.log('🎯 Airbnb Smooth Marker Manager initialized');
+  }
+
+  updateMarkers(newMarkers, mapMode, currentFilter) {
+    // Use frame-based rendering for smooth updates
+    this.frameRenderer.scheduleUpdate(() => {
+      this.performMarkerUpdate(newMarkers, mapMode, currentFilter);
+    }, 'high');
+  }
+
+  performMarkerUpdate(newMarkers, mapMode, currentFilter) {
+    // Step 1: Cull markers outside viewport
+    const visibleMarkers = this.viewportCuller.cullMarkers(newMarkers);
+    
+    // Step 2: Create sets for comparison
+    const newMarkerIds = new Set(
+      visibleMarkers.map(m => m.id || m.googlePlaceId || m.userId)
+    );
+    const currentMarkerIds = new Set(this.activeMarkers.keys());
+    
+    // Step 3: Remove markers that are no longer needed
+    currentMarkerIds.forEach(id => {
+      if (!newMarkerIds.has(id)) {
+        this.removeMarkerSmoothly(id);
+      }
+    });
+    
+    // Step 4: Add or update markers
+    visibleMarkers.forEach((markerData, index) => {
+      const id = markerData.id || markerData.googlePlaceId || markerData.userId;
+      
+      if (this.activeMarkers.has(id)) {
+        this.updateExistingMarker(id, markerData, index, currentFilter);
+      } else {
+        this.addMarkerSmoothly(id, markerData, index, mapMode, currentFilter);
+      }
+    });
+  }
+
+  addMarkerSmoothly(id, markerData, index, mapMode, currentFilter) {
+    if (this.transitioningMarkers.has(id)) return; // Already transitioning
+    
+    this.transitioningMarkers.add(id);
+    
+    // Get marker from pool
+    const marker = this.markerPool.getMarker(id, mapMode);
+    
+    // Set position and basic properties
+    const position = mapMode === 'people' 
+      ? { lat: markerData.latitude, lng: markerData.longitude }
+      : { lat: markerData.location.latitude, lng: markerData.location.longitude };
+    
+    marker.setPosition(position);
+    
+    // Create appropriate icon
+    const icon = this.createMarkerIcon(markerData, index, mapMode, currentFilter);
+    marker.setIcon(icon);
+    
+    // Start invisible and fade in
+    marker.setVisible(false);
+    
+    // Smooth fade in using requestAnimationFrame
+    this.frameRenderer.scheduleUpdate(() => {
+      marker.setVisible(true);
+      this.fadeInMarker(marker, () => {
+        this.transitioningMarkers.delete(id);
+      });
+    });
+    
+    // Store reference
+    this.activeMarkers.set(id, { marker, data: markerData });
+    
+    console.log(`➕ Added marker ${id} smoothly`);
+  }
+
+  removeMarkerSmoothly(id) {
+    const markerInfo = this.activeMarkers.get(id);
+    if (!markerInfo || this.transitioningMarkers.has(id)) return;
+    
+    this.transitioningMarkers.add(id);
+    
+    // Smooth fade out using the pool's method
+    this.markerPool.releaseMarker(id);
+    this.activeMarkers.delete(id);
+    
+    setTimeout(() => {
+      this.transitioningMarkers.delete(id);
+    }, 200);
+    
+    console.log(`➖ Removed marker ${id} smoothly`);
+  }
+
+  updateExistingMarker(id, markerData, index, currentFilter) {
+    const markerInfo = this.activeMarkers.get(id);
+    if (!markerInfo) return;
+    
+    const { marker } = markerInfo;
+    
+    // Update icon if needed (for hover states, etc.)
+    const newIcon = this.createMarkerIcon(markerData, index, 
+      markerData.firstName ? 'people' : 'places', currentFilter);
+    
+    // Smooth icon transition
+    this.frameRenderer.scheduleUpdate(() => {
+      marker.setIcon(newIcon);
+    });
+    
+    // Update stored data
+    markerInfo.data = markerData;
+  }
+
+  fadeInMarker(marker, callback) {
+    let opacity = 0;
+    const fadeStep = () => {
+      opacity += 0.2;
+      
+      if (opacity >= 1) {
+        callback();
+        return;
+      }
+      
+      // Apply smooth opacity transition
+      const icon = marker.getIcon();
+      if (icon) {
+        const newIcon = {
+          ...icon,
+          opacity: opacity
+        };
+        marker.setIcon(newIcon);
+      }
+      
+      requestAnimationFrame(fadeStep);
+    };
+    
+    requestAnimationFrame(fadeStep);
+  }
+
+  createMarkerIcon(markerData, index, mapMode, currentFilter) {
+    if (mapMode === 'people') {
+      return this.createUserMarkerIcon(markerData);
+    } else {
+      return this.createPlaceMarkerIcon(markerData, index, currentFilter);
+    }
+  }
+
+  createUserMarkerIcon(user) {
+    const getStatusColor = () => {
+      if (!user.isLive) return '#6b7280';
+      
+      const timeDiff = new Date() - new Date(user.lastSeen);
+      const minutesAgo = Math.floor(timeDiff / (1000 * 60));
+      
+      if (minutesAgo < 2) return '#10b981';
+      if (minutesAgo < 5) return '#22c55e';
+      if (minutesAgo < 15) return '#eab308';
+      if (minutesAgo < 30) return '#f59e0b';
+      return '#6b7280';
+    };
+
+    const statusColor = getStatusColor();
+    const markerSize = 28;
+    const totalSize = markerSize + 12;
+
+    const userMarkerSVG = `
+      <svg width="${totalSize}" height="${totalSize}" viewBox="0 0 ${totalSize} ${totalSize}" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="purpleGrad${user.userId || user.id}" cx="30%" cy="30%" r="70%">
+            <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.8" />
+            <stop offset="30%" style="stop-color:#a855f7;stop-opacity:0.9" />
+            <stop offset="100%" style="stop-color:#7c3aed;stop-opacity:1" />
+          </radialGradient>
+        </defs>
+        
+        <circle cx="${totalSize / 2}" cy="${totalSize / 2}" r="${markerSize / 2 + 2}" 
+                fill="none" stroke="#a855f7" stroke-width="2" opacity="0.6"/>
+        
+        <circle cx="${totalSize / 2}" cy="${totalSize / 2}" r="${markerSize / 2}" 
+                fill="url(#purpleGrad${user.userId || user.id})" stroke="#7c3aed" stroke-width="2"/>
+        
+        <path d="M${totalSize / 2 - 4} ${totalSize / 2 - 6} L${totalSize / 2 + 1} ${totalSize / 2 - 1} L${totalSize / 2 - 2} ${totalSize / 2 - 1} L${totalSize / 2 + 4} ${totalSize / 2 + 6} L${totalSize / 2 - 1} ${totalSize / 2 + 1} L${totalSize / 2 + 2} ${totalSize / 2 + 1} Z" 
+              fill="#fbbf24" stroke="#ffffff" stroke-width="0.5"/>
+        
+        ${user.isLive && statusColor === '#10b981' ? `
+          <circle cx="${totalSize / 2}" cy="${totalSize / 2}" r="${markerSize / 2 + 6}" 
+                  fill="none" stroke="#a855f7" stroke-width="2" opacity="0.4">
+            <animate attributeName="r" values="${markerSize / 2 + 6};${markerSize / 2 + 12};${markerSize / 2 + 6}" 
+                    dur="2s" repeatCount="indefinite"/>
+            <animate attributeName="opacity" values="0.4;0.1;0.4" dur="2s" repeatCount="indefinite"/>
+          </circle>
+        ` : ''}
+      </svg>
+    `;
+
+    return {
+      url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(userMarkerSVG)}`,
+      scaledSize: new window.google.maps.Size(totalSize, totalSize),
+      anchor: new window.google.maps.Point(totalSize / 2, totalSize / 2),
+    };
+  }
+
+  createPlaceMarkerIcon(cafe, index, currentType) {
+    const rating = cafe.rating || 0;
+    const reviewCount = cafe.user_ratings_total || cafe.userRatingsTotal || 0;
+    
+    // Airbnb's quality-based sizing
+    const getQualityTier = () => {
+      const ratingScore = (rating / 5) * 0.7;
+      const reviewScore = Math.min(reviewCount / 80, 1) * 0.3;
+      const totalScore = ratingScore + reviewScore;
+      
+      if (totalScore >= 0.85) return 5;
+      if (totalScore >= 0.70) return 4;
+      if (totalScore >= 0.55) return 3;
+      if (totalScore >= 0.40) return 2;
+      return 1;
+    };
+    
+    const qualityLevel = getQualityTier();
+    const markerSize = [28, 34, 40, 48, 56][qualityLevel - 1] || 32;
+    
+    const colors = currentType === 'restaurant' ? {
+      primary: '#E74C3C',
+      secondary: '#C0392B'
+    } : {
+      primary: '#FF9500',
+      secondary: '#E67E22'
+    };
+
+    const placeMarkerSVG = `
+      <svg width="${markerSize + 10}" height="${markerSize + 10}" viewBox="0 0 ${markerSize + 10} ${markerSize + 10}" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="grad${index}" cx="50%" cy="30%" r="70%">
+            <stop offset="0%" style="stop-color:${colors.primary};stop-opacity:1" />
+            <stop offset="70%" style="stop-color:${colors.secondary};stop-opacity:0.9" />
+            <stop offset="100%" style="stop-color:${colors.primary};stop-opacity:0.8" />
+          </radialGradient>
+        </defs>
+        
+        <circle cx="${(markerSize + 10) / 2}" cy="${(markerSize + 10) / 2}" r="${markerSize / 2}" 
+                fill="url(#grad${index})" 
+                stroke="rgba(255,255,255,0.6)" 
+                stroke-width="2"/>
+        
+        <text x="${(markerSize + 10) / 2}" y="${(markerSize + 10) / 2 + 6}" 
+              text-anchor="middle" 
+              font-size="${Math.max(16, markerSize * 0.35)}" 
+              fill="white">
+          ${currentType === 'restaurant' ? '🍽️' : '☕'}
+        </text>
+      </svg>
+    `;
+
+    return {
+      url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(placeMarkerSVG)}`,
+      scaledSize: new window.google.maps.Size(markerSize + 10, markerSize + 10),
+      anchor: new window.google.maps.Point((markerSize + 10) / 2, (markerSize + 10) / 2),
+    };
+  }
+
+  updateViewport(bounds) {
+    this.viewportCuller.setViewport(bounds);
+  }
+
+  destroy() {
+    this.frameRenderer.clearPendingUpdates();
+    this.markerPool.clearPool();
+    this.viewportCuller.destroy();
+    this.activeMarkers.clear();
+    this.transitioningMarkers.clear();
+    console.log('🧹 Airbnb Marker Manager destroyed');
+  }
+}
+
+// MAIN FULLPAGE MAP COMPONENT WITH AIRBNB SYSTEM
 const FullPageMap = ({
   center,
   zoom,
   cafes,
-  users, // User array for people mode
+  users,
   selectedCafe,
-  selectedUser, // Selected user
+  selectedUser,
   userLocation,
   onCafeSelect,
-  onUserSelect, // User selection callback
+  onUserSelect,
   onCenterChange,
   onClosePopup,
   loading,
@@ -37,20 +594,15 @@ const FullPageMap = ({
   onPreciseLocation,
   qualityText,
   sourceText,
-  mapMode, // 'people' | 'places'
-  isSelectingPlace, // Place selection mode for invitations
-  allowDataFetching, // NEW: Whether data fetching is allowed
+  mapMode,
+  isSelectingPlace,
+  allowDataFetching,
 }) => {
 
   const mapRef = useRef(null);
   const googleMapRef = useRef(null);
-  const markersRef = useRef(new Map()); // Place markers
-  const userMarkersRef = useRef(new Map()); // User markers
+  const markerManagerRef = useRef(null);
   const userMarkerRef = useRef(null);
-  const radiusCircleRef = useRef(null);
-  const activeMarkersRef = useRef(new Set());
-  const infoWindowRef = useRef(null);
-  
   
   // Core map states
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -61,55 +613,32 @@ const FullPageMap = ({
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [hasInitialLoad, setHasInitialLoad] = useState(false);
   
-  // ENHANCED: Ultra-smooth interaction states
+  // Interaction states
   const [isMapInteracting, setIsMapInteracting] = useState(false);
   const [hoveredCafe, setHoveredCafe] = useState(null);
   const [hoveredUser, setHoveredUser] = useState(null);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const [showTooltip, setShowTooltip] = useState(false);
-  const hoverDelayRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [smoothTransition, setSmoothTransition] = useState(false);
-  const [isMapUpdating, setIsMapUpdating] = useState(false);
-  const [hoveredMarker, setHoveredMarker] = useState(null);
   const [zoomLevel, setZoomLevel] = useState(zoom || 15);
   const [isZoomingIn, setIsZoomingIn] = useState(false);
   const [isZoomingOut, setIsZoomingOut] = useState(false);
-  const [currentVisibleMarkers, setCurrentVisibleMarkers] = useState(new Set());
 
   // Movement detection refs
   const lastSearchLocationRef = useRef(null);
   const isUserDraggingRef = useRef(false);
-  const debounceTimeoutRef = useRef(null);
   const currentFilterRef = useRef(cafeType);
   const smoothSearchTimeoutRef = useRef(null);
-  const interactionTimeoutRef = useRef(null);
-  const refreshAnimationRef = useRef(null);
-  const debouncedSearchTimeoutRef = useRef(null);
   const dragStartTimeRef = useRef(null);
-  const lastDragPositionRef = useRef(null);
-  const pollIntervalRef = useRef(null);
   const lastZoomRef = useRef(zoom || 15);
   const zoomTimeoutRef = useRef(null);
   const hoverTimeoutRef = useRef(null);
-  const markerAnimationRef = useRef(new Map());
 
-  // ENHANCED: Popularity-based marker sizing system
-  const calculatePopularityScore = (place) => {
-    const rating = place.rating || 0;
-    const reviewCount = place.user_ratings_total || place.userRatingsTotal || 0;
-    
-    // Weight: 70% rating, 30% review count (normalized)
-    const ratingScore = (rating / 5) * 0.7; // 0-0.7
-    const reviewScore = Math.min(reviewCount / 100, 1) * 0.3; // 0-0.3 (capped at 100 reviews = max)
-    
-    return ratingScore + reviewScore; // 0-1 score
-  };
-
-  // ENHANCED: Distance calculation utility
-  const calculateDistance = (lat1, lng1, lat2, lng2) => {
-    const R = 6371e3; // Earth's radius in meters
+  // Distance calculation utility
+  const calculateDistance = useCallback((lat1, lng1, lat2, lng2) => {
+    const R = 6371e3;
     const φ1 = lat1 * Math.PI/180;
     const φ2 = lat2 * Math.PI/180;
     const Δφ = (lat2-lat1) * Math.PI/180;
@@ -120,531 +649,54 @@ const FullPageMap = ({
             Math.sin(Δλ/2) * Math.sin(Δλ/2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 
-    return R * c; // Distance in meters
-  };
+    return R * c;
+  }, []);
 
-  const getMarkerSizeFromPopularity = (popularityScore, currentZoom = 15) => {
-    // Dynamic sizing based on zoom level
-    const zoomMultiplier = Math.min(Math.max(currentZoom / 15, 0.7), 1.5);
-    
-    const baseSize = 24 * zoomMultiplier;
-    const maxSize = 48 * zoomMultiplier;
-    const minSize = 18 * zoomMultiplier;
-    
-    // Scale size based on popularity
-    const dynamicSize = minSize + (popularityScore * (maxSize - minSize));
-    
-    return Math.round(dynamicSize);
-  };
-
-  // ENHANCED: User marker creation with profile photos and status
-  const createUserMarker = useCallback((user) => {
-    if (!googleMapRef.current || !user) return null;
-
-    console.log('👤 Creating enhanced user marker:', user.firstName);
-
-    // Calculate online status with more precise timing
-    const getStatusColor = () => {
-      if (!user.isLive) return '#6b7280';
-      
-      const timeDiff = new Date() - new Date(user.lastSeen);
-      const minutesAgo = Math.floor(timeDiff / (1000 * 60));
-      
-      if (minutesAgo < 2) return '#10b981'; // Bright green - very recent
-      if (minutesAgo < 5) return '#22c55e'; // Green - online now
-      if (minutesAgo < 15) return '#eab308'; // Yellow - recently active
-      if (minutesAgo < 30) return '#f59e0b'; // Orange - away
-      return '#6b7280'; // Gray - offline
-    };
-
-    const statusColor = getStatusColor();
-    const markerSize = 28; // Slightly larger for better visibility
-    const totalSize = markerSize + 12;
-
-    // Enhanced user status text
-    const getStatusText = () => {
-      if (!user.isLive) return 'Offline';
-      
-      const timeDiff = new Date() - new Date(user.lastSeen);
-      const minutesAgo = Math.floor(timeDiff / (1000 * 60));
-      
-      if (minutesAgo < 2) return 'Online now';
-      if (minutesAgo < 5) return 'Active now';
-      if (minutesAgo < 15) return `${minutesAgo}m ago`;
-      if (minutesAgo < 30) return 'Recently active';
-      return 'Away';
-    };
-
-    // Enhanced SVG for user marker - Purple Lightning Theme (Smaller & Cuter)
-    const userMarkerSVG = `
-      <svg width="${totalSize}" height="${totalSize}" viewBox="0 0 ${totalSize} ${totalSize}" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <clipPath id="circleClip${user.userId || user.id}">
-            <circle cx="${totalSize / 2}" cy="${totalSize / 2}" r="${markerSize / 2 - 3}"/>
-          </clipPath>
-          <filter id="purpleGlow${user.userId || user.id}">
-            <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
-            <feMerge>
-              <feMergeNode in="coloredBlur"/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
-          <radialGradient id="purpleGrad${user.userId || user.id}" cx="30%" cy="30%" r="70%">
-            <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.8" />
-            <stop offset="30%" style="stop-color:#a855f7;stop-opacity:0.9" />
-            <stop offset="100%" style="stop-color:#7c3aed;stop-opacity:1" />
-          </radialGradient>
-          <linearGradient id="lightningGrad${user.userId || user.id}" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" style="stop-color:#fbbf24;stop-opacity:1" />
-            <stop offset="50%" style="stop-color:#f59e0b;stop-opacity:1" />
-            <stop offset="100%" style="stop-color:#d97706;stop-opacity:1" />
-          </linearGradient>
-        </defs>
-        
-        <!-- Outer purple glow ring -->
-        <circle cx="${totalSize / 2}" cy="${totalSize / 2}" r="${markerSize / 2 + 2}" 
-                fill="none" stroke="#a855f7" stroke-width="2" opacity="0.6"
-                filter="url(#purpleGlow${user.userId || user.id})"/>
-        
-        <!-- Main purple background -->
-        <circle cx="${totalSize / 2}" cy="${totalSize / 2}" r="${markerSize / 2}" 
-                fill="url(#purpleGrad${user.userId || user.id})" stroke="#7c3aed" stroke-width="2"/>
-        
-        <!-- Lightning bolt icon -->
-        <path d="M${totalSize / 2 - 4} ${totalSize / 2 - 6} L${totalSize / 2 + 1} ${totalSize / 2 - 1} L${totalSize / 2 - 2} ${totalSize / 2 - 1} L${totalSize / 2 + 4} ${totalSize / 2 + 6} L${totalSize / 2 - 1} ${totalSize / 2 + 1} L${totalSize / 2 + 2} ${totalSize / 2 + 1} Z" 
-              fill="url(#lightningGrad${user.userId || user.id})" stroke="#ffffff" stroke-width="0.5"/>
-        
-        ${user.distance ? `
-          <!-- Distance label -->
-          <rect x="2" y="${totalSize - 16}" width="20" height="12" rx="6" 
-                fill="rgba(139, 69, 19, 0.9)" stroke="white" stroke-width="1"/>
-          <text x="12" y="${totalSize - 8}" text-anchor="middle" 
-                font-size="7" font-weight="bold" fill="white">
-            ${Math.round(user.distance)}m
-          </text>
-        ` : ''}
-        
-        ${user.isLive && statusColor === '#10b981' ? `
-          <!-- Active pulse animation -->
-          <circle cx="${totalSize / 2}" cy="${totalSize / 2}" r="${markerSize / 2 + 6}" 
-                  fill="none" stroke="#a855f7" stroke-width="2" opacity="0.4">
-            <animate attributeName="r" values="${markerSize / 2 + 6};${markerSize / 2 + 12};${markerSize / 2 + 6}" 
-                    dur="2s" repeatCount="indefinite"/>
-            <animate attributeName="opacity" values="0.4;0.1;0.4" dur="2s" repeatCount="indefinite"/>
-          </circle>
-        ` : ''}
-      </svg>
-    `;
-
-    const marker = new window.google.maps.Marker({
-      position: { lat: user.latitude, lng: user.longitude },
-      map: googleMapRef.current,
-      title: `${user.firstName} ${user.lastName} • ${getStatusText()}`,
-      icon: {
-        url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(userMarkerSVG)}`,
-        scaledSize: new window.google.maps.Size(totalSize, totalSize),
-        anchor: new window.google.maps.Point(totalSize / 2, totalSize / 2),
-      },
-      zIndex: 2000, // Higher than places
-      optimized: false
-    });
-
-    marker.addListener('click', () => {
-      console.log('👤 User marker clicked:', user.firstName);
-      onUserSelect(user);
-    });
-
-    marker.addListener('mouseover', () => {
-      if (!isDragging && !isMapInteracting) {
-        setHoveredUser({
-          ...user,
-          statusText: getStatusText(),
-          statusColor: statusColor
-        });
-        setShowTooltip(true);
-      }
-    });
-
-    marker.addListener('mouseout', () => {
-      setHoveredUser(null);
-      setShowTooltip(false);
-    });
-
-    return marker;
-  }, [onUserSelect, isDragging, isMapInteracting]);
-
-  // ENHANCED: Go to user location with better animation
+  // AIRBNB-STYLE: Enhanced go to user location
   const handleGoToUserLocation = useCallback(() => {
-    if (!userLocation || !googleMapRef.current) {
-      console.log('❌ No user location or map available');
-      return;
-    }
-
-    console.log('🎯 Enhanced navigation to user location:', userLocation);
+    if (!userLocation || !googleMapRef.current) return;
     
-    // Hide any active tooltips and popups
     setShowTooltip(false);
     setHoveredCafe(null);
     setHoveredUser(null);
-    setHoveredMarker(null);
     
     if (selectedCafe || selectedUser) {
       onClosePopup();
     }
     
-    // Start smooth transition
     setIsMapInteracting(true);
     setSmoothTransition(true);
     
-    const currentCenter = googleMapRef.current.getCenter();
-    const currentZoom = googleMapRef.current.getZoom();
     const targetPosition = {
       lat: userLocation.latitude,
       lng: userLocation.longitude
     };
 
-    // Calculate optimal zoom level based on mode
-    const targetZoom = mapMode === 'people' ? 
-      Math.max(16, currentZoom) : // Closer for people discovery
-      Math.max(15, currentZoom);  // Standard for places
+    const targetZoom = mapMode === 'people' ? 16 : 15;
     
-    // Check if significant movement is needed
-    const needsMovement = currentCenter && (
-      Math.abs(currentCenter.lat() - targetPosition.lat) > 0.001 ||
-      Math.abs(currentCenter.lng() - targetPosition.lng) > 0.001
-    );
+    googleMapRef.current.panTo(targetPosition);
     
-    console.log('🎬 USER LOCATION ANIMATION:', {
-      currentCenter: currentCenter ? { lat: currentCenter.lat(), lng: currentCenter.lng() } : null,
-      targetPosition,
-      currentZoom,
-      targetZoom,
-      needsMovement,
-      mapMode
-    });
-    
-    // Enhanced animation sequence
-    if (needsMovement) {
-      // Step 1: Smooth pan to user location
-      googleMapRef.current.panTo(targetPosition);
+    setTimeout(() => {
+      googleMapRef.current.setZoom(targetZoom);
+    }, 400);
+
+    setTimeout(() => {
+      lastSearchLocationRef.current = targetPosition;
+      onCenterChange(targetPosition);
       
-      // Step 2: Smooth zoom after pan completes
-      setTimeout(() => {
-        if (googleMapRef.current && Math.abs(currentZoom - targetZoom) > 0.5) {
-          googleMapRef.current.setZoom(targetZoom);
-        }
-      }, 400);
-      
-      // Step 3: Update location and refresh data
-      setTimeout(() => {
-        lastSearchLocationRef.current = targetPosition;
-        onCenterChange(targetPosition);
-        
-        // Clear existing markers for fresh search
-        if (mapMode === 'places') {
-          markersRef.current.forEach((marker) => {
-            if (marker && marker.setMap) {
-              marker.setMap(null);
-            }
-          });
-          markersRef.current.clear();
-        } else {
-          userMarkersRef.current.forEach((marker) => {
-            if (marker && marker.setMap) {
-              marker.setMap(null);
-            }
-          });
-          userMarkersRef.current.clear();
-        }
-        
-        activeMarkersRef.current.clear();
-        
-        // Trigger refresh for current mode
-        setTimeout(() => {
-          console.log(`🔍 Refreshing ${mapMode} around user location`);
-          if (onRefresh) {
-            console.log(`🔄 Calling refresh for ${mapMode} mode`);
-            onRefresh();
-          }
-        }, 200);
-        
-        // End animation states
-        setIsMapInteracting(false);
-        setSmoothTransition(false);
-      }, 800);
-      
-    } else {
-      // Already at location, just zoom if needed
-      if (Math.abs(currentZoom - targetZoom) > 0.5) {
-        googleMapRef.current.setZoom(targetZoom);
+      if (onRefresh) {
+        onRefresh();
       }
       
-      // Still refresh data
-      setTimeout(() => {
-        if (onRefresh) {
-          onRefresh();
-        }
-        setIsMapInteracting(false);
-        setSmoothTransition(false);
-      }, 400);
-    }
+      setIsMapInteracting(false);
+      setSmoothTransition(false);
+    }, 800);
     
   }, [userLocation, selectedCafe, selectedUser, onClosePopup, onCenterChange, onRefresh, mapMode]);
 
-  // ENHANCED: Place marker creation with better styling
-  const createEnhancedDarkMapMarker = (cafe, index, currentType, isHovered = false, isSearchResult = false) => {
-    const rating = cafe.rating || 0;
-    const reviewCount = cafe.user_ratings_total || cafe.userRatingsTotal || 0;
-    
-    // Enhanced 5-tier quality system
-    const getQualityTier = () => {
-      const ratingScore = (rating / 5) * 0.7;
-      const reviewScore = Math.min(reviewCount / 80, 1) * 0.3;
-      const totalScore = ratingScore + reviewScore;
-      
-      if (totalScore >= 0.85) return 5; // Exceptional
-      if (totalScore >= 0.70) return 4; // Excellent  
-      if (totalScore >= 0.55) return 3; // Very good
-      if (totalScore >= 0.40) return 2; // Good
-      return 1;                         // Basic
-    };
-    
-    const qualityLevel = getQualityTier();
-    
-    // Enhanced type-based colors
-    const getTypeColor = () => {
-      const baseColors = currentType === 'restaurant' ? {
-        primary: '#E74C3C',
-        secondary: '#C0392B',
-        glow: '#FF6B6B'
-      } : {
-        primary: '#FF9500',
-        secondary: '#E67E22', 
-        glow: '#FFB84D'
-      };
-      
-      // Special colors for selection mode
-      if (isSelectingPlace) {
-        return {
-          primary: '#10B981',
-          secondary: '#059669',
-          glow: '#34D399'
-        };
-      }
-      
-      // Enhanced colors when hovered
-      if (isHovered) {
-        return {
-          primary: currentType === 'restaurant' ? '#FF5733' : '#FFB84D',
-          secondary: currentType === 'restaurant' ? '#E74C3C' : '#FF9500',
-          glow: currentType === 'restaurant' ? '#FF8566' : '#FFC266'
-        };
-      }
-      
-      return baseColors;
-    };
-    
-    const colors = getTypeColor();
-    
-    // Special search result marker treatment
-    if (isSearchResult) {
-      colors.primary = '#9C27B0';
-      colors.secondary = '#7B1FA2';
-      colors.glow = '#BA68C8';
-    }
-    
-    // Dynamic size with hover enhancement
-    const getMarkerSize = () => {
-      const baseSizes = {
-        5: 56, 4: 48, 3: 40, 2: 34, 1: 28
-      };
-      
-      const baseSize = baseSizes[qualityLevel] || 32;
-      const zoomMultiplier = Math.min(Math.max(zoomLevel / 15, 0.8), 1.3);
-      const hoverMultiplier = isHovered ? 1.3 : 1;
-      const selectionMultiplier = isSelectingPlace ? 1.2 : 1;
-      
-      return Math.round(baseSize * zoomMultiplier * hoverMultiplier * selectionMultiplier);
-    };
-    
-    const markerSize = getMarkerSize();
-    
-    // Enhanced star display system
-    const getStarDisplay = () => {
-      const starSize = Math.max(8, markerSize * 0.18);
-      const starColor = isHovered ? '#FFE55C' : '#FFD700';
-      
-      const patterns = {
-        5: 'crown-full', 4: 'crown-4', 3: 'triangle', 2: 'sides', 1: 'single'
-      };
-      
-      return {
-        count: qualityLevel,
-        pattern: patterns[qualityLevel],
-        size: starSize,
-        color: starColor
-      };
-    };
-    
-    const starDisplay = getStarDisplay();
-    const isVeryClose = cafe.distance && cafe.distance < 200;
-    
-    // Calculate total SVG size
-    const totalSize = markerSize + (isHovered ? 80 : 24);
-    
-    return `
-      <svg width="${totalSize}" height="${totalSize}" viewBox="0 0 ${totalSize} ${totalSize}" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <filter id="glow${index}${isHovered ? 'hover' : ''}">
-            <feGaussianBlur stdDeviation="${isHovered ? '4' : '3'}" result="coloredBlur"/>
-            <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
-          </filter>
-          <radialGradient id="grad${index}${isHovered ? 'hover' : ''}" cx="50%" cy="30%" r="70%">
-            <stop offset="0%" style="stop-color:${colors.primary};stop-opacity:1" />
-            <stop offset="70%" style="stop-color:${colors.secondary};stop-opacity:0.9" />
-            <stop offset="100%" style="stop-color:${colors.primary};stop-opacity:0.8" />
-          </radialGradient>
-          ${isHovered ? `
-            <radialGradient id="pulseGrad${index}" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" style="stop-color:${colors.glow};stop-opacity:0.3" />
-              <stop offset="100%" style="stop-color:${colors.glow};stop-opacity:0" />
-            </radialGradient>
-            <path id="textPath${index}" d="M ${totalSize/2 - 35} ${totalSize/2 - 25} A 35 35 0 0 1 ${totalSize/2 + 35} ${totalSize/2 - 25}" fill="none"/>
-          ` : ''}
-        </defs>
-        
-        ${isHovered ? `
-          <!-- Hover pulse effect -->
-          <circle cx="${totalSize / 2}" cy="${totalSize / 2}" r="${markerSize / 2 + 12}" 
-                  fill="url(#pulseGrad${index})">
-            <animate attributeName="r" values="${markerSize / 2 + 12};${markerSize / 2 + 18};${markerSize / 2 + 12}" 
-                    dur="2s" repeatCount="indefinite"/>
-          </circle>
-          
-          <!-- Curved text above marker -->
-          <text font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="white" stroke="rgba(0,0,0,0.8)" stroke-width="2">
-            <textPath href="#textPath${index}" startOffset="50%" text-anchor="middle">
-              ${cafe.name || 'Unknown Place'}
-            </textPath>
-          </text>
-          <text font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="${colors.primary}">
-            <textPath href="#textPath${index}" startOffset="50%" text-anchor="middle">
-              ${cafe.name || 'Unknown Place'}
-            </textPath>
-          </text>
-        ` : ''}
-        
-        ${isSelectingPlace ? `
-          <!-- Selection mode indicator -->
-          <circle cx="${totalSize / 2}" cy="${totalSize / 2}" r="${markerSize / 2 + 8}" 
-                  fill="none" stroke="#10B981" stroke-width="3" opacity="0.8">
-            <animate attributeName="stroke-width" values="3;6;3" dur="1.5s" repeatCount="indefinite"/>
-            <animate attributeName="opacity" values="0.8;0.4;0.8" dur="1.5s" repeatCount="indefinite"/>
-          </circle>
-        ` : ''}
-        
-        <!-- Main marker circle -->
-        <circle cx="${totalSize / 2}" cy="${totalSize / 2}" r="${markerSize / 2}" 
-                fill="url(#grad${index}${isHovered ? 'hover' : ''})" 
-                filter="url(#glow${index}${isHovered ? 'hover' : ''})"
-                stroke="${isHovered ? 'white' : 'rgba(255,255,255,0.6)'}" 
-                stroke-width="${isHovered ? '4' : '2'}"/>
-        
-        <!-- Venue type emoji -->
-        <text x="${totalSize / 2}" y="${totalSize / 2 + 6}" 
-              text-anchor="middle" 
-              font-size="${Math.max(16, markerSize * 0.35)}" 
-              fill="white"
-              style="filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.8));">
-          ${currentType === 'restaurant' ? '🍽️' : '☕'}
-        </text>
-        
-        ${starDisplay.pattern === 'crown-full' ? `
-          <text x="${totalSize / 2}" y="16" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
-          <text x="${totalSize / 2 - 12}" y="22" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
-          <text x="${totalSize / 2 + 12}" y="22" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
-          <text x="${totalSize / 2 - 7}" y="28" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
-          <text x="${totalSize / 2 + 7}" y="28" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
-        ` : starDisplay.pattern === 'crown-4' ? `
-          <text x="${totalSize / 2 - 9}" y="18" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
-          <text x="${totalSize / 2 + 9}" y="18" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
-          <text x="${totalSize / 2 - 5}" y="26" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
-          <text x="${totalSize / 2 + 5}" y="26" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
-        ` : starDisplay.pattern === 'triangle' ? `
-          <text x="${totalSize / 2}" y="16" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
-          <text x="${totalSize / 2 - 9}" y="26" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
-          <text x="${totalSize / 2 + 9}" y="26" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
-        ` : starDisplay.pattern === 'sides' ? `
-          <text x="${totalSize / 2 - 11}" y="20" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
-          <text x="${totalSize / 2 + 11}" y="20" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
-        ` : starDisplay.pattern === 'single' ? `
-          <text x="${totalSize / 2}" y="16" text-anchor="middle" font-size="${starDisplay.size}" fill="${starDisplay.color}">⭐</text>
-        ` : ''}
-        
-        ${qualityLevel >= 4 && rating > 0 ? `
-          <circle cx="${totalSize / 2}" cy="${markerSize + 16}" r="${isHovered ? '11' : '10'}" 
-                  fill="rgba(0,0,0,0.8)" 
-                  stroke="white" 
-                  stroke-width="1"/>
-          <text x="${totalSize / 2}" y="${markerSize + 20}" 
-                text-anchor="middle" 
-                font-size="${isHovered ? '11' : '10'}" 
-                fill="white" 
-                font-weight="bold">
-            ${rating.toFixed(1)}
-          </text>
-        ` : ''}
-        
-        ${isVeryClose ? `
-          <circle cx="${markerSize + 8}" cy="${markerSize + 8}" r="${isHovered ? '9' : '8'}" 
-                  fill="#9B59B6" 
-                  stroke="white" 
-                  stroke-width="2"/>
-          <text x="${markerSize + 8}" y="${markerSize + 12}" 
-                text-anchor="middle" 
-                font-size="10" 
-                fill="white">📍</text>
-        ` : ''}
-      </svg>
-    `;
-  };
-
-  // ENHANCED: Real-time marker hover updates
-  const updateMarkerHoverState = useCallback((cafeId, isHovered) => {
-    const marker = markersRef.current.get(cafeId);
-    if (!marker) return;
-
-    const cafe = cafes.find(c => (c.id || c.googlePlaceId) === cafeId);
-    if (!cafe) return;
-
-    const position = marker.getPosition();
-    const index = Array.from(markersRef.current.keys()).indexOf(cafeId);
-
-    const markerSVG = createEnhancedDarkMapMarker(cafe, index, currentFilterRef.current, isHovered);
-    
-    const popularityScore = calculatePopularityScore(cafe);
-    const baseSize = getMarkerSizeFromPopularity(popularityScore, zoomLevel);
-    const hoverMultiplier = isHovered ? 1.3 : 1;
-    const markerSize = Math.round(baseSize * hoverMultiplier);
-    const totalSize = markerSize + (isHovered ? 80 : 24);
-
-    marker.setIcon({
-      url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(markerSVG),
-      scaledSize: new window.google.maps.Size(totalSize, totalSize),
-      anchor: new window.google.maps.Point(totalSize / 2, totalSize / 2)
-    });
-
-    const newZIndex = Math.round(popularityScore * 1000) + 100 + (isHovered ? 2000 : 0);
-    marker.setZIndex(newZIndex);
-
-  }, [cafes, zoomLevel, calculatePopularityScore, getMarkerSizeFromPopularity, createEnhancedDarkMapMarker]);
-
-  // ENHANCED: Smart search trigger
+  // Smart search trigger
   const shouldTriggerNewSearch = useCallback((newCenter) => {
-    if (!lastSearchLocationRef.current) {
-      console.log('🔍 SHOULD SEARCH: No previous search location');
-      return true;
-    }
+    if (!lastSearchLocationRef.current) return true;
     
     const lastSearch = lastSearchLocationRef.current;
     const distance = calculateDistance(
@@ -652,22 +704,11 @@ const FullPageMap = ({
       newCenter.lat, newCenter.lng
     );
     
-    // Mode-specific search thresholds
-    const threshold = mapMode === 'people' ? 100 : 150; // More sensitive for people
-    const shouldSearch = distance > threshold;
-    
-    console.log(`🔍 SHOULD SEARCH CHECK (${mapMode}):`, {
-      distance: Math.round(distance),
-      threshold,
-      shouldSearch,
-      lastSearch,
-      newCenter
-    });
-    
-    return shouldSearch;
-  }, [mapMode]);
+    const threshold = mapMode === 'people' ? 150 : 200;
+    return distance > threshold;
+  }, [mapMode, calculateDistance]);
 
-  // ENHANCED: Intelligent smooth search
+  // Smooth search with caching
   const handleSmoothSearch = useCallback(() => {
     if (!googleMapRef.current || isDragging) return;
     
@@ -677,53 +718,41 @@ const FullPageMap = ({
       lng: currentCenter.lng()
     };
     
-    console.log(`🔄 Smooth search (${mapMode}) with current map center:`, newCenter);
-    
     lastSearchLocationRef.current = newCenter;
     onCenterChange(newCenter);
     
     setIsRefreshing(true);
 
-    if (onRefresh) {
-      onRefresh();
-    }
-
     setTimeout(() => {
-      setIsRefreshing(false);
-      setSmoothTransition(false);
-    }, 1000);
+      if (onRefresh) {
+        onRefresh();
+      }
+      
+      setTimeout(() => {
+        setIsRefreshing(false);
+        setSmoothTransition(false);
+      }, 1000);
+    }, 100);
     
-  }, [onCenterChange, onRefresh, isDragging, mapMode]);
+  }, [onCenterChange, onRefresh, isDragging]);
 
-  // ENHANCED: Drag handling with mode awareness
+  // Enhanced drag handling
   const handleDragStart = useCallback(() => {
-    console.log(`🎬 Drag started (${mapMode})`);
+    console.log('🎬 Drag started - preserving markers');
     setIsDragging(true);
     setIsMapInteracting(true);
     setSmoothTransition(false);
     dragStartTimeRef.current = Date.now();
     isUserDraggingRef.current = true;
     
-    if (googleMapRef.current) {
-      const center = googleMapRef.current.getCenter();
-      lastDragPositionRef.current = {
-        lat: center.lat(),
-        lng: center.lng()
-      };
-    }
-    
     // Clear pending searches
     if (smoothSearchTimeoutRef.current) {
       clearTimeout(smoothSearchTimeoutRef.current);
     }
-    if (debouncedSearchTimeoutRef.current) {
-      clearTimeout(debouncedSearchTimeoutRef.current);
-    }
-  }, [mapMode]);
+  }, []);
 
   const handleDragEnd = useCallback(() => {
-    console.log(`🎬 Drag ended (${mapMode})`);
-    const dragDuration = Date.now() - (dragStartTimeRef.current || 0);
+    console.log('🎬 Drag ended - updating markers smoothly');
     
     setTimeout(() => {
       setIsDragging(false);
@@ -736,7 +765,13 @@ const FullPageMap = ({
       setTimeout(() => setSmoothTransition(false), 200);
     }, 100);
     
-    // Force search for new area with mode-specific logic
+    // Update viewport for marker manager
+    if (markerManagerRef.current && googleMapRef.current) {
+      const bounds = googleMapRef.current.getBounds();
+      markerManagerRef.current.updateViewport(bounds);
+    }
+    
+    // Smart search triggering
     const currentCenter = googleMapRef.current?.getCenter();
     if (currentCenter) {
       const newCenter = {
@@ -744,138 +779,63 @@ const FullPageMap = ({
         lng: currentCenter.lng()
       };
       
-      const lastPosition = lastSearchLocationRef.current;
-      let significantMove = true;
-      
-      if (lastPosition) {
-        const distance = calculateDistance(
-          lastPosition.lat, lastPosition.lng,
-          newCenter.lat, newCenter.lng
-        );
-        const threshold = mapMode === 'people' ? 150 : 200;
-        significantMove = distance > threshold;
-      }
-      
-      console.log(`🗺️ Drag ended (${mapMode}) - analyzing move:`, {
-        newCenter,
-        lastPosition,
-        significantMove,
-        willSearch: true
-      });
-      
-      // Clear existing markers based on mode
-      if (mapMode === 'places') {
-        markersRef.current.forEach((marker) => {
-          if (marker && marker.setMap) {
-            marker.setMap(null);
-          }
-        });
-        markersRef.current.clear();
-      } else {
-        userMarkersRef.current.forEach((marker) => {
-          if (marker && marker.setMap) {
-            marker.setMap(null);
-          }
-        });
-        userMarkersRef.current.clear();
-      }
-      
-      activeMarkersRef.current.clear();
-      
-      lastSearchLocationRef.current = newCenter;
-      onCenterChange(newCenter);
-      
-      // Mode-specific search delays
-      const searchDelay = mapMode === 'people' ? 400 : (zoomLevel >= 16 ? 300 : 500);
-      
-      console.log(`🚀 ${mapMode.toUpperCase()} search scheduled in ${searchDelay}ms`);
-      
-      if (smoothSearchTimeoutRef.current) {
-        clearTimeout(smoothSearchTimeoutRef.current);
-      }
-      
-      smoothSearchTimeoutRef.current = setTimeout(() => {
-        const finalCenter = googleMapRef.current?.getCenter();
-        if (finalCenter) {
-          const exactCenter = {
-            lat: finalCenter.lat(),
-            lng: finalCenter.lng()
-          };
-          
-          console.log(`📍 Executing ${mapMode} search at exact center:`, exactCenter);
-          
-          lastSearchLocationRef.current = exactCenter;
-          onCenterChange(exactCenter);
-          
+      if (shouldTriggerNewSearch(newCenter)) {
+        lastSearchLocationRef.current = newCenter;
+        onCenterChange(newCenter);
+        
+        const searchDelay = mapMode === 'people' ? 400 : 500;
+        
+        if (smoothSearchTimeoutRef.current) {
+          clearTimeout(smoothSearchTimeoutRef.current);
+        }
+        
+        smoothSearchTimeoutRef.current = setTimeout(() => {
           if (onRefresh) {
             onRefresh();
           }
-        }
-      }, searchDelay);
+        }, searchDelay);
+      }
     }
-  }, [handleSmoothSearch, zoomLevel, onCenterChange, mapMode]);
+  }, [shouldTriggerNewSearch, onCenterChange, mapMode, onRefresh]);
 
-  // ENHANCED: Smooth marker click
-  const handleSmoothMarkerClick = useCallback((cafe) => {
-    console.log('🎯 Enhanced marker click:', cafe.name);
-    
+  // Smooth marker click
+  const handleSmoothMarkerClick = useCallback((item) => {
     setShowTooltip(false);
     setHoveredCafe(null);
     setHoveredUser(null);
-    setHoveredMarker(null);
     
     setIsMapInteracting(true);
     setSmoothTransition(true);
     
     if (!googleMapRef.current) return;
     
-    const currentCenter = googleMapRef.current.getCenter();
-    const currentZoom = googleMapRef.current.getZoom();
-    const targetPosition = {
-      lat: cafe.location.latitude,
-      lng: cafe.location.longitude
-    };
+    const targetPosition = item.firstName ? 
+      { lat: item.latitude, lng: item.longitude } :
+      { lat: item.location.latitude, lng: item.location.longitude };
     
-    const targetZoom = Math.min(Math.max(currentZoom + 1, 16), 18);
+    const targetZoom = Math.min(Math.max(googleMapRef.current.getZoom() + 1, 16), 18);
     
-    const needsMovement = currentCenter && (
-      Math.abs(currentCenter.lat() - targetPosition.lat) > 0.001 ||
-      Math.abs(currentCenter.lng() - targetPosition.lng) > 0.001
-    );
+    googleMapRef.current.panTo(targetPosition);
     
-    // Enhanced animation sequence
-    if (needsMovement) {
-      googleMapRef.current.panTo(targetPosition);
+    setTimeout(() => {
+      googleMapRef.current.setZoom(targetZoom);
+    }, 300);
+    
+    setTimeout(() => {
+      setIsMapInteracting(false);
+      setSmoothTransition(false);
       
-      setTimeout(() => {
-        if (googleMapRef.current && Math.abs(currentZoom - targetZoom) > 0.5) {
-          googleMapRef.current.setZoom(targetZoom);
-        }
-      }, 300);
-      
-      setTimeout(() => {
-        setIsMapInteracting(false);
-        setSmoothTransition(false);
-        onCafeSelect(cafe);
-      }, 600);
-      
-    } else {
-      if (Math.abs(currentZoom - targetZoom) > 0.5) {
-        googleMapRef.current.setZoom(targetZoom);
+      if (item.firstName) {
+        onUserSelect(item);
+      } else {
+        onCafeSelect(item);
       }
-      
-      setTimeout(() => {
-        setIsMapInteracting(false);
-        setSmoothTransition(false);
-        onCafeSelect(cafe);
-      }, 300);
-    }
+    }, 600);
     
-  }, [onCafeSelect]);
+  }, [onCafeSelect, onUserSelect]);
 
-  // ENHANCED: Popup close
+  // Popup close
   const handleSmoothPopupClose = useCallback(() => {
-    console.log('🎬 Enhanced popup close');
     setSmoothTransition(true);
     
     setTimeout(() => {
@@ -885,7 +845,7 @@ const FullPageMap = ({
     
   }, [onClosePopup]);
 
-  // ENHANCED: Zoom handling
+  // Zoom handling
   const handleZoomChanged = useCallback(() => {
     if (!googleMapRef.current) return;
     
@@ -898,11 +858,9 @@ const FullPageMap = ({
     if (newZoom > oldZoom) {
       setIsZoomingIn(true);
       setIsZoomingOut(false);
-      console.log(`🔍 ZOOMING IN (${mapMode}) to level:`, newZoom);
     } else if (newZoom < oldZoom) {
       setIsZoomingOut(true);
       setIsZoomingIn(false);
-      console.log(`🔍 ZOOMING OUT (${mapMode}) to level:`, newZoom);
     }
     
     if (zoomTimeoutRef.current) {
@@ -914,28 +872,9 @@ const FullPageMap = ({
       setIsZoomingOut(false);
     }, 300);
     
-    // Mode-aware zoom refresh
-    const zoomDifference = Math.abs(newZoom - oldZoom);
-    
-    if (zoomDifference >= 1 && !isDragging) {
-      console.log(`🔄 ${mapMode.toUpperCase()} zoom change detected, triggering refresh`);
-      
-      if (debouncedSearchTimeoutRef.current) {
-        clearTimeout(debouncedSearchTimeoutRef.current);
-      }
-      
-      const refreshDelay = mapMode === 'people' ? 1200 : 1500;
-      
-      debouncedSearchTimeoutRef.current = setTimeout(() => {
-        if (!isDragging && !isMapInteracting && !isZoomingIn && !isZoomingOut) {
-          handleSmoothSearch();
-        }
-      }, refreshDelay);
-    }
-    
-  }, [isDragging, handleSmoothSearch, mapMode]);
+  }, []);
 
-  // ENHANCED: Marker hover handling
+  // Marker hover handling
   const handleMarkerHover = useCallback((item, isEntering, itemType = 'cafe') => {
     if (isDragging || isMapInteracting || isZoomingIn || isZoomingOut) {
       return;
@@ -944,39 +883,24 @@ const FullPageMap = ({
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current);
     }
-    if (hoverDelayRef.current) {
-      clearTimeout(hoverDelayRef.current);
-    }
     
     if (isEntering) {
-      if (itemType === 'user') {
-        setHoveredMarker(item.userId || item.id);
-        hoverDelayRef.current = setTimeout(() => {
+      setTimeout(() => {
+        if (itemType === 'user') {
           setHoveredUser(item);
-          setShowTooltip(true);
-        }, 200);
-      } else {
-        setHoveredMarker(item.id || item.googlePlaceId);
-        hoverDelayRef.current = setTimeout(() => {
+        } else {
           setHoveredCafe(item);
-          setShowTooltip(true);
-        }, 200);
-      }
-      
-      console.log(`🖱️ Enhanced hover (${itemType}):`, item.name || item.firstName);
-      
+        }
+        setShowTooltip(true);
+      }, 200);
     } else {
       setShowTooltip(false);
       setHoveredCafe(null);
       setHoveredUser(null);
-      
-      hoverTimeoutRef.current = setTimeout(() => {
-        setHoveredMarker(null);
-      }, 150);
     }
   }, [isDragging, isMapInteracting, isZoomingIn, isZoomingOut]);
 
-  // ENHANCED: Mouse move for tooltip positioning
+  // Mouse move for tooltip positioning
   const handleMouseMove = useCallback((mouseEvent) => {
     if (showTooltip && (hoveredCafe || hoveredUser)) {
       setTooltipPosition({
@@ -994,7 +918,6 @@ const FullPageMap = ({
         window.google.maps.Map &&
         window.google.maps.MapTypeId &&
         window.google.maps.MapTypeId.ROADMAP) {
-      console.log('✅ Google Maps API fully available');
       setGoogleMapsReady(true);
       return true;
     }
@@ -1003,7 +926,6 @@ const FullPageMap = ({
 
   // Google Maps API Loading
   useEffect(() => {
-    console.log('🔄 Loading Google Maps API...');
     setLoadingProgress(10);
 
     if (checkGoogleMapsAvailability()) {
@@ -1012,7 +934,6 @@ const FullPageMap = ({
     }
 
     const handleGoogleMapsLoad = () => {
-      console.log('✅ Google Maps loaded via event');
       setTimeout(() => {
         if (checkGoogleMapsAvailability()) {
           setGoogleMapsReady(true);
@@ -1028,14 +949,12 @@ const FullPageMap = ({
       if (checkGoogleMapsAvailability()) {
         clearInterval(pollInterval);
         setLoadingProgress(100);
-        console.log('✅ Google Maps API ready via polling');
       }
     }, 300);
 
     const timeout = setTimeout(() => {
       clearInterval(pollInterval);
       if (!googleMapsReady) {
-        console.error('❌ Google Maps loading timeout');
         setGoogleMapsError('Google Maps failed to load');
         setLoadingProgress(100);
       }
@@ -1049,29 +968,18 @@ const FullPageMap = ({
         mapRef.current.removeEventListener('mousemove', handleMouseMove);
       }
     };
-  }, [checkGoogleMapsAvailability, googleMapsReady]);
+  }, [checkGoogleMapsAvailability, googleMapsReady, handleMouseMove]);
 
-  // FIXED: Map initialization with proper dependency array
+  // Map initialization
   useEffect(() => {
-    // Prevent multiple initializations with stricter checks
-    if (googleMapsReady || mapInitialized || !mapRef.current) return;
-    
-    console.log('🔄 Loading Google Maps API...');
+    if (!googleMapsReady || mapInitialized || !mapRef.current) return;
     
     const initMap = async () => {
       try {
-        if (!window.google || !window.google.maps) {
-          console.log('⚠️ Google Maps API not loaded');
-          return;
-        }
+        if (!window.google || !window.google.maps) return;
         
-        console.log('✅ Google Maps API fully available');
         setGoogleMapsReady(true);
-        
-        // Add a small delay to prevent rapid re-initialization
         await new Promise(resolve => setTimeout(resolve, 100));
-        
-        console.log(`🗺️ Initializing enhanced ${mapMode} map...`);
         
         if (!window.google || !window.google.maps || !window.google.maps.MapTypeId) {
           throw new Error('Google Maps API not fully loaded');
@@ -1083,21 +991,13 @@ const FullPageMap = ({
           center: { lat: center.lat, lng: center.lng },
           zoom: zoom || 15,
           mapTypeId: window.google.maps.MapTypeId.ROADMAP,
-          
-          // Enhanced animation options
           gestureHandling: 'greedy',
           clickableIcons: false,
           disableDefaultUI: false,
           zoomControl: true,
           mapTypeControl: false,
-          scaleControl: false,
           streetViewControl: false,
-          rotateControl: false,
           fullscreenControl: !isEmbedMode,
-          
-          zoomControlOptions: {
-            position: window.google.maps.ControlPosition.RIGHT_BOTTOM
-          },
           
           // Enhanced dark theme
           styles: [
@@ -1105,77 +1005,35 @@ const FullPageMap = ({
             { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
             { elementType: "labels.text.fill", stylers: [{ color: "#757575" }] },
             { elementType: "labels.text.stroke", stylers: [{ color: "#212121" }] },
-            { featureType: "administrative", elementType: "geometry", stylers: [{ color: "#757575" }] },
-            { featureType: "administrative.country", elementType: "labels.text.fill", stylers: [{ color: "#9e9e9e" }] },
-            { featureType: "administrative.land_parcel", stylers: [{ visibility: "off" }] },
-            { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#bdbdbd" }] },
-            { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#757575" }] },
-            { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#181818" }] },
-            { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#616161" }] },
-            { featureType: "poi.park", elementType: "labels.text.stroke", stylers: [{ color: "#1b1b1b" }] },
             { featureType: "road", elementType: "geometry.fill", stylers: [{ color: "#2c2c2c" }] },
-            { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#8a8a8a" }] },
-            { featureType: "road.arterial", elementType: "geometry", stylers: [{ color: "#373737" }] },
-            { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#3c3c3c" }] },
-            { featureType: "road.highway.controlled_access", elementType: "geometry", stylers: [{ color: "#4e4e4e" }] },
-            { featureType: "road.local", elementType: "labels.text.fill", stylers: [{ color: "#616161" }] },
-            { featureType: "transit", elementType: "labels.text.fill", stylers: [{ color: "#757575" }] },
-            { featureType: "water", elementType: "geometry", stylers: [{ color: "#000000" }] },
-            { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#3d3d3d" }] }
+            { featureType: "water", elementType: "geometry", stylers: [{ color: "#000000" }] }
           ]
         };
 
-        console.log('🗺️ Creating enhanced Google Maps instance...');
         googleMapRef.current = new window.google.maps.Map(mapRef.current, mapOptions);
         
-        console.log('✅ Enhanced dual-mode map created');
+        // Initialize Airbnb marker manager
+        markerManagerRef.current = new AirbnbSmoothMarkerManager(googleMapRef.current);
         
-        // Enhanced event listeners
+        // Event listeners
         googleMapRef.current.addListener('dragstart', handleDragStart);
         googleMapRef.current.addListener('dragend', handleDragEnd);
         googleMapRef.current.addListener('zoom_changed', handleZoomChanged);
         
-        // Enhanced center change handling
+        // Center change handling
         let centerChangeTimeout;
         googleMapRef.current.addListener('center_changed', () => {
           if (centerChangeTimeout) clearTimeout(centerChangeTimeout);
           centerChangeTimeout = setTimeout(() => {
-            if (!isDragging && !isUserDraggingRef.current) {
-              console.log(`📍 ${mapMode.toUpperCase()} center change detected`);
-              
-              const currentMapCenter = googleMapRef.current?.getCenter();
-              if (currentMapCenter) {
-                const actualCenter = {
-                  lat: currentMapCenter.lat(),
-                  lng: currentMapCenter.lng()
-                };
-                
-                if (shouldTriggerNewSearch(actualCenter)) {
-                  console.log(`🚀 ${mapMode.toUpperCase()} center change triggering search:`, actualCenter);
-                  
-                  lastSearchLocationRef.current = actualCenter;
-                  onCenterChange(actualCenter);
-                  
-                  if (smoothSearchTimeoutRef.current) {
-                    clearTimeout(smoothSearchTimeoutRef.current);
-                  }
-
-                  const delay = mapMode === 'people' ? 400 : (zoomLevel >= 16 ? 300 : 600);
-                  smoothSearchTimeoutRef.current = setTimeout(() => {
-                    if (onRefresh) {
-                      console.log(`🔄 Auto-refresh triggered for ${mapMode} mode`);
-                      onRefresh();
-                    }
-                  }, delay);
-                }
-              }
+            if (!isDragging && !isUserDraggingRef.current && markerManagerRef.current) {
+              const bounds = googleMapRef.current.getBounds();
+              markerManagerRef.current.updateViewport(bounds);
             }
           }, 50);
         });
         
         googleMapRef.current.addListener('idle', () => {
           if (!isDragging) {
-            console.log(`😴 ${mapMode} map idle - ready for interactions`);
             setIsMapInteracting(false);
           }
         });
@@ -1185,10 +1043,7 @@ const FullPageMap = ({
         setLoadingProgress(100);
         setHasInitialLoad(true);
 
-
-        console.log(`✅ Enhanced ${mapMode} map created successfully`);
-
-        // Close popup if clicking on map
+        // Close popup on map click
         googleMapRef.current.addListener('click', () => {
           if ((selectedCafe || selectedUser) && !isDragging) {
             handleSmoothPopupClose();
@@ -1201,8 +1056,10 @@ const FullPageMap = ({
 
         lastSearchLocationRef.current = { lat: center.lat, lng: center.lng };
 
+        console.log('✅ Airbnb-style map initialized successfully');
+
       } catch (error) {
-        console.error('❌ Failed to initialize enhanced map:', error);
+        console.error('❌ Failed to initialize map:', error);
         setMapError('Failed to initialize map: ' + error.message);
         setMapLoaded(false);
         setLoadingProgress(100);
@@ -1210,7 +1067,7 @@ const FullPageMap = ({
     };
 
     initMap();
-  }, [center.lat, center.lng]); // FIXED: Remove googleMapsReady and mapInitialized from dependencies
+  }, [center.lat, center.lng, googleMapsReady, mapInitialized, zoom, isEmbedMode, handleDragStart, handleDragEnd, handleZoomChanged, isDragging, selectedCafe, selectedUser, handleSmoothPopupClose, handleMouseMove]);
   
   // Update map center for external changes
   useEffect(() => {
@@ -1220,23 +1077,19 @@ const FullPageMap = ({
       const latDiff = Math.abs(currentCenter.lat() - center.lat);
       const lngDiff = Math.abs(currentCenter.lng() - center.lng);
       
-      // Only update if there's a significant difference (avoid micro-updates)
       if (latDiff > 0.0001 || lngDiff > 0.0001) {
-        console.log('📍 Updating map center externally');
         googleMapRef.current.setCenter(center);
       }
     }
   }, [center.lat, center.lng, mapLoaded, mapInitialized]);
 
-  // ENHANCED: User location marker
+  // User location marker
   useEffect(() => {
     if (!googleMapRef.current || !mapLoaded || !userLocation) return;
 
     if (userMarkerRef.current) {
       userMarkerRef.current.setMap(null);
     }
-
-    console.log('🎯 Creating enhanced user location marker');
 
     const userLocationSVG = `
       <svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1246,50 +1099,16 @@ const FullPageMap = ({
             <stop offset="50%" style="stop-color:#4285F4;stop-opacity:0.4" />
             <stop offset="100%" style="stop-color:#4285F4;stop-opacity:0.1" />
           </radialGradient>
-          
-          <radialGradient id="mainButton" cx="30%" cy="30%" r="70%">
-            <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.4" />
-            <stop offset="30%" style="stop-color:#4285F4;stop-opacity:1" />
-            <stop offset="100%" style="stop-color:#1557b0;stop-opacity:1" />
-            <animateTransform attributeName="gradientTransform" type="rotate" 
-                            values="0 22 22;360 22 22" dur="3s" repeatCount="indefinite"/>
-          </radialGradient>
-          
-          <radialGradient id="lightenOverlay" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.8" />
-            <stop offset="70%" style="stop-color:#87ceeb;stop-opacity:0.6" />
-            <stop offset="100%" style="stop-color:#4285F4;stop-opacity:0.2" />
-          </radialGradient>
-          
-          <filter id="buttonGlow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
-            <feMerge>
-              <feMergeNode in="coloredBlur"/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
         </defs>
         
-        <!-- Outer pulsing circle -->
         <circle cx="22" cy="22" r="20" fill="url(#outerPulse)">
           <animate attributeName="r" values="20;26;20" dur="2s" repeatCount="indefinite"/>
           <animate attributeName="opacity" values="0.6;0.2;0.6" dur="2s" repeatCount="indefinite"/>
         </circle>
         
-        <!-- Main blue button -->
-        <circle cx="22" cy="22" r="12" fill="url(#mainButton)" 
-                stroke="rgba(255,255,255,0.6)" stroke-width="2" 
-                filter="url(#buttonGlow)"/>
+        <circle cx="22" cy="22" r="12" fill="#4285F4" stroke="rgba(255,255,255,0.6)" stroke-width="2"/>
         
-        <!-- Lightening overlay -->
-        <circle cx="22" cy="22" r="12" fill="url(#lightenOverlay)">
-          <animate attributeName="opacity" values="0.3;0.8;0.3" dur="1.5s" repeatCount="indefinite"/>
-        </circle>
-        
-        <!-- Bright flash effect -->
-        <circle cx="22" cy="22" r="10" fill="#ffffff">
-          <animate attributeName="opacity" values="0;0.6;0" dur="2s" repeatCount="indefinite"/>
-        </circle>
+        <circle cx="22" cy="22" r="6" fill="white"/>
       </svg>
     `;
 
@@ -1302,133 +1121,111 @@ const FullPageMap = ({
         scaledSize: new window.google.maps.Size(44, 44),
         anchor: new window.google.maps.Point(22, 22)
       },
-      zIndex: 3000, // Highest priority
+      zIndex: 3000,
       optimized: false
     });
 
-    console.log('🎯 Enhanced user location marker created');
   }, [userLocation, mapLoaded]);
 
-  // ENHANCED: Dual marker management (places + users)
+  // AIRBNB MARKER SYSTEM: Update markers using the smooth manager
   useEffect(() => {
-    if (!googleMapRef.current || !mapLoaded || !allowDataFetching) return;
-
-
-    console.log('🗺️ ENHANCED DUAL MARKER UPDATE:', {
-      mapMode,
-      totalCafes: cafes?.length || 0,
-      totalUsers: users?.length || 0,
-      selectedType: cafeType,
-      zoomLevel,
-      isDragging,
-      isMapInteracting,
-      isSelectingPlace
-    });
+    if (!googleMapRef.current || !mapLoaded || !allowDataFetching || !markerManagerRef.current) return;
 
     currentFilterRef.current = cafeType;
 
-    // Preserve markers during interactions for stability
+    // Don't update markers during interactions to prevent flickering
     if (isDragging || isMapInteracting || isZoomingIn || isZoomingOut) {
-      console.log('🎬 STABLE: Preserving markers during interaction');
+      console.log('🔒 Preserving markers during interaction');
       return;
     }
 
-    // Clear existing markers efficiently
-    markersRef.current.forEach(marker => marker.setMap(null));
-    markersRef.current.clear();
-    
-    userMarkersRef.current.forEach(marker => marker.setMap(null));
-    userMarkersRef.current.clear();
-    
-    activeMarkersRef.current.clear();
+    console.log('🎯 Updating markers with Airbnb system');
 
     if (mapMode === 'places' && cafes && cafes.length > 0) {
-      // PLACES MODE: Create place markers
       const validCafes = cafes.filter(cafeItem => {
         return cafeItem.location && cafeItem.location.latitude && cafeItem.location.longitude;
       });
 
-      console.log(`🏪 Creating ${validCafes.length} enhanced place markers`);
-
-      validCafes.forEach((cafe, index) => {
-        const position = {
-          lat: cafe.location.latitude,
-          lng: cafe.location.longitude
-        };
-
-        const cafeId = cafe.id || cafe.googlePlaceId;
-        const isHovered = !isDragging && !isMapInteracting && hoveredMarker === cafeId;
-        const isSearchMarker = cafe.source === 'search' || cafe.isSearchResult;
+      // Use Airbnb's smooth marker manager
+      markerManagerRef.current.updateMarkers(validCafes, 'places', currentFilterRef.current);
+      
+      // Add event listeners for interaction
+      validCafes.forEach(cafe => {
+        const markerId = cafe.id || cafe.googlePlaceId;
+        const markerInfo = markerManagerRef.current.activeMarkers.get(markerId);
         
-        const markerSVG = createEnhancedDarkMapMarker(cafe, index, currentFilterRef.current, isHovered, isSearchMarker);
-        const popularityScore = calculatePopularityScore(cafe);
-        const markerSize = getMarkerSizeFromPopularity(popularityScore, zoomLevel);
-        const totalSize = markerSize + (isHovered ? 80 : 24);
-        
-        const marker = new window.google.maps.Marker({
-          position: position,
-          map: googleMapRef.current,
-          title: `${isSearchMarker ? '🔍 ' : ''}${cafe.emoji || (currentFilterRef.current === 'restaurant' ? '🍽️' : '☕')} ${cafe.name}`,
-          icon: {
-            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(markerSVG),
-            scaledSize: new window.google.maps.Size(totalSize, totalSize),
-            anchor: new window.google.maps.Point(totalSize / 2, totalSize / 2)
-          },
-          zIndex: isSearchMarker ? 5000 : Math.round(popularityScore * 1000) + 100,
-          optimized: true,
-          visible: true
-        });
-
-        marker.addListener('click', () => {
-          console.log('📍 Marker clicked:', cafe.name, 'isSelectingPlace:', isSelectingPlace);
+        if (markerInfo && markerInfo.marker) {
+          const marker = markerInfo.marker;
           
-          // ALWAYS SHOW POPUP FIRST - even in selection mode
-          // The CafePopup will show a "Select this place" button when isLocationSelecting = true
-          console.log('📍 Showing popup for place info (selection mode aware)');
-          handleSmoothMarkerClick(cafe);
-        });
+          // Remove existing listeners to prevent duplicates
+          window.google.maps.event.clearListeners(marker, 'click');
+          window.google.maps.event.clearListeners(marker, 'mouseover');
+          window.google.maps.event.clearListeners(marker, 'mouseout');
+          
+          // Add new listeners
+          marker.addListener('click', () => {
+            handleSmoothMarkerClick(cafe);
+          });
 
-        marker.addListener('mouseover', () => {
-          handleMarkerHover(cafe, true, 'cafe');
-        });
+          marker.addListener('mouseover', () => {
+            handleMarkerHover(cafe, true, 'cafe');
+          });
 
-        marker.addListener('mouseout', () => {
-          handleMarkerHover(cafe, false, 'cafe');
-        });
-
-        markersRef.current.set(cafeId, marker);
-        activeMarkersRef.current.add(cafeId);
+          marker.addListener('mouseout', () => {
+            handleMarkerHover(cafe, false, 'cafe');
+          });
+        }
       });
-
-      console.log(`✅ Created ${validCafes.length} enhanced place markers`);
-      console.log('🔍 MARKER DEBUG - mapMode:', mapMode, 'users:', users?.length, 'mapLoaded:', mapLoaded);
 
     } else if (mapMode === 'people' && users && users.length > 0) {
-      // PEOPLE MODE: Create user markers
-      console.log(`👥 Creating ${users.length} enhanced user markers`);
-
-      users.forEach(user => {
-        if (!user.latitude || !user.longitude) {
-          console.warn('⚠️ User missing location:', user.firstName);
-          return;
-        }
-
-        const marker = createUserMarker(user);
-        if (marker) {
-          const userId = user.userId || user.id;
-          userMarkersRef.current.set(userId, marker);
-          activeMarkersRef.current.add(userId);
-        }
+      const activeUsers = users.filter(user => {
+        return user.latitude && user.longitude;
       });
 
-      console.log(`✅ Created ${userMarkersRef.current.size} enhanced user markers`);
+      // Use Airbnb's smooth marker manager
+      markerManagerRef.current.updateMarkers(activeUsers, 'people', currentFilterRef.current);
+      
+      // Add event listeners for interaction
+      activeUsers.forEach(user => {
+        const markerId = user.userId || user.id;
+        const markerInfo = markerManagerRef.current.activeMarkers.get(markerId);
+        
+        if (markerInfo && markerInfo.marker) {
+          const marker = markerInfo.marker;
+          
+          // Remove existing listeners to prevent duplicates
+          window.google.maps.event.clearListeners(marker, 'click');
+          window.google.maps.event.clearListeners(marker, 'mouseover');
+          window.google.maps.event.clearListeners(marker, 'mouseout');
+          
+          // Add new listeners
+          marker.addListener('click', () => {
+            handleSmoothMarkerClick(user);
+          });
+
+          marker.addListener('mouseover', () => {
+            handleMarkerHover(user, true, 'user');
+          });
+
+          marker.addListener('mouseout', () => {
+            handleMarkerHover(user, false, 'user');
+          });
+        }
+      });
     }
 
-    console.log(`🎉 ENHANCED DUAL MARKER UPDATE completed - Mode: ${mapMode}`);
+  }, [cafes, users, mapMode, cafeType, mapLoaded, allowDataFetching, isDragging, isMapInteracting, isZoomingIn, isZoomingOut, handleSmoothMarkerClick, handleMarkerHover]);
 
-  }, [cafes, users, mapMode, cafeType, mapLoaded, handleSmoothMarkerClick, handleMarkerHover, createUserMarker, isSelectingPlace, onCafeSelect]);
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (markerManagerRef.current) {
+        markerManagerRef.current.destroy();
+      }
+    };
+  }, []);
 
-  // ENHANCED: Smooth loading animations
+  // Loading animations
   const SmoothLoader = ({ isVisible, message = "Loading..." }) => (
     <div 
       className={`smooth-loader ${isVisible ? 'visible' : 'hidden'}`}
@@ -1467,7 +1264,7 @@ const FullPageMap = ({
     </div>
   );
 
-  // ENHANCED: CSS for smooth animations
+  // Enhanced CSS for smooth animations
   const enhancedStyles = `
     @keyframes smoothSpin {
       0% { transform: rotate(0deg); }
@@ -1521,43 +1318,6 @@ const FullPageMap = ({
       border: 1px solid rgba(255, 255, 255, 0.1);
     }
     
-    .selecting-place-indicator {
-      position: absolute;
-      top: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: linear-gradient(135deg, #10B981, #059669);
-      color: white;
-      padding: 18px 28px;
-      border-radius: 18px;
-      box-shadow: 0 10px 40px rgba(16, 185, 129, 0.4);
-      z-index: 1000;
-      animation: pulseIndicator 2s infinite;
-      backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-    }
-    
-    .selecting-place-content {
-      text-align: center;
-    }
-    
-    .selecting-place-content span {
-      display: block;
-      font-weight: 600;
-      font-size: 16px;
-      margin-bottom: 4px;
-    }
-    
-    .selecting-place-content small {
-      font-size: 13px;
-      opacity: 0.9;
-    }
-    
-    @keyframes pulseIndicator {
-      0%, 100% { transform: translateX(-50%) scale(1); }
-      50% { transform: translateX(-50%) scale(1.05); }
-    }
-    
     .map-error-toast {
       position: absolute;
       bottom: 20px;
@@ -1608,7 +1368,7 @@ const FullPageMap = ({
   }
 
   return (
-    <div className="full-page-map dark-map-theme">
+    <div className="full-page-map dark-map-theme airbnb-optimized">
       <style>{enhancedStyles}</style>
       
       {/* Enhanced Zoom Indicator */}
@@ -1616,17 +1376,17 @@ const FullPageMap = ({
         {isZoomingIn ? `🔍 Zoom In (${mapMode})` : isZoomingOut ? `🔍 Zoom Out (${mapMode})` : ''}
       </div>
       
-      {/* Enhanced Loading Indicators */}
+      {/* Optimized Loading Indicators */}
       <SmoothLoader 
         isVisible={isRefreshing && !error} 
-        message={mapMode === 'people' ? "🔄 Updating users..." : "🔄 Updating places..."} 
+        message={mapMode === 'people' ? "🔄 Finding users..." : "🔄 Finding places..."} 
       />
 
-      {/* Initial Loading Screen - SIMPLIFIED */}
+      {/* Initial Loading Screen */}
       {(!hasInitialLoad && (!mapLoaded || !googleMapsReady || loading)) && (
         <LoadingScreen 
-          message={mapMode === 'people' ? "Loading users..." : "Loading enhanced map..."}
-          subMessage={mapMode === 'people' ? "Searching for people nearby" : "Preparing smooth interactions"}
+          message="Loading Airbnb-style map..."
+          subMessage="Initializing smooth marker system"
           progress={loadingProgress}
         />
       )}
@@ -1701,19 +1461,11 @@ const FullPageMap = ({
           userLocation={userLocation}
           isLocationSelecting={isSelectingPlace}
           onLocationSelect={(cafe) => {
-            console.log('🎯 FullPageMap: Location selected from popup:', cafe?.name);
-            console.log('🔍 isSelectingPlace:', isSelectingPlace);
-            
-            if (isSelectingPlace) {
-              console.log('✅ Calling handlePlaceClick from popup');
-              if (window.handlePlaceClickFromPopup) {
-                window.handlePlaceClickFromPopup(cafe);
-              }
+            if (isSelectingPlace && window.handlePlaceClickFromPopup) {
+              window.handlePlaceClickFromPopup(cafe);
             }
           }}
           onInviteHere={(cafe) => {
-            console.log('🎉 FullPageMap: Invite someone here for:', cafe?.name);
-            // Call the parent component's handler
             if (window.handleInviteHereFromPopup) {
               window.handleInviteHereFromPopup(cafe);
             }
@@ -1721,7 +1473,7 @@ const FullPageMap = ({
         />
       )}
 
-      {/* Enhanced Hover Tooltip - Supports both users and places */}
+      {/* Enhanced Hover Tooltip */}
       <MarkerHoverTooltip
         cafe={hoveredCafe}
         user={hoveredUser}
@@ -1737,7 +1489,7 @@ const FullPageMap = ({
       {error && (
         <div className="map-error-toast dark-theme">
           <span>❌ {error.message || 'Error loading data'}</span>
-          <button onClick={handleSmoothSearch}>Retry</button>
+          <button onClick={() => window.location.reload()}>Retry</button>
         </div>
       )}
     </div>
