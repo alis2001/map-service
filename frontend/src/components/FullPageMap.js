@@ -38,7 +38,8 @@ const FullPageMap = ({
   qualityText,
   sourceText,
   mapMode, // 'people' | 'places'
-  isSelectingPlace // Place selection mode for invitations
+  isSelectingPlace, // Place selection mode for invitations
+  allowDataFetching, // NEW: Whether data fetching is allowed
 }) => {
 
   const mapRef = useRef(null);
@@ -49,6 +50,7 @@ const FullPageMap = ({
   const radiusCircleRef = useRef(null);
   const activeMarkersRef = useRef(new Set());
   const infoWindowRef = useRef(null);
+  
   
   // Core map states
   const [mapLoaded, setMapLoaded] = useState(false);
@@ -1191,6 +1193,7 @@ const FullPageMap = ({
         setLoadingProgress(100);
         setHasInitialLoad(true);
 
+
         console.log(`✅ Enhanced ${mapMode} map created successfully`);
 
         // Close popup if clicking on map
@@ -1316,7 +1319,8 @@ const FullPageMap = ({
 
   // ENHANCED: Dual marker management (places + users)
   useEffect(() => {
-    if (!googleMapRef.current || !mapLoaded) return;
+    if (!googleMapRef.current || !mapLoaded || !allowDataFetching) return;
+
 
     console.log('🗺️ ENHANCED DUAL MARKER UPDATE:', {
       mapMode,
@@ -1625,7 +1629,7 @@ const FullPageMap = ({
         message={mapMode === 'people' ? "🔄 Updating users..." : "🔄 Updating places..."} 
       />
 
-      {/* Initial Loading Screen */}
+      {/* Initial Loading Screen - SIMPLIFIED */}
       {(!hasInitialLoad && (!mapLoaded || !googleMapsReady || loading)) && (
         <LoadingScreen 
           message={mapMode === 'people' ? "Loading users..." : "Loading enhanced map..."}
