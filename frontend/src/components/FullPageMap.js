@@ -280,7 +280,7 @@ class AirbnbFrameRenderer {
   }
 }
 
-// AIRBNB'S SMOOTH MARKER MANAGER
+// ENHANCED AIRBNB'S SMOOTH MARKER MANAGER WITH MODE SWITCHING FIX
 class AirbnbSmoothMarkerManager {
   constructor(map) {
     this.map = map;
@@ -290,11 +290,41 @@ class AirbnbSmoothMarkerManager {
     this.activeMarkers = new Map();
     this.markerElements = new Map();
     this.transitioningMarkers = new Set();
+    this.currentMode = null; // Track current mode
     
     console.log('🎯 Airbnb Smooth Marker Manager initialized');
   }
 
+  // FIX: Force clear all markers when switching modes
+  forceClearAllMarkers() {
+    console.log('🧹 Force clearing all markers for mode switch');
+    
+    // Clear all active markers immediately
+    this.activeMarkers.forEach((markerInfo, id) => {
+      if (markerInfo.marker) {
+        markerInfo.marker.setVisible(false);
+        markerInfo.marker.setMap(null);
+      }
+    });
+    
+    // Clear all data structures
+    this.activeMarkers.clear();
+    this.transitioningMarkers.clear();
+    
+    // Clear the marker pool
+    this.markerPool.clearPool();
+    
+    console.log('✅ All markers force cleared');
+  }
+
   updateMarkers(newMarkers, mapMode, currentFilter) {
+    // FIX: Force clear when mode changes
+    if (this.currentMode && this.currentMode !== mapMode) {
+      console.log(`🔄 Mode changed from ${this.currentMode} to ${mapMode} - force clearing`);
+      this.forceClearAllMarkers();
+    }
+    this.currentMode = mapMode;
+
     // Use frame-based rendering for smooth updates
     this.frameRenderer.scheduleUpdate(() => {
       this.performMarkerUpdate(newMarkers, mapMode, currentFilter);
@@ -303,11 +333,11 @@ class AirbnbSmoothMarkerManager {
 
   performMarkerUpdate(newMarkers, mapMode, currentFilter) {
     // Step 1: Cull markers outside viewport
-    const visibleMarkers = this.viewportCuller.cullMarkers(newMarkers);
+    const visibleMarkers = this.viewportCuller.cullMarkers(newMarkers || []);
     
     // Step 2: Create sets for comparison
     const newMarkerIds = new Set(
-      visibleMarkers.map(m => m.id || m.googlePlaceId || m.userId)
+      visibleMarkers.map(m => m.id || m.googlePlaceId || m.userId).filter(Boolean)
     );
     const currentMarkerIds = new Set(this.activeMarkers.keys());
     
@@ -320,7 +350,10 @@ class AirbnbSmoothMarkerManager {
     
     // Step 4: Add or update markers
     visibleMarkers.forEach((markerData, index) => {
+      if (!markerData) return;
+      
       const id = markerData.id || markerData.googlePlaceId || markerData.userId;
+      if (!id) return;
       
       if (this.activeMarkers.has(id)) {
         this.updateExistingMarker(id, markerData, index, currentFilter);
@@ -328,31 +361,41 @@ class AirbnbSmoothMarkerManager {
         this.addMarkerSmoothly(id, markerData, index, mapMode, currentFilter);
       }
     });
+
+    console.log(`🎯 Updated markers: ${visibleMarkers.length} visible, ${this.activeMarkers.size} active, mode: ${mapMode}`);
   }
 
   addMarkerSmoothly(id, markerData, index, mapMode, currentFilter) {
-    if (this.transitioningMarkers.has(id)) return; // Already transitioning
+    if (this.transitioningMarkers.has(id)) return;
     
     this.transitioningMarkers.add(id);
     
     // Get marker from pool
     const marker = this.markerPool.getMarker(id, mapMode);
+    if (!marker) {
+      this.transitioningMarkers.delete(id);
+      return;
+    }
     
-    // Set position and basic properties
+    // Set position
     const position = mapMode === 'people' 
       ? { lat: markerData.latitude, lng: markerData.longitude }
       : { lat: markerData.location.latitude, lng: markerData.location.longitude };
     
+    if (!position.lat || !position.lng) {
+      this.markerPool.releaseMarker(id);
+      this.transitioningMarkers.delete(id);
+      return;
+    }
+    
     marker.setPosition(position);
     
-    // Create appropriate icon
+    // Create appropriate icon with enhanced styling
     const icon = this.createMarkerIcon(markerData, index, mapMode, currentFilter);
-    marker.setIcon(icon);
+    if (icon) marker.setIcon(icon);
     
-    // Start invisible and fade in
+    // Smooth fade in
     marker.setVisible(false);
-    
-    // Smooth fade in using requestAnimationFrame
     this.frameRenderer.scheduleUpdate(() => {
       marker.setVisible(true);
       this.fadeInMarker(marker, () => {
@@ -363,7 +406,7 @@ class AirbnbSmoothMarkerManager {
     // Store reference
     this.activeMarkers.set(id, { marker, data: markerData });
     
-    console.log(`➕ Added marker ${id} smoothly`);
+    console.log(`➕ Added ${mapMode} marker ${id} smoothly`);
   }
 
   removeMarkerSmoothly(id) {
@@ -372,7 +415,7 @@ class AirbnbSmoothMarkerManager {
     
     this.transitioningMarkers.add(id);
     
-    // Smooth fade out using the pool's method
+    // Smooth fade out
     this.markerPool.releaseMarker(id);
     this.activeMarkers.delete(id);
     
@@ -389,16 +432,16 @@ class AirbnbSmoothMarkerManager {
     
     const { marker } = markerInfo;
     
-    // Update icon if needed (for hover states, etc.)
+    // Update icon with enhanced styling
     const newIcon = this.createMarkerIcon(markerData, index, 
       markerData.firstName ? 'people' : 'places', currentFilter);
     
-    // Smooth icon transition
-    this.frameRenderer.scheduleUpdate(() => {
-      marker.setIcon(newIcon);
-    });
+    if (newIcon) {
+      this.frameRenderer.scheduleUpdate(() => {
+        marker.setIcon(newIcon);
+      });
+    }
     
-    // Update stored data
     markerInfo.data = markerData;
   }
 
@@ -412,16 +455,6 @@ class AirbnbSmoothMarkerManager {
         return;
       }
       
-      // Apply smooth opacity transition
-      const icon = marker.getIcon();
-      if (icon) {
-        const newIcon = {
-          ...icon,
-          opacity: opacity
-        };
-        marker.setIcon(newIcon);
-      }
-      
       requestAnimationFrame(fadeStep);
     };
     
@@ -430,57 +463,176 @@ class AirbnbSmoothMarkerManager {
 
   createMarkerIcon(markerData, index, mapMode, currentFilter) {
     if (mapMode === 'people') {
-      return this.createUserMarkerIcon(markerData);
+      return this.createEnhancedUserMarkerIcon(markerData);
     } else {
       return this.createPlaceMarkerIcon(markerData, index, currentFilter);
     }
   }
 
-  createUserMarkerIcon(user) {
+  // ENHANCED: Emotional people markers with same impact as places
+  createEnhancedUserMarkerIcon(user) {
     const getStatusColor = () => {
       if (!user.isLive) return '#6b7280';
       
       const timeDiff = new Date() - new Date(user.lastSeen);
       const minutesAgo = Math.floor(timeDiff / (1000 * 60));
       
-      if (minutesAgo < 2) return '#10b981';
-      if (minutesAgo < 5) return '#22c55e';
-      if (minutesAgo < 15) return '#eab308';
-      if (minutesAgo < 30) return '#f59e0b';
-      return '#6b7280';
+      if (minutesAgo < 2) return '#10b981'; // Very active - bright green
+      if (minutesAgo < 5) return '#22c55e';  // Active - green
+      if (minutesAgo < 15) return '#eab308'; // Recently active - yellow
+      if (minutesAgo < 30) return '#f59e0b'; // Less active - orange
+      return '#6b7280'; // Inactive - gray
+    };
+
+    const getActivityLevel = () => {
+      if (!user.isLive) return 0;
+      const timeDiff = new Date() - new Date(user.lastSeen);
+      const minutesAgo = Math.floor(timeDiff / (1000 * 60));
+      
+      if (minutesAgo < 2) return 5;  // Very active
+      if (minutesAgo < 5) return 4;  // Active  
+      if (minutesAgo < 15) return 3; // Recently active
+      if (minutesAgo < 30) return 2; // Less active
+      return 1; // Inactive
     };
 
     const statusColor = getStatusColor();
-    const markerSize = 28;
-    const totalSize = markerSize + 12;
+    const activityLevel = getActivityLevel();
+    const baseSize = 32; // Increased base size
+    const markerSize = baseSize + (activityLevel * 4); // Dynamic sizing based on activity
+    const totalSize = markerSize + 16;
+    const userId = user.userId || user.id || 'unknown';
 
+    // Enhanced gradient based on activity and mood
+    const getPersonalityGradient = () => {
+      // Base personality colors
+      if (user.interests?.includes('coffee') || user.bio?.toLowerCase().includes('coffee')) {
+        return {
+          primary: '#8B4513',   // Coffee brown
+          secondary: '#D2691E', // Sandy brown
+          accent: '#CD853F'     // Peru
+        };
+      }
+      if (user.interests?.includes('travel') || user.bio?.toLowerCase().includes('travel')) {
+        return {
+          primary: '#4169E1',   // Royal blue
+          secondary: '#87CEEB', // Sky blue  
+          accent: '#6495ED'     // Cornflower blue
+        };
+      }
+      if (user.interests?.includes('food') || user.bio?.toLowerCase().includes('food')) {
+        return {
+          primary: '#FF6347',   // Tomato
+          secondary: '#FFA07A', // Light salmon
+          accent: '#FF7F50'     // Coral
+        };
+      }
+      
+      // Default warm gradient
+      return {
+        primary: '#a855f7',   // Purple
+        secondary: '#7c3aed', // Darker purple
+        accent: '#c084fc'     // Light purple
+      };
+    };
+
+    const colors = getPersonalityGradient();
+    
+    // Enhanced SVG with emotional depth
     const userMarkerSVG = `
       <svg width="${totalSize}" height="${totalSize}" viewBox="0 0 ${totalSize} ${totalSize}" xmlns="http://www.w3.org/2000/svg">
         <defs>
-          <radialGradient id="purpleGrad${user.userId || user.id}" cx="30%" cy="30%" r="70%">
-            <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.8" />
-            <stop offset="30%" style="stop-color:#a855f7;stop-opacity:0.9" />
-            <stop offset="100%" style="stop-color:#7c3aed;stop-opacity:1" />
+          <!-- Enhanced gradient with personality -->
+          <radialGradient id="personalityGrad${userId}" cx="30%" cy="30%" r="70%">
+            <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.9" />
+            <stop offset="25%" style="stop-color:${colors.accent};stop-opacity:0.8" />
+            <stop offset="60%" style="stop-color:${colors.primary};stop-opacity:0.9" />
+            <stop offset="100%" style="stop-color:${colors.secondary};stop-opacity:1" />
           </radialGradient>
+          
+          <!-- Activity ring gradient -->
+          <radialGradient id="activityRing${userId}" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" style="stop-color:${statusColor};stop-opacity:0.6" />
+            <stop offset="70%" style="stop-color:${statusColor};stop-opacity:0.3" />
+            <stop offset="100%" style="stop-color:${statusColor};stop-opacity:0.1" />
+          </radialGradient>
+          
+          <!-- Shadow filter for depth -->
+          <filter id="shadow${userId}" x="-50%" y="-50%" width="200%" height="200%">
+            <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.3)"/>
+          </filter>
         </defs>
         
-        <circle cx="${totalSize / 2}" cy="${totalSize / 2}" r="${markerSize / 2 + 2}" 
-                fill="none" stroke="#a855f7" stroke-width="2" opacity="0.6"/>
-        
-        <circle cx="${totalSize / 2}" cy="${totalSize / 2}" r="${markerSize / 2}" 
-                fill="url(#purpleGrad${user.userId || user.id})" stroke="#7c3aed" stroke-width="2"/>
-        
-        <path d="M${totalSize / 2 - 4} ${totalSize / 2 - 6} L${totalSize / 2 + 1} ${totalSize / 2 - 1} L${totalSize / 2 - 2} ${totalSize / 2 - 1} L${totalSize / 2 + 4} ${totalSize / 2 + 6} L${totalSize / 2 - 1} ${totalSize / 2 + 1} L${totalSize / 2 + 2} ${totalSize / 2 + 1} Z" 
-              fill="#fbbf24" stroke="#ffffff" stroke-width="0.5"/>
-        
-        ${user.isLive && statusColor === '#10b981' ? `
-          <circle cx="${totalSize / 2}" cy="${totalSize / 2}" r="${markerSize / 2 + 6}" 
-                  fill="none" stroke="#a855f7" stroke-width="2" opacity="0.4">
-            <animate attributeName="r" values="${markerSize / 2 + 6};${markerSize / 2 + 12};${markerSize / 2 + 6}" 
-                    dur="2s" repeatCount="indefinite"/>
-            <animate attributeName="opacity" values="0.4;0.1;0.4" dur="2s" repeatCount="indefinite"/>
+        <!-- Outer activity ring with pulsing animation for very active users -->
+        ${activityLevel >= 4 ? `
+          <circle cx="${totalSize / 2}" cy="${totalSize / 2}" r="${markerSize / 2 + 8}" 
+                  fill="url(#activityRing${userId})" opacity="0.7">
+            <animate attributeName="r" 
+                     values="${markerSize / 2 + 8};${markerSize / 2 + 14};${markerSize / 2 + 8}" 
+                     dur="${activityLevel === 5 ? '1.5s' : '2.5s'}" 
+                     repeatCount="indefinite"/>
+            <animate attributeName="opacity" 
+                     values="0.7;0.2;0.7" 
+                     dur="${activityLevel === 5 ? '1.5s' : '2.5s'}" 
+                     repeatCount="indefinite"/>
           </circle>
         ` : ''}
+        
+        <!-- Subtle outer ring for presence -->
+        <circle cx="${totalSize / 2}" cy="${totalSize / 2}" r="${markerSize / 2 + 3}" 
+                fill="none" stroke="${colors.primary}" stroke-width="2" opacity="0.5"/>
+        
+        <!-- Main avatar circle with personality gradient -->
+        <circle cx="${totalSize / 2}" cy="${totalSize / 2}" r="${markerSize / 2}" 
+                fill="url(#personalityGrad${userId})" 
+                stroke="${colors.secondary}" 
+                stroke-width="3"
+                filter="url(#shadow${userId})"/>
+        
+        <!-- User avatar/initial area -->
+        <circle cx="${totalSize / 2}" cy="${totalSize / 2}" r="${markerSize / 2 - 6}" 
+                fill="rgba(255,255,255,0.9)" 
+                stroke="none"/>
+        
+        <!-- User initial or emoji -->
+        <text x="${totalSize / 2}" y="${totalSize / 2 + 4}" 
+              text-anchor="middle" 
+              font-size="${Math.max(12, markerSize * 0.3)}" 
+              font-weight="600"
+              fill="${colors.secondary}"
+              font-family="system-ui, -apple-system, sans-serif">
+          ${user.firstName ? user.firstName.charAt(0).toUpperCase() : '👤'}
+        </text>
+        
+        <!-- Status indicator dot -->
+        <circle cx="${totalSize / 2 + markerSize / 2 - 3}" cy="${totalSize / 2 - markerSize / 2 + 3}" 
+                r="4" 
+                fill="${statusColor}" 
+                stroke="white" 
+                stroke-width="2">
+          ${activityLevel >= 4 ? `
+            <animate attributeName="r" 
+                     values="4;6;4" 
+                     dur="2s" 
+                     repeatCount="indefinite"/>
+          ` : ''}
+        </circle>
+        
+        <!-- Coffee interest indicator -->
+        ${user.interests?.includes('coffee') || user.bio?.toLowerCase().includes('coffee') ? `
+          <text x="${totalSize / 2 - markerSize / 2 + 3}" y="${totalSize / 2 + markerSize / 2 - 3}" 
+                text-anchor="middle" 
+                font-size="8" 
+                fill="#8B4513">☕</text>
+        ` : ''}
+        
+        <!-- Activity level indicator (small dots) -->
+        ${Array.from({length: activityLevel}, (_, i) => `
+          <circle cx="${totalSize / 2 - 8 + i * 3}" cy="${totalSize / 2 + markerSize / 2 + 6}" 
+                  r="1.5" 
+                  fill="${statusColor}" 
+                  opacity="0.8"/>
+        `).join('')}
       </svg>
     `;
 
